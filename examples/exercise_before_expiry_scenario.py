@@ -19,17 +19,13 @@ from projections.projection_state import (
 )
 from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs
+from loaders.profile_loader import ProfileLoader
 
 
 def load_user_profile():
-    """Load real user profile data."""
-    profile_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'data', 'user_profile.json'
-    )
-
-    with open(profile_path, 'r') as f:
-        return json.load(f)
+    """Load user profile with secure fallback to demo data."""
+    loader = ProfileLoader()
+    return loader.load_profile(verbose=True)
 
 
 def create_user_profile_object(profile_data):

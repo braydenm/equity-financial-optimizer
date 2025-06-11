@@ -17,17 +17,13 @@ from projections.projection_state import UserProfile
 from engine.natural_evolution_generator import generate_natural_evolution_from_profile_data
 from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs
+from loaders.profile_loader import ProfileLoader
 
 
 def load_user_profile():
-    """Load real user profile data."""
-    profile_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'data', 'user_profile.json'
-    )
-
-    with open(profile_path, 'r') as f:
-        return json.load(f)
+    """Load user profile with secure fallback to demo data."""
+    loader = ProfileLoader()
+    return loader.load_profile(verbose=True)
 
 
 def create_user_profile_object(profile_data):
@@ -119,7 +115,7 @@ def main():
 
     # Load real user profile data
     print("Loading user profile data...")
-    profile_data = load_user_profile()
+    profile_data, is_real_data = load_user_profile()
     user_profile = create_user_profile_object(profile_data)
 
     print(f"✅ Profile loaded: {user_profile.filing_status}")

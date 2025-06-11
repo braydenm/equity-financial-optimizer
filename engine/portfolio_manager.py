@@ -18,6 +18,7 @@ from projections.projection_state import (
     ProjectionPlan, PlannedAction, ShareLot, UserProfile,
     ShareType, LifecycleState, TaxTreatment, ActionType
 )
+from loaders.profile_loader import ProfileLoader
 from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs, create_comparison_csv
 from loaders.scenario_loader import ScenarioLoader
@@ -99,15 +100,15 @@ class PortfolioManager:
     def __init__(self):
         self.csv_loader = CSVLoader()
         self.price_projector = PriceProjector()
+        self.profile_loader = ProfileLoader()
         self._user_profile = None
         self._initial_lots = None
 
     def load_user_data(self, profile_path: str = "data/user_profile.json",
                       equity_timeline_path: str = "output/working/equity_position_timeline/equity_position_timeline.csv"):
-        """Load user profile and initial equity position."""
-        # Load user profile
-        with open(profile_path, 'r') as f:
-            profile_data = json.load(f)
+        """Load user profile and initial equity position with secure fallback to demo data."""
+        # Load user profile with secure fallback
+        profile_data, is_real_data = self.profile_loader.load_profile(verbose=True)
 
         # Create UserProfile
         personal = profile_data['personal_information']

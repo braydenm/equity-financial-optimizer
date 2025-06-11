@@ -15,6 +15,45 @@ python3 examples/portfolio_analysis.py scenario scenarios/exercise_all_vested --
 python3 examples/portfolio_analysis.py portfolio portfolios/tax_strategies.json
 ```
 
+## 🔐 Secure Profile Setup
+
+The system uses a secure three-file pattern for handling sensitive financial data:
+
+### Files Explained
+- **`user_profile.json`** ⚠️ **SENSITIVE** - Your real financial data (git-ignored, never committed)
+- **`demo_profile.json`** 🧪 **SAFE** - Example data for demos and testing  
+- **`user_profile_template.json`** 📋 **TEMPLATE** - Copy this to create your profile
+
+### Getting Started with Your Data
+
+**Option 1: Use Demo Data (Safe)**
+```bash
+# Just run - system automatically uses demo data
+python3 examples/portfolio_analysis.py demo
+```
+
+**Option 2: Use Your Real Data**
+```bash
+# 1. Copy template to create your private profile
+cp data/user_profile_template.json data/user_profile.json
+
+# 2. Edit user_profile.json with your real financial information
+# (This file is git-ignored and stays private)
+
+# 3. Run scenarios - system automatically detects and uses your data
+python3 examples/portfolio_analysis.py demo
+```
+
+### Security Features
+✅ **Private data isolation**: `user_profile.json` is git-ignored  
+✅ **Automatic fallback**: Uses demo data when real profile unavailable  
+✅ **Clear messaging**: System tells you which data source it's using  
+✅ **No accidental commits**: Sensitive data never enters version control  
+
+The system will automatically detect which profile to use and inform you:
+- 🔒 "Using personal financial data" = Your real data
+- 🧪 "Using demo financial data" = Safe example data
+
 ## 🎯 Data-Driven Scenario Planning
 
 Create scenarios by defining actions in simple CSV files:
