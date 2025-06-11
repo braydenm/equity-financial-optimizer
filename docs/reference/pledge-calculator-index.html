@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pledge Taxes Calculator</title>
+    <meta property="og:title" content="Pledge taxes calculator" />
+    <meta property="og:description" content="Sell vs donate, exercise vs wait, ISO vs NSO, and tax implications in one simplified chart." />
+    <meta property="og:image" content="https://pledge-calculator.onrender.com/screenshot.png" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="donation-calculator-favicon.svg">
+    <style>
+      .formula {
+        font-size: 0.8em;
+        color: #666;
+        margin-bottom: 4px;
+      }
+      .value {
+        font-weight: 500;
+        color: #333;
+        padding-left: 8px;
+      }
+      .multiplier-table {
+        font-size: 0.85rem;
+        margin-bottom: 16px;
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 600px;
+      }
+      .multiplier-cell-left {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        width: 40%;
+      }
+      .multiplier-cell-right {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        width: 60%;
+      }
+      .multiplier-header {
+        padding: 10px 8px;
+        border: 1px solid #ddd;
+        background-color: #f0f0f0;
+        text-align: left;
+        font-weight: 600;
+      }
+      .multiplier-header-left {
+        width: 40%;
+      }
+      .multiplier-header-right {
+        width: 60%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="App">
+        <h1>Pledge Taxes Calculator</h1>
+
+        <div style="margin-bottom: 30px;">
+          <!-- Tax Rates Section -->
+          <h2>Tax Rates</h2>
+
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Income tax</label>
+              <div class="description">
+                Also, short term capital gains tax <a href="#footnotes" >[1]</a>.
+                If you're calculating this at home, remember to include payroll taxes for income, and NIIT for capital gains.
+                <br> Includes both federal and state (California).
+              </div>
+            </div>
+            <div class="input-group">
+              <input
+                type="text"
+                id="incomeTaxRate"
+                value="50"
+              />
+              <span style="margin-left: 5px;">%</span>
+            </div>
+          </div>
+
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Long term capital gains tax (ltcg)</label>
+              <div class="description">
+                Remember to include NIIT. Include both federal and state.
+              </div>
+            </div>
+            <div class="input-group">
+              <input
+                type="text"
+                id="ltcgRate"
+                value="35"
+              />
+              <span style="margin-left: 5px;">%</span>
+            </div>
+          </div>
+
+          <!-- Stock Prices Section -->
+          <h2>Stock Prices</h2>
+
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Strike price</label>
+              <div class="description">
+                The 409a valuation at the time your grant was issued.
+              </div>
+            </div>
+            <div class="input-group">
+              <span style="margin-right: 5px;">$</span>
+              <input
+                type="text"
+                id="strikePrice"
+                value="10"
+              />
+            </div>
+          </div>
+
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Exercise price</label>
+              <div class="description">
+                The 409a valuation at the time of exercise (which is at least 1 year after your grant started).
+              </div>
+            </div>
+            <div class="input-group">
+              <span style="margin-right: 5px;">$</span>
+              <input
+                type="text"
+                id="exercisePrice"
+                value="20"
+              />
+            </div>
+          </div>
+
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Sale price</label>
+              <div class="description">
+                The 409a valuation at the time of the liquidity event.
+              </div>
+            </div>
+            <div class="input-group">
+              <span style="margin-right: 5px;">$</span>
+              <input
+                type="text"
+                id="salePrice"
+                value="60"
+              />
+            </div>
+          </div>
+
+          <!-- Warning Section -->
+          <div id="price-warning"></div>
+
+          <!-- Results Section -->
+          <h2>Calculated Results</h2>
+          <div id="results" style="margin-bottom: 30px;">
+            Calculating...
+          </div>
+        </div>
+
+        <hr>
+
+        <!-- Options Comparison Table -->
+        <div style="margin-bottom: 30px;">
+          <h2>Stock Options: Compare Your Options</h2>
+
+          <div class="field-container" style="margin-bottom: 20px;">
+            <div class="label-container">
+              <label style="font-weight: 500;">Match</label>
+            </div>
+            <div class="input-group" style="display: flex; gap: 15px; width: auto;">
+              <label style="display: flex; align-items: center; gap: 4px;">
+                <input type="radio" name="match" value="none" checked> None
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px;">
+                <input type="radio" name="match" value="1:1"> 1:1
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px;">
+                <input type="radio" name="match" value="3:1"> 3:1
+              </label>
+            </div>
+          </div>
+
+          <div class="grid-table-container">
+            <div class="grid-table">
+              <!-- Table Header -->
+              <div class="grid-header">Option type</div>
+              <div class="grid-header">Holding period</div>
+              <div class="grid-header">Disposal Method</div>
+              <div class="grid-header">Government gets</div>
+              <div class="grid-header">Charity gets <a href="#footnotes" >[2]</a></div>
+              <div class="grid-header">You get in cash</div>
+              <div class="grid-header">You get via tax deduction <a href="#footnotes" >[3]</a></div>
+              <div class="grid-header"># of shares</div>
+
+              <!-- Row 1 -->
+              <div class="grid-cell">ISO or NSO</div>
+              <div class="grid-cell">Cashless exercise during liquidity</div>
+              <div class="grid-cell">Sell</div>
+              <div class="grid-cell">income tax * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - income tax) * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 2 -->
+              <div class="grid-cell">ISO or NSO</div>
+              <div class="grid-cell">Cashless exercise during liquidity</div>
+              <div class="grid-cell">Donate</div>
+              <div class="grid-cell">income tax * sprain</div>
+              <div class="grid-cell">(1 - income tax) * sprain * (1 + match)</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - income tax) * sprain * income tax</div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 3 -->
+              <div class="grid-cell">ISO or NSO</div>
+              <div class="grid-cell">Dispose &lt;1 yr after exercise</div>
+              <div class="grid-cell">Sell</div>
+              <div class="grid-cell">income tax * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - income tax) * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 4 -->
+              <div class="grid-cell">ISO or NSO</div>
+              <div class="grid-cell">Dispose &lt;1 yr after exercise</div>
+              <div class="grid-cell">Donate</div>
+              <div class="grid-cell" data-formula="income tax * spread">income tax * spread <a href="#footnotes" >[4]</a></div>
+              <div class="grid-cell" data-formula="sale price * (1 + match)">sale price * (1 + match)</div>
+              <div class="grid-cell" data-formula="- strike price - income tax * spread">- strike price - income tax * spread</div>
+              <div class="grid-cell" data-formula="exercise price * income tax">exercise price * income tax</div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 5 - NSO Sell -->
+              <div class="grid-cell">NSO</div>
+              <div class="grid-cell">Dispose 1+ yr after exercise</div>
+              <div class="grid-cell">Sell</div>
+              <div class="grid-cell">income tax * spread + ltcg * gain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - income tax) * spread + (1 - ltcg) * gain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 6 - NSO Donate -->
+              <div class="grid-cell">NSO</div>
+              <div class="grid-cell">Dispose 1+ yr after exercise</div>
+              <div class="grid-cell">Donate</div>
+              <div class="grid-cell">income tax * spread</div>
+              <div class="grid-cell">sale price * (1 + match)</div>
+              <div class="grid-cell">- strike price - income tax * spread</div>
+              <div class="grid-cell">sale price * income tax</div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 7 - ISO Sell -->
+              <div class="grid-cell">ISO</div>
+              <div class="grid-cell">Dispose 1+ yr after exercise</div>
+              <div class="grid-cell">Sell</div>
+              <div class="grid-cell">ltcg * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - ltcg) * sprain</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 8 - ISO Donate -->
+              <div class="grid-cell">ISO</div>
+              <div class="grid-cell">Dispose 1+ yr after exercise</div>
+              <div class="grid-cell">Donate</div>
+              <div class="grid-cell">amt * spread <a href="#footnotes" >[5]</a></div>
+              <div class="grid-cell">sale price * (1 + match)</div>
+              <div class="grid-cell">- strike price</div>
+              <div class="grid-cell">sale price * income tax</div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Row 9 - RSU Sell -->
+              <div class="grid-cell">RSU</div>
+              <div class="grid-cell">Any</div>
+              <div class="grid-cell">Sell</div>
+              <div class="grid-cell">income tax * sale price</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell">(1 - income tax) * sale price</div>
+              <div class="grid-cell"></div>
+              <div class="grid-cell"><input type="text" value="0" class="shares-input"></div>
+
+              <!-- Totals Row -->
+              <div class="grid-cell totals-cell">Totals</div>
+              <div class="grid-cell totals-cell"></div>
+              <div class="grid-cell totals-cell"></div>
+              <div class="grid-cell totals-cell" id="total-gov"></div>
+              <div class="grid-cell totals-cell" id="total-charity"></div>
+              <div class="grid-cell totals-cell" id="total-cash"></div>
+              <div class="grid-cell totals-cell" id="total-deduction"></div>
+              <div class="grid-cell totals-cell" id="total-shares"></div>
+            </div>
+
+            <!-- Summary and Spreadsheet Link Line -->
+            <div style="display: flex; margin-top: 20px; margin-bottom: 32px; width: 100%; justify-content: space-between; align-items: flex-start;">
+              <!-- Spreadsheet Link -->
+              <div style="font-size: 0.85rem;">
+                Also available <a href="https://docs.google.com/spreadsheets/d/1Q-78IZw9qGZB8evrbqTUSdgFulAuGDSN9ti6ctZrFzQ/edit" target="_blank" rel="noopener noreferrer">as a spreadsheet</a>.
+              </div>
+
+              <!-- Summary Lines - Outside Grid -->
+              <div style="display: flex; flex-direction: column; width: 100%; max-width: 600px; align-items: flex-end;">
+                <div style="display: flex; margin-bottom: 8px; justify-content: flex-end;">
+                  <div style="font-weight: 500; font-size: 0.95rem; text-align: right; margin-right: 4px;">Total to charity:</div>
+                  <div id="total-to-charity" style="font-weight: 500; font-size: 0.95rem; width: 100px; text-align: right;"></div>
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                  <div style="font-weight: 500; font-size: 0.95rem; text-align: right; margin-right: 4px;">Total to you (cash + deduction):</div>
+                  <div id="total-to-you" style="font-weight: 500; font-size: 0.95rem; width: 100px; text-align: right;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Donation Multipliers Section -->
+          <div class="field-container">
+            <div class="label-container">
+              <label style="font-weight: 500;">Donation multipliers</label>
+              <div class="description">
+                How many dollars go to charity for each dollar you forgo, in each category.
+                The computation here is "(Total to charity if Donate) / (Total to you if Sell - Total to you if Donate)" in each category <a href="#footnotes" >[6]</a>.
+              </div>
+            </div>
+          </div>
+          <table class="multiplier-table">
+            <thead>
+              <tr>
+                <th class="multiplier-header multiplier-header-left">Holding period</th>
+                <th class="multiplier-header multiplier-header-right">Initial donation multiplier <a href="#footnotes" >[7]</a></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="multiplier-cell-left">Cashless exercise during liquidity</td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) / (1 - income tax)</div>
+                  <div class="value"></div>
+                </td>
+              </tr>
+              <tr>
+                <td class="multiplier-cell-left">Dispose &lt;1 yr after exercise</td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) / (1 - income tax)</div>
+                  <div class="value"></div>
+                </td>
+              </tr>
+              <tr>
+                <td class="multiplier-cell-left">NSO: Dispose 1+ yr after exercise</td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) * sale / [sale * (1 - income tax) - gain * ltcg]</div>
+                  <div class="value"></div>
+                </td>
+              </tr>
+              <tr>
+                <td class="multiplier-cell-left">ISO: Dispose 1+ yr after exercise</td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) * sale / [sale * (1 - income tax) - sprain * ltcg]</div>
+                  <div class="value"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 16px; margin-bottom: 16px; font-size: 0.85rem; max-width: 600px;">
+            The multipliers if you go directly from "Cashless sell" to "Donate 1+ yr after exercise" <a href="#footnotes" >[8]</a>.
+          </div>
+
+          <table class="multiplier-table">
+            <tbody>
+              <tr>
+                <td class="multiplier-cell-left">Cashless → NSO: dispose 1+ yr</td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) * sale / [sale * (1 - income tax) - gain * income tax]</div>
+                  <div class="value" id="nso-combined-multiplier"></div>
+                </td>
+              </tr>
+              <tr>
+                <td class="multiplier-cell-left">Cashless → ISO: dispose 1+ yr <a href="#footnotes" >[9]</a></td>
+                <td class="multiplier-cell-right">
+                  <div class="formula">(1 + match) * sale / [sale * (1 - income tax) - sprain * income tax]</div>
+                  <div class="value" id="combined-multiplier"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr>
+
+        <!-- Notes Section -->
+        <div id="notes" style="margin-top: 40px; margin-bottom: 30px;">
+          <div style="max-width: 600px;">
+            <!-- Tax deduction limitations Section -->
+            <div id="tax-deduction-limitation" class="collapsible-section" style="margin-bottom: 24px;">
+              <h3 style="font-size: 1.1rem; color: #555; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center;" onclick="toggleSection('deduction-limits-section')">
+                <span id="deduction-limits-toggle" style="margin-right: 8px; font-size: 0.8em; width: 12px;">&#9654;</span>
+                Tax deduction limitation
+              </h3>
+              <div id="deduction-limits-section" style="display: none; margin-top: 16px;">
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The IRS implements tax deductions by reducing your taxable income. In all cases, this means your tax deductions are limited by the total taxes you pay, but for donations, the IRS has stricter limits than that.
+                  The goal of this section is to give a realistic picture of what your total tax deduction might be, and a sense of the tax planning needed to get that deduction.</p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  Here is a graph of the maximum tax deduction you can expect, using the share numbers above. The x-axis is the total (household) income you expect over the next 10 years, not including income you get from exercising or selling company shares. Include both wage income and investment income.
+                </p>
+
+                <div style="width: 100%; max-width: 600px; height: 300px; margin-bottom: 20px; position: relative;">
+                  <canvas id="deduction-graph" width="600" height="300"></canvas>
+                  <div id="no-donations-message" style="display: none; position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.8); padding: 8px; border-radius: 4px; font-weight: normal; text-align: center; font-size: 13px; color: #666; width: 80%; max-width: 400px;">
+                    Add some information (in particular, a non-zero number of donations) into the table above
+                  </div>
+                </div>
+
+                <p style="font-size: 0.85rem; margin-bottom: 10px">
+                  Some caveats: this graph is less battle-tested than the table above, and so could straight up have mistakes. There are other strategies not
+                  represented that could increase the line (e.g. <a href="#footnotes" >[10]</a>). And finally, AMT considerations could change the ideal strategy.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 10px">
+                  Caveats aside, below is the minimum amount of planning you may want to do, if it'll take Y years of income to get to $<span id="calc-row4-ref"></span> (minimum income needed to realize max deduction):
+                </p>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 0;">
+                  <li>If your total pre-match donations are less than 1-2x your household income: Nothing special is needed.</li>
+                  <li>If Y &lt; 5: Any time you sell, donate at least your pledge %age in that calendar year.</li>
+                  <li>If 5 &lt; Y &lt; 10: The above, plus space out donations (see below).</li>
+                  <li>If Y &gt; 10: The above, plus make cost basis elections (see below).</li>
+                </ul>
+
+                <p style="font-size: 0.85rem; margin-bottom: 10px">
+                  The planning involved when Y &gt; 5 can get complex, and it's natural to wonder how much you'd "lose" if you only followed the relatively simple Y &lt; 5 advice. I would say: it's not material enough to be relevant for a pledge decision,
+                  but material enough that I'd recommend hiring someone (should cost &lt; $10k/yr) to deal with it
+                  in the case that your shares are worth enough for this to be a problem.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The rest of this section is going to get into the weeds a bit, since it's necessary context if you're going to DIY it.
+                  If you're not, feel free to skip.
+                </p>
+
+                <h4 style="font-size: 0.95rem; color: #555; margin-top: 20px; margin-bottom: 12px;">Doing the computation</h4>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                 DAFs are "50% limit organizations", in the parlance of the IRS. 50% limit organizations have the following deduction limits:
+                </p>
+
+                <table style="font-size: 0.85rem; margin-bottom: 16px; border-collapse: collapse; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem;">Holding period</th>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem;">Annual deduction limit, as a % of income</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Cashless exercise during liquidity</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">50% <a href="#footnotes" >[11]</a></td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Dispose &lt;1 yr after exercise</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">50%</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Dispose 1+ yr after exercise</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">30% if using sale price, or 50% with cost basis election (see below)</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  Extra donations carry forward for 5 years. So if you make $100k/yr, and donate in cash, you can donate $300k in year 1 (50% * 100k * 6 years), and have it all (eventually) be deducted.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  In the table below, we show the calculation for the start of the flat part of the graph, i.e. the x value of last "kink" in the graph,
+                  which is the point after which we don't take the cost basis election. (The kink won't be visible, if Row 4 in the table below is &lt; 0.)
+                  It uses the inputs from the main "Stock Options" table above, with
+                  the following notation:
+                </p>
+
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 16px;">
+                  <li>D: number of donated shares</li>
+                  <li>S: number of sold shares</li>
+                  <li>DS: number of shares donated or sold (D + S)</li>
+                  <li>Cashless: Cashless exercise during liquidity</li>
+                  <li>Long: disposed 1+ yr after exercise</li>
+                  <li>Short: disposed &lt;1 yr after exercise</li>
+                </ul>
+
+                <table style="font-size: 0.85rem; margin-bottom: 16px; border-collapse: collapse; width: 100%;" id="computation-table">
+                  <thead>
+                    <tr>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem; width: 5%;"></th>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem; width: 45%;">Computation step</th>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem; width: 50%;">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd; width: 5%;">1</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd; width: 45%;">Deductions subject to 30% limit</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd; width: 50%;" data-formula="Long D * sale price">
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 4px;">Long D * sale price</div>
+                        <div style="font-weight: 500; color: #333; padding-left: 8px;" id="calc-row1"></div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">2</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Deductions subject to 50% limit</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;" data-formula="Cashless D * (1 - income tax) * sprain + Short D * exercise price">
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 4px;">Cashless D * (1 - income tax) * sprain +<br>Short D * exercise price</div>
+                        <div style="font-weight: 500; color: #333; padding-left: 8px;" id="calc-row2"></div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">3</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Income generated from exercise and sale of options</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;" data-formula="(Cashless DS + Short S + Long S) * sprain + (Short D + NSO Long D) * spread + RSU * sale price">
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 4px;">(Cashless DS + Short S + Long S) * sprain +<br>(Short D + NSO Long D) * spread + RSU * sale price</div>
+                        <div style="font-weight: 500; color: #333; padding-left: 8px;" id="calc-row3"></div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 10px; border: 1px solid #ddd; background-color: #f0f0f0; font-weight: 600; border-top: 2px solid #ccc;">4</td>
+                      <td style="padding: 8px 10px; border: 1px solid #ddd; background-color: #f0f0f0; border-top: 2px solid #ccc;">Add'l wage/investment income needed (over 10+ years) to fully deduct</td>
+                      <td style="padding: 8px 10px; border: 1px solid #ddd; background-color: #f0f0f0; border-top: 2px solid #ccc;" data-formula="max(100/30 * row1, 2 * (row1 + row2)) - row3">
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 4px;">max(100/30 * row1, 2 * (row1 + row2)) - row3</div>
+                        <div style="font-weight: 500; color: #333; padding-left: 8px;" id="calc-row4"></div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The computations for the other points on the graph are similar. They are <a href="https://github.com/rishig/pledge-calculator/blob/main/script.js" target="_blank" rel="noopener noreferrer">on GitHub</a> for now (search for updateDeductionGraph);
+                  I can clean it up and add it here if there's interest.
+                </p>
+
+                <h4 style="font-size: 0.95rem; color: #555; margin-top: 24px; margin-bottom: 12px;">Cost basis election for NSOs and ISOs</h4>
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  This is only relevant if you're not likely to hit the Row 4 value in the table above. Almost certainly, that means you have some
+                  Long D, and very likely it means you will end up fully saturating your 30% deductions, but not saturating your 50% deductions.
+                </p>
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  In that scenario, you can elect to have your Long Ds fall under the 50% limit, in exchange for the deductable amount being smaller. Here are the deductible
+                  amounts under each limit:
+                </p>
+
+                <table style="font-size: 0.85rem; margin-bottom: 16px; margin-top: 16px; border-collapse: collapse; width: 100%; max-width: 400px;">
+                  <thead>
+                    <tr>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem;"></th>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem;">Under 30% limit</th>
+                      <th style="padding: 10px 8px; border: 1px solid #ddd; background-color: #f0f0f0; text-align: left; font-weight: 600; font-size: 0.85rem;">Under 50% limit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Long NSO</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Sale price</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Exercise price</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Long ISO</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Sale price</td>
+                      <td style="padding: 6px 10px; border: 1px solid #ddd;">Strike price</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                   As you can see, NSOs that get switched over are worth more than ISOs, which is why the graph above suggests switching over NSOs before
+                    switching over ISOs.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  An important note is that if you elect to switch your 30% donations to the 50% limit, you must do it for all your 30% donations that year. The election
+                  also applies to all carryover from that year, though it doesn't apply to donations initiated in future years. You cannot amend a tax return
+                  to retroactively change this election, in either direction.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  If you expect to end up in this situation, the planning implications are a bit complicated. It may imply that you donate only NSOs
+                  or only ISOs in a particular year, or that you don't bother early exercising shares that you're exercising only to donate.
+                  Some simplifying observations: it's still basically always better to exercise ISOs (vs NSOs) if you have the choice. And Short
+                  donations are still (far) worse than Long donations, even with the election, since even though the deduction is the same,
+                  with Short donations you owe taxes on the gain.
+                </p>
+
+                <h4 style="font-size: 0.95rem; color: #555; margin-top: 24px; margin-bottom: 12px;">Spacing donations out</h4>
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The 5 &lt; Y &lt; 10 case in the intro mentions spacing out your donations. Donations carry forward for only 5 years,
+                  after which anything that hasn't been deducted is lost. So with a sufficiently large donation, it can be beneficial to
+                  split it over multiple years, so that it can be deducted over more than 5 years of income.
+                  Some additional thoughts:
+                </p>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 16px;">
+                  <li>You have three years after a sale to make the donation (company rule, not tax law), which should help with this.</li>
+                  <li>You always have to use the current year's donations before you can dip into your carryover, even if the carryover is about to expire.
+                    In the extreme case, let's say you make a 10x-your-income donation in year 1.
+                    You would need to delay any further donations till year 7 to get a deduction benefit for them.</li>
+                  <li>You may want to front-load your donations (e.g. start donating this year), to start the clock / take advantage of this year's income.</li>
+                </ul>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  Finally, an unrelated reminder not to let the tax tail wag the impact dog. The benefit of the tax deduction is material,
+                  but may or may not be enough to outweigh being able to donate earlier, if you have a concrete reason to do so.
+                </p>
+
+                <h4 style="font-size: 0.95rem; color: #555; margin-top: 24px; margin-bottom: 12px;">Some reminders</h4>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 16px;">
+                  <li>If you switch tax accountants or tax software, make sure to <span style="font-weight: 600;">copy over your charitable contribution carryovers</span>. Most accountants will not think to ask for it.</li>
+                  <li>Do not donate shares that have lost value (i.e. where sale price &lt; exercise price). Sell the shares and donate the cash. See "Cashflow and risk considerations" for further discussion.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="collapsible-section">
+              <h3 style="font-size: 1.1rem; color: #555; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center;" onclick="toggleSection('cashflow-section')">
+                <span id="cashflow-toggle" style="margin-right: 8px; font-size: 0.8em; width: 12px;">&#9654;</span>
+                Cashflow and risk considerations
+              </h3>
+              <div id="cashflow-section" style="display: none; margin-top: 16px;">
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  From the table above, you can see that exercising in advance of a sale/donation (especially 1+ year in advance) is significantly more favorable
+                  than cashless exercise. So why are we even talking about cashless exercise?
+                </p>
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The two main considerations with exercising in advance are that you have to put up money before you get anything in return (cashflow),
+                  and that you risk the loss of the money you put up (what I'm calling risk). Details of the calculation are below.
+                </p>
+
+                <p style="font-size: 0.92rem; margin-bottom: 8px; font-weight: 500;">Cashflow</p>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 12px;">
+                  <li>When you exercise NSOs, you owe "strike price + income tax * spread"<span id="nso-exercise-cost"> ($15/share)</span> at the time of exercise.
+                    Some of this you pay in Carta at the time of exercise, and the rest you pay at tax time (appears on your W-2).</li>
+                  <li>When you exercise ISOs, you owe "strike price"<span id="iso-exercise-cost"> ($10/share)</span> for sure, and then possibly also owe AMT on the spread.
+                    You do not pay AMT at the time of exercise in Carta; it only appears at tax time (Form 3921).</li>
+                </ul>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  The relevance to cashflow is that even if things go well, you won't have access to this money until there is a liquidity event and you sell.
+                </p>
+
+                <p style="font-size: 0.92rem; margin-bottom: 8px; font-weight: 500;">Risk</p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 12px;">
+                  If sale price &gt;= exercise price (i.e. if gain &gt;= 0), then exercising early is always at least as good on net as cashless exercise (so, nothing to worry about).
+                  However, if gain < 0, then exercising early will end up coming out worse than cashless exercise.
+                </p>
+
+                <p style="font-size: 0.85rem; margin-bottom: 8px; font-weight: 500;">How sales work:</p>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 16px;">
+                  <li>In the extreme case, if the sale price is 0, you lose everything you paid at time of exercise, and get a capital loss of "exercise price" that you can carry forward indefinitely, to offset future capital gains.</li>
+                  <li>In general, when gain < 0, you did worse than if you had cashless exercised, but are only out money on net if sale price &lt; "what you paid when you exercised" (<span id="payment-when-exercised">$15/share or $10/share + AMT for NSO/ISO respectively</span>). At the time of sale you'll get a free capital loss of "-gain" that you can carry forward indefinitely.</li>
+                  <li>One exception is that if you sell an ISO in the same year that you exercise, the AMT is "forgiven", so it'll just be as if you cashless exercised at the time you sold.</li>
+                </ul>
+
+                <p style="font-size: 0.85rem; margin-bottom: 8px; font-weight: 500;">For donations:</p>
+                <ul style="font-size: 0.85rem; padding-left: 20px; margin-bottom: 24px;">
+                  <li>If gain < 0, you should sell and donate the money in almost all cases, instead of directly donating the shares. If you do end up donating directly, in the very best case, it's similar to selling and donating the cash, except you don't get the free capital loss.
+                    The worst case is if you donate ISOs that have lost value &lt;1 yr after exercise; they turn into NSOs and I believe you now retroactively owe income tax on the spread.</li>
+                </ul>
+              </div>
+            </div>
+
+            <h3 id="footnotes" style="font-size: 1.1rem; color: #555; margin-bottom: 12px;">Footnotes</h3>
+            <p style="font-size: 0.85rem; margin-bottom: 12px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[1]</span>
+              I decided to elide differences of a few percent and rare-ish technicalities in favor of simplification. I'm happy to go over any particular (US/California-centric) tax situation if you think
+              there may be a technicality that might apply!
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[2]</span>
+              The match will likely be in shares, but easier to reason about as the cash-equivalent.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[3]</span>
+              The actual deduction could be significantly less, especially if the company does well, and you donate ISOs or NSOs you hold for longer than a year.
+              See the <a href="#tax-deduction-limitation" onclick="toggleSection('deduction-limits-section')">tax deduction limitation</a> section for a handy graph. A few additional caveats:
+              <ul style="padding-left: 16px; margin-top: -8px; margin-bottom: 0; font-size: 0.85rem;">
+                <li>If you would normally take the standard deduction, subtract $2-3k (single) or $7-9k (married) per year that you donate, since you give up on the standard deduction when you take this one.</li>
+                <li>If you normally itemize deductions (i.e. don't take the standard deduction), subtract $3-4k (single or married) each year exercising ISOs pushes you into paying AMT. This is because SALT is deductible under regular income tax, but not under AMT, and the marginal AMT from the SALT adjustment is not recoverable (see
+                  the treatment of exclusion items vs deferral items in <a href="https://www.irs.gov/instructions/i8801" target="_blank" rel="noopener noreferrer">Form 8801</a>).
+                </li>
+                <li>If you live in California and have high income, subtract $700 per $100k you make above $250k (single) or $500k (married) per year that you donate (see "Reduction in itemized deductions" <a href="https://www.caltax.com/spidellweb/public/editorial/cat/1024-tax-rates-2024.pdf" target="_blank" rel="noopener noreferrer">here</a>).</li>
+              </ul>
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[4]</span>
+              I believe you also owe "amt * spread" of AMT on the ISOs, if you hold them past the end of the calendar year. If you're going to donate
+              ISOs after holding for less than a year, make sure to also donate in the same calendar year as the exercise!
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[5]</span>
+              This deserves its own calculator, but at a high level, each year you work and have a "normal" tax situation you generate tens of thousands of "AMT credits". Ignoring questions of cash flow, you only end up paying AMT if your (lifetime, post-year-of-exercise) AMT credits don't cover the AMT you owe.
+              For now, I've excluded AMT from Totals, and haven't subtracted it from "what you get in cash", even though you are likely to owe lifetime AMT
+              in worlds where the company does well and you donate a large fraction of your shares.
+              Also, AMT rates range from 26% to 42%, depending on your income and state; I arbitrarily used 35% here.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[6]</span>
+              It might be confusing why the multiples are more than the match. It's because the IRS provides a significant tax deduction for donations, and doubly so for donations of appreciated stock.
+              <a href="https://cs.stanford.edu/~rishig/giving-and-taxes" target="_blank" rel="noopener noreferrer">See here</a> for a visual explanation.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[7]</span>
+              "Initial" because these numbers apply for the first X% of your pledge:
+              <ul style="padding-left: 16px; margin-top: -8px; margin-bottom: 0; font-size: 0.85rem;">
+                <li>X &ge; 20% in almost all cases, assuming that you donate your pledge percentage each time you sell (donate in the same calendar year).</li>
+                <li>X &ge; 50% in many poor and middling company outcomes, assuming you continue to have a salary.</li>
+                <li>In great outcomes, you hit <a href="#tax-deduction-limitation" onclick="toggleSection('deduction-limits-section')">tax deduction limitations</a>,
+                  which reduces the multiple. If so, the numbers in the table will likely hold for the first 25% or 30% of your grant, and then
+                  start dropping off to 4x for cashless and 5-6x for "dispose 1+ yr" for donations beyond that (assuming a 3:1 match).</li>
+              </ul>
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px; margin-top: -16px;">
+              The computation above does not take AMT into account (affects ISOs), nor the fixed donation costs mentioned in the bullets of footnote [3]
+              (which mostly matter if you're deciding whether to donate at all).
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[8]</span>
+              A common strategy is to cashless exercise anything you're going to sell, and exercise 1+ yr in advance anything you're going to donate.
+              This is because the savings from exercising early are not that high if you're selling, but huge if you're donating.
+              These next multipliers are the relevant ones if you're considering that strategy.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              An unfortunate aspect of the strategy is that it can require a lot of cash upfront. If you're interested in doing this, but don't have
+              the cash, DM me and I'll see if I can find someone to help (relatively more doable if you happen to have the 3:1 match).
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[9]</span>
+              The difference between the NSO and ISO multipliers here can often be stark. This is entirely driven by the denominator being small
+              (you don't lose much money from the donation, either for NSOs or ISOs), rather than it being different for the charity. E.g.
+              ($20 to the charity)/($2 loss to you) is a really different multiple from ($20 to the charity)/($1 loss to you), but $2 vs $1 is not
+              much, and likely other considerations (like exercise taxes) will be more important to whether you exercise NSOs or ISOs. Also note that the calculation
+              here does not include AMT, which can increase the denominator for ISOs in some situations.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[10]</span>
+              As an example, it seems possible (but I haven’t verified) that one can elect to realize income on the full sale price of short term option donations, and also deduct that value under the 50% limit. This would help in the common case where you have too many 30% donations and not enough 50% donations, since increasing your income increases the number of 30% donations you can make.
+            </p>
+            <p style="font-size: 0.85rem; margin-bottom: 8px;">
+              <span style="display: inline-block; min-width: 20px; font-weight: 500;">[11]</span>
+              It's actually 60% federally for 2025 (still 50% for California).
+            </p>
+
+            <p style="font-size: 0.85rem; margin-top: 24px; margin-bottom: 12px; font-weight: 500;">Errata</p>
+            <ul style="font-size: 0.85rem; padding-left: 16px; margin-top: -8px; margin-bottom: 0px;">
+              <li>4/11/25: Updated taxes paid on short term ISO and NSO donations to "income tax * spread", from "income tax * sprain". The affected the "Government gets" and the "You get in cash" columns. Thanks @peter for the catch!</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>

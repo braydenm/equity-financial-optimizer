@@ -1,0 +1,21 @@
+{
+  "name": "Tax Strategy Comparison",
+  "description": "Compare different tax optimization strategies for equity compensation",
+  "scenarios": [
+    "scenarios/natural_evolution",
+    "scenarios/exercise_all_vested",
+    "scenarios/tender_and_donate",
+    "scenarios/amt_optimization",
+    "scenarios/exercise_at_ipo"
+  ],
+  "price_scenario": "moderate",
+  "projection_years": 5,
+  "notes": [
+    "This portfolio compares five different tax strategies:",
+    "1. Natural Evolution - baseline do-nothing scenario",
+    "2. Exercise All Vested - immediate exercise to start LTCG clock",
+    "3. Tender and Donate - balanced liquidity and charity approach",
+    "4. AMT Optimization - exercise below AMT threshold each year",
+    "5. Exercise at IPO - wait for liquidity event to exercise"
+  ]
+}

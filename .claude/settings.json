@@ -1,0 +1,8 @@
+{
+  "env": {
+    "PROJECT_NAME": "equity-financial-optimizer",
+    "PROJECT_TYPE": "financial-toolkit"
+  },
+  "includeCoAuthoredBy": true,
+  "cleanupPeriodDays": 90
+}

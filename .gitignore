@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.zed/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.coverage
+.pytest_cache/
+*.cover
+.hypothesis/
+
+# Claude Code
+.claude/settings.local.json
+
+# Financial data (sensitive)
+data/private/
+data/user_profile.json
+data/user_backgound_info.txt
+docs/reference/equity-donation-matching-faq.md
+docs/reference/tender-offer-may-2025.md
+scenario_config.json
+*.csv
+*.xlsx
+!data/examples/*.csv
+!data/examples/*.xlsx
+!data/user_profile_template.json
+
+# Private output data (contains sensitive financial information)
+output/working/
+output/scenarios/
+output/projections/
+
+# Build outputs
+out/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Documentation build
+docs/_build/
+docs/api/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
