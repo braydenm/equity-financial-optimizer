@@ -7,7 +7,7 @@ of scenarios that can be executed together for comparative analysis.
 
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 
@@ -18,11 +18,11 @@ from projections.projection_state import (
     ProjectionPlan, PlannedAction, ShareLot, UserProfile,
     ShareType, LifecycleState, TaxTreatment, ActionType
 )
-from loaders.profile_loader import ProfileLoader
 from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs, create_comparison_csv
 from loaders.scenario_loader import ScenarioLoader
 from loaders.csv_loader import CSVLoader
+from loaders.profile_loader import ProfileLoader
 
 
 class PriceProjector:
@@ -77,8 +77,9 @@ class Portfolio:
 
     def add_scenario(self, scenario_path: str) -> None:
         """Add a scenario to the portfolio."""
-        if not os.path.exists(scenario_path):
-            raise FileNotFoundError(f"Scenario path not found: {scenario_path}")
+        # New format: just scenario name like "001_exercise_all_vested"
+        # Store the scenario name, resolution will happen at execution time
+        # when we know the data source (demo vs user)
         self.scenario_paths.append(scenario_path)
 
     def set_price_scenario(self, scenario: str) -> None:
@@ -103,12 +104,17 @@ class PortfolioManager:
         self.profile_loader = ProfileLoader()
         self._user_profile = None
         self._initial_lots = None
+        self._data_source = None  # Track whether using 'demo' or 'user' data
+        self._current_price_scenario = None  # Track current price scenario
 
     def load_user_data(self, profile_path: str = "data/user_profile.json",
                       equity_timeline_path: str = "output/working/equity_position_timeline/equity_position_timeline.csv"):
         """Load user profile and initial equity position with secure fallback to demo data."""
         # Load user profile with secure fallback
         profile_data, is_real_data = self.profile_loader.load_profile(verbose=True)
+
+        # Track data source for output path generation
+        self._data_source = "user" if is_real_data else "demo"
 
         # Create UserProfile
         personal = profile_data['personal_information']
@@ -170,7 +176,7 @@ class PortfolioManager:
     def execute_single_scenario(self, scenario_path: str,
                               price_scenario: str = "moderate",
                               projection_years: int = 5,
-                              output_dir: str = "output") -> Any:
+                              output_dir: str = None) -> Any:
         """
         Execute a single scenario.
 
@@ -178,7 +184,7 @@ class PortfolioManager:
             scenario_path: Path to scenario directory containing actions.csv
             price_scenario: Name of price growth scenario to use
             projection_years: Years to project (minimum 5)
-            output_dir: Directory for output files
+            output_dir: Directory for output files (optional, auto-generated if not provided)
 
         Returns:
             ProjectionResult
@@ -186,12 +192,28 @@ class PortfolioManager:
         if not self._user_profile:
             self.load_user_data()
 
+        # Store current price scenario for output path generation
+        self._current_price_scenario = price_scenario
+
+        # Resolve scenario path
+        resolved_path = self._resolve_scenario_path(scenario_path)
+
+        # Generate scenario name for output
+        scenario_name = os.path.basename(resolved_path)
+        if scenario_name.endswith('_actions.csv'):
+            scenario_name = scenario_name[:-12]  # Remove "_actions.csv"
+
+        # Generate proper output directory if not provided
+        if output_dir is None:
+            output_dir = self._generate_output_path(scenario_name, price_scenario)
+
         # Create portfolio with single scenario
         portfolio = Portfolio("single_scenario")
         portfolio.add_scenario(scenario_path)
         portfolio.set_price_scenario(price_scenario)
         portfolio.set_projection_years(projection_years)
 
+        # Execute as single-scenario portfolio
         results = self.execute_portfolio(portfolio, output_dir)
         return results[0] if results else None
 
@@ -234,9 +256,12 @@ class PortfolioManager:
         results = []
         for scenario_path in portfolio.scenario_paths:
             try:
+                # Resolve scenario path based on data source
+                resolved_path = self._resolve_scenario_path(scenario_path)
+
                 # Load scenario actions
                 plan = self._load_scenario_plan(
-                    scenario_path=scenario_path,
+                    scenario_path=resolved_path,
                     start_date=start_date,
                     end_date=end_date,
                     price_projections=price_projections
@@ -246,9 +271,23 @@ class PortfolioManager:
                 result = calculator.evaluate_projection_plan(plan)
                 results.append(result)
 
-                # Save outputs
-                scenario_name = os.path.basename(scenario_path)
-                scenario_output_dir = os.path.join(output_dir, scenario_name)
+                # Generate proper output path with data source and price scenario
+                scenario_name = os.path.basename(resolved_path)
+                if scenario_name.endswith('_actions.csv'):
+                    scenario_name = scenario_name[:-12]  # Remove "_actions.csv"
+
+                scenario_output_dir = self._generate_output_path(scenario_name, portfolio.price_scenario)
+
+                # Create output directory
+                os.makedirs(scenario_output_dir, exist_ok=True)
+
+                # Generate and save metadata
+                metadata = self._generate_scenario_metadata(scenario_name, portfolio.price_scenario)
+                metadata_path = os.path.join(scenario_output_dir, "metadata.json")
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+
+                # Save projection outputs
                 save_all_projection_csvs(result, scenario_name, scenario_output_dir)
 
                 print(f"✅ Executed scenario: {plan.name}")
@@ -260,7 +299,12 @@ class PortfolioManager:
 
         # Create comparison if multiple scenarios
         if len(results) > 1:
-            comparison_path = os.path.join(output_dir, f"{portfolio.name}_comparison.csv")
+            # Create portfolio comparison directory
+            portfolio_comparison_dir = f"output/{self._data_source}/portfolio_comparisons"
+            os.makedirs(portfolio_comparison_dir, exist_ok=True)
+
+            comparison_filename = f"{portfolio.price_scenario}_{portfolio.name.lower().replace(' ', '_')}_comparison.csv"
+            comparison_path = os.path.join(portfolio_comparison_dir, comparison_filename)
             create_comparison_csv(results, comparison_path)
             print(f"✅ Created comparison: {comparison_path}")
 
@@ -269,13 +313,20 @@ class PortfolioManager:
     def _load_scenario_plan(self, scenario_path: str, start_date: date,
                           end_date: date, price_projections: Dict[int, float]) -> ProjectionPlan:
         """Load scenario and create projection plan."""
-        # Load actions from CSV
-        actions_path = os.path.join(scenario_path, "actions.csv")
+        # New format: scenarios/{data_source}/001_exercise_all_vested_actions.csv
+        scenario_base = os.path.basename(scenario_path)
+        if not scenario_base.endswith('_actions.csv'):
+            scenario_base = f"{scenario_base}_actions.csv"
+
+        actions_path = os.path.join(self._get_scenario_directory(), scenario_base)
+        # Extract clean scenario name (remove number prefix and _actions.csv suffix)
+        scenario_name = scenario_base.replace('_actions.csv', '')
+        if scenario_name[:4].isdigit() and scenario_name[3] == '_':
+            scenario_name = scenario_name[4:]  # Remove "001_" prefix
+        scenario_name = scenario_name.replace('_', ' ').title()
+
         if not os.path.exists(actions_path):
             raise FileNotFoundError(f"Actions file not found: {actions_path}")
-
-        # Get scenario name from directory
-        scenario_name = os.path.basename(scenario_path).replace('_', ' ').title()
 
         # Create plan
         plan = ProjectionPlan(
@@ -386,6 +437,43 @@ class PortfolioManager:
         # Default: use current year projection
         return price_projections.get(action_date.year,
                                    self._profile_data['equity_position']['current_prices']['last_409a_price'])
+
+    def _generate_output_path(self, scenario_name: str, price_scenario: str = "moderate") -> str:
+        """Generate output path with data source and price scenario."""
+        # Extract scenario number and name from filename (e.g., "001_exercise_all_vested" -> "scenario_001_exercise_all_vested")
+        if scenario_name.endswith('_actions.csv'):
+            scenario_name = scenario_name[:-12]  # Remove "_actions.csv"
+
+        scenario_dir = f"scenario_{scenario_name}"
+        return f"output/{self._data_source}/{price_scenario}/{scenario_dir}"
+
+    def _generate_scenario_metadata(self, scenario_name: str, price_scenario: str = "moderate") -> Dict[str, Any]:
+        """Generate metadata for scenario execution."""
+        base_price = self._profile_data['equity_position']['current_prices']['last_409a_price']
+
+        return {
+            "data_source": f"{self._data_source}_profile",
+            "price_scenario": price_scenario,
+            "scenario_name": scenario_name,
+            "generated_timestamp": datetime.now().isoformat(),
+            "profile_version": self._profile_data.get('metadata', {}).get('profile_version', 'unknown'),
+            "base_409a_price": base_price,
+            "projection_years": 5,  # Default, should be parameterized
+            "data_source_type": "real_user_data" if self._data_source == "user" else "demo_data"
+        }
+
+    def _get_scenario_directory(self) -> str:
+        """Get the appropriate scenario directory based on data source."""
+        return f"scenarios/{self._data_source}"
+
+    def _resolve_scenario_path(self, scenario_path: str) -> str:
+        """Resolve scenario path based on data source and naming convention."""
+        # Resolve scenario name to appropriate data source directory
+        scenario_name = scenario_path
+        if not scenario_name.endswith("_actions.csv"):
+            scenario_name = f"{scenario_name}_actions.csv"
+
+        return os.path.join(self._get_scenario_directory(), scenario_name)
 
     def create_portfolio_from_json(self, json_path: str) -> Portfolio:
         """Create a portfolio from a JSON definition file."""

@@ -1,0 +1,10 @@
+{
+  "data_source": "user_profile",
+  "price_scenario": "moderate",
+  "scenario_name": "000_natural_evolution",
+  "generated_timestamp": "2025-06-11T16:08:10.294149",
+  "profile_version": "2.0",
+  "base_409a_price": 23.75,
+  "projection_years": 5,
+  "data_source_type": "real_user_data"
+}

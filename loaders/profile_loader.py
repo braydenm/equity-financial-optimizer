@@ -97,15 +97,13 @@ class ProfileLoader:
             return json.load(f)
 
     def _validate_profile_data(self, profile_data: Dict[str, Any]) -> None:
-        """Validate that profile data has required structure."""
+        """Validate that profile data has required structure and add defaults for optional sections."""
+        # Core required sections
         required_sections = [
             'metadata',
             'personal_information',
             'income',
-            'equity_position',
-            'financial_position',
-            'goals_and_constraints',
-            'charitable_giving'
+            'equity_position'
         ]
 
         for section in required_sections:
@@ -117,6 +115,57 @@ class ProfileLoader:
         version = metadata.get('profile_version')
         if version != "2.0":
             raise ValueError(f"Profile version '{version}' not supported. Expected '2.0'")
+
+        # Validate required fields within core sections
+        self._validate_required_fields(profile_data)
+
+        # Add defaults for optional sections
+        self._add_optional_section_defaults(profile_data)
+
+    def _validate_required_fields(self, profile_data: Dict[str, Any]) -> None:
+        """Validate required fields within each section."""
+        # personal_information required fields
+        personal = profile_data.get('personal_information', {})
+        required_personal_fields = ['ordinary_income_rate', 'ltcg_rate', 'stcg_rate', 'tax_filing_status', 'state_of_residence']
+        for field in required_personal_fields:
+            if field not in personal:
+                raise ValueError(f"Profile missing required field 'personal_information.{field}'")
+
+        # income required fields
+        income = profile_data.get('income', {})
+        required_income_fields = ['annual_w2_income']
+        for field in required_income_fields:
+            if field not in income:
+                raise ValueError(f"Profile missing required field 'income.{field}'")
+
+        # equity_position required fields
+        equity = profile_data.get('equity_position', {})
+        if 'current_prices' not in equity or 'last_409a_price' not in equity['current_prices']:
+            raise ValueError("Profile missing required field 'equity_position.current_prices.last_409a_price'")
+
+    def _add_optional_section_defaults(self, profile_data: Dict[str, Any]) -> None:
+        """Add default values for optional sections and fields."""
+        # Add defaults to income section
+        income = profile_data.setdefault('income', {})
+        income.setdefault('spouse_w2_income', 0)
+        income.setdefault('interest_income', 0)
+        income.setdefault('other_income', 0)
+        income.setdefault('dividend_income', 0)
+
+        # Add defaults for financial_position section
+        financial = profile_data.setdefault('financial_position', {})
+        liquid_assets = financial.setdefault('liquid_assets', {})
+        liquid_assets.setdefault('cash', 0)
+
+        # Add defaults for goals_and_constraints section
+        goals = profile_data.setdefault('goals_and_constraints', {})
+        liquidity_needs = goals.setdefault('liquidity_needs', {})
+        liquidity_needs.setdefault('exercise_reserves', 0)
+
+        # Add defaults for charitable_giving section
+        charitable = profile_data.setdefault('charitable_giving', {})
+        charitable.setdefault('pledge_percentage', 0.0)
+        charitable.setdefault('company_match_ratio', 0.0)
 
     def get_profile_status(self) -> Dict[str, Any]:
         """Get status of available profile files."""
@@ -180,6 +229,15 @@ def get_profile_loader(project_root: str = None) -> ProfileLoader:
 
     Returns:
         ProfileLoader instance
+    """
+    return ProfileLoader(project_root)
+
+
+def check_profile_setup(project_root: str = None) -> None:
+    """Print profile setup status and instructions.
+
+    Args:
+        project_root: Path to project root. If None, auto-detects.
     """
     return ProfileLoader(project_root)
 
