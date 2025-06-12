@@ -153,6 +153,61 @@ class PortfolioManager:
 
         return self._user_profile, self._initial_lots
 
+    def _create_initial_lots_from_profile(self, profile_data: Dict[str, Any]) -> List[ShareLot]:
+        """Create initial share lots from profile data."""
+        lots = []
+        equity_pos = profile_data.get('equity_position', {})
+
+        # Create lots for exercised shares
+        for lot_data in equity_pos.get('exercised_lots', []):
+            lot = ShareLot(
+                lot_id=lot_data['lot_id'],
+                share_type=ShareType.ISO if lot_data['type'] == 'ISO' else ShareType.NSO if lot_data['type'] == 'NSO' else ShareType.RSU,
+                quantity=lot_data['shares'],
+                strike_price=lot_data['strike_price'],
+                grant_date=None,  # Could be extracted from grants if needed
+                exercise_date=datetime.fromisoformat(lot_data['exercise_date']).date() if lot_data.get('exercise_date') else None,
+                lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
+                tax_treatment=TaxTreatment.NA,  # Will be determined based on holding period
+                fmv_at_exercise=lot_data.get('fmv_at_exercise')
+            )
+            lots.append(lot)
+
+        # Create lots for vested unexercised options
+        vested = equity_pos.get('vested_unexercised', {})
+
+        # Get strike price from original grants
+        original_grants = equity_pos.get('original_grants', [])
+        strike_price = original_grants[0]['strike_price'] if original_grants else 0.0
+
+        if vested.get('iso_shares', 0) > 0:
+            lots.append(ShareLot(
+                lot_id='VESTED_ISO',
+                share_type=ShareType.ISO,
+                quantity=vested['iso_shares'],
+                strike_price=strike_price,
+                grant_date=None,
+                exercise_date=None,
+                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                tax_treatment=TaxTreatment.NA,
+                fmv_at_exercise=None
+            ))
+
+        if vested.get('nso_shares', 0) > 0:
+            lots.append(ShareLot(
+                lot_id='VESTED_NSO',
+                share_type=ShareType.NSO,
+                quantity=vested['nso_shares'],
+                strike_price=strike_price,
+                grant_date=None,
+                exercise_date=None,
+                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                tax_treatment=TaxTreatment.NA,
+                fmv_at_exercise=None
+            ))
+
+        return lots
+
     def _apply_exercise_dates_from_profile(self):
         """Apply exercise dates from user profile to initial lots."""
         if not self._profile_data or not self._initial_lots:
