@@ -30,15 +30,12 @@ This document defines the canonical format for user profile data in the Equity F
 
     // Tax rates (as decimals)
     "federal_tax_rate": 0.37,
+    "federal_ltcg_rate": 0.20,  // Federal LTCG rate (0%, 15%, or 20% based on income)
     "state_tax_rate": 0.093,
+    "state_ltcg_rate": 0.093,  // State LTCG rate (often same as state rate)
     "fica_tax_rate": 0.0765,  // Social Security + Medicare
     "additional_medicare_rate": 0.009,  // On high earners
-    "niit_rate": 0.038,  // Net Investment Income Tax
-
-    // Computed rates for convenience
-    "ordinary_income_rate": 0.50,  // All taxes on ordinary income
-    "ltcg_rate": 0.35,  // All taxes on long-term capital gains
-    "stcg_rate": 0.50   // Same as ordinary income
+    "niit_rate": 0.038  // Net Investment Income Tax
   },
 
   "income": {
@@ -239,9 +236,11 @@ This document defines the canonical format for user profile data in the Equity F
 
 ### personal_information
 - All tax rates as decimals (0.37 not 37%)
-- `ordinary_income_rate`: Combined federal + state + FICA + NIIT
-- `ltcg_rate`: Combined long-term capital gains rate
-- `stcg_rate`: Same as ordinary_income_rate
+- `federal_tax_rate`: Federal marginal tax rate
+- `federal_ltcg_rate`: Federal LTCG rate (will be overridden by bracket calculation)
+- `state_tax_rate`: State marginal tax rate
+- `state_ltcg_rate`: State LTCG rate (usually same as state rate)
+- Tax calculations now use proper brackets, not combined flat rates
 
 ### equity_position
 - `exercised_lots`: Array of all exercised share lots
@@ -254,21 +253,14 @@ These fields must always be present:
 - metadata.profile_version
 - personal_information.tax_filing_status
 - personal_information.state_of_residence
-- personal_information.ordinary_income_rate
-- personal_information.ltcg_rate
+- personal_information.federal_tax_rate
+- personal_information.federal_ltcg_rate
+- personal_information.state_tax_rate
+- personal_information.state_ltcg_rate
 - equity_position.company
 - equity_position.exercised_lots (can be empty array)
 
 ### Optional Fields
 All other fields are optional but should follow the schema when present.
 
-## Migration from v1.x
 
-To migrate existing profiles:
-1. Rename `company_equity_position` → `equity_position`
-2. Rename `total_ordinary_income_rate` → `ordinary_income_rate`
-3. Rename `total_ltcg_rate` → `ltcg_rate`
-4. Remove all `_note` fields
-5. Convert string numbers to actual numbers
-6. Ensure all lots have `shares` field
-7. Update version to "2.0"

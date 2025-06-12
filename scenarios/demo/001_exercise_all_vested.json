@@ -1,0 +1,14 @@
+{
+  "scenario_name": "001_exercise_all_vested",
+  "description": "Exercise all vested ISOs at the start of the projection period",
+  "actions": [
+    {
+      "action_date": "2025-07-01",
+      "action_type": "exercise",
+      "lot_id": "VESTED_ISO",
+      "quantity": 12000,
+      "price": null,
+      "notes": "Exercise all vested ISOs at start of projection"
+    }
+  ]
+}

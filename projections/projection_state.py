@@ -59,6 +59,7 @@ class ShareLot:
     cost_basis: float = 0.0
     taxes_paid: float = 0.0
     amt_adjustment: float = 0.0
+    fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
 
 
 @dataclass
@@ -271,6 +272,7 @@ class ProjectionPlan:
 class ProjectionResult:
     """Results from evaluating a projection plan."""
     plan: ProjectionPlan
+    user_profile: 'UserProfile'  # Added to maintain tax rates through materialization #TODO explain this forward reference, is this the simplest implementation or a risk of bugs?
     yearly_states: List[YearlyState]
     summary_metrics: Dict[str, Any] = field(default_factory=dict)
 
@@ -316,10 +318,18 @@ class ProjectionResult:
 @dataclass
 class UserProfile:
     """Simplified user profile for projection calculations."""
-    # Tax rates
-    ordinary_income_rate: float
-    ltcg_rate: float
-    stcg_rate: float
+    # Federal tax rates (for AMT calculation)
+    federal_tax_rate: float      # Marginal federal rate
+    federal_ltcg_rate: float     # Federal LTCG rate (0%, 15%, or 20%)
+
+    # State tax rates
+    state_tax_rate: float        # State marginal rate
+    state_ltcg_rate: float       # State LTCG rate (usually = state rate)
+
+    # FICA/Medicare
+    fica_tax_rate: float         # Social Security + Medicare base
+    additional_medicare_rate: float  # Additional 0.9% on high earners
+    niit_rate: float             # Net Investment Income Tax (3.8%)
 
     # Income
     annual_w2_income: float

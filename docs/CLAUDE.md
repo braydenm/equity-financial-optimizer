@@ -69,6 +69,8 @@ Each calculator must include:
 ## Project Overview
 The Equity Financial Optimizer is a modular toolkit of financial calculators designed for equity compensation and donation planning scenarios. Each calculator is built as a standalone module that can interact with other calculators and be exposed via MCP (Model Context Protocol) or other integration methods.
 
+The system uses a component-based annual tax composition architecture that properly calculates taxes using progressive brackets, not flat rates.
+
 ## Architecture Principles
 1. **Modular Design**: Each calculator is a self-contained module with clear inputs/outputs
 2. **Composability**: Calculators can call each other to build complex scenarios
@@ -251,6 +253,7 @@ The Equity Financial Optimizer is a modular toolkit of financial calculators des
 - Implemented share donation calculator:
   - Created `share_donation_calculator.py` with comprehensive donation calculations
   - Handles AGI limitations (30% stock, 50% cash), carryforward rules, company match
+  - See [REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md) for full details
   - Built `donation_strategy_generator.py` with 7 different strategies
   - Integrated with scenario planner through `evaluate_donation_strategies()`
   - Created `donation_strategy_discovery.py` example showing real usage
@@ -314,102 +317,121 @@ The Equity Financial Optimizer is a modular toolkit of financial calculators des
     - Removed legacy directory-based scenario handling
     - Fixed trailing underscore bug in output folder names
     - Consolidated documentation: merged MAIN_EXECUTION_WORKFLOW.md into TECHNICAL_ARCHITECTURE.md
+  - Completed Timeline Generation & Data Source Management:
+    - ✅ Created automated timeline generation based on active data source (demo vs user)
+    - ✅ Built `engine/timeline_generator.py` for data-source aware timeline creation
+    - ✅ Integrated timeline generation into PortfolioManager.load_user_data()
+    - ✅ Timelines automatically saved to `output/{data_source}/timeline/equity_position_timeline.csv`
+    - ✅ Eliminated lot ID mismatch errors when switching between demo and user data
+    - ✅ Scenarios now always reference correct lot IDs for their data source
+  - Completed Detailed Financial Materialization:
+    - ✅ Built `projections/detailed_materialization.py` for comprehensive calculation transparency
+    - ✅ Created three levels of detail: action summary, annual summary, and full details
+    - ✅ Integrated with projection output to run automatically on every scenario
+    - ✅ Shows which calculator was used for each action (ISO exercise, share sale, donation)
+    - ✅ Captures all intermediate calculations: gross proceeds, capital gains, tax impacts
+    - ✅ Enables tracing of financial differences between scenarios to specific actions/years
+    - ✅ Generated CSV files support easy analysis in Excel/Google Sheets
+- **Completed Annual Tax Composition Refactor:**
+  - ✅ Created component data structures (ISOExerciseComponents, NSOExerciseComponents, ShareSaleComponents, DonationComponents)
+  - ✅ Built AnnualTaxCalculator for proper annual tax calculation with progressive brackets
+  - ✅ Updated ProjectionCalculator to use component extraction instead of direct tax calculation
+  - ✅ Fixed critical bugs:
+    - NSO exercises now use proper tax brackets instead of flat 48.65% rate
+    - LTCG now uses 0%/15%/20% federal brackets based on income
+    - AMT properly calculated at annual level
+    - Charitable deductions respect AGI limits
+  - ✅ Removed backward compatibility - profiles now require separate federal/state tax rates
+  - ✅ Enhanced UserProfile with separate federal/state tax rates (removed combined rates)
+  - ✅ Added UserProfile to ProjectionResult to maintain context
+  - ✅ Renamed data/ → input_data/ and removed CSV loader
+  - ✅ Converted scenarios from CSV to JSON format
+  - ✅ Fixed ISO disqualifying disposition calculations with proper FMV tracking
+  - ✅ Removed all legacy tax calculation methods from calculators
+  - ✅ Updated all profile files and templates to new format
+  - ✅ Created comprehensive test suite demonstrating ~25% tax savings from proper calculations
 
 ### In Progress 🔄
 
-**Timeline Generation & Data Source Management** - Foundation for all scenario execution:
-- 🔄 Generate working timeline CSV based on specified profile (user_profile.json or demo_profile.json)
-- 🔄 Ensure timeline CSV matches the data source being used (demo vs user)
-- 🔄 Automate timeline regeneration when switching between data sources
-- 🔄 Validate lot IDs in scenarios match those in generated timeline
-
-**Detailed Financial Materialization** - Enhanced calculation transparency:
-- 🔄 Plan for annualizing and materializing calculations within each scenario
-- 🔄 Create detailed materialized CSV columns for every period/action
-- 🔄 Enable tracing of financial outcome differences to specific years/actions
-- 🔄 Design comprehensive column structure for full financial visibility
+Currently no major features in progress. The system is stable with:
+- Component-based annual tax calculations
+- Progressive tax brackets properly applied
+- All inputs via JSON, all outputs via CSV
+- Comprehensive test coverage
 
 ### Up Next 📋
 
-**IMMEDIATE - Timeline Generation & Data Management:**
-1. **Automated timeline generation for data sources:**
-   - Create `generate_timeline_for_profile(profile_path: str)` function
-   - Ensure demo scenarios work with demo timeline (demo lot IDs)
-   - Ensure user scenarios work with user timeline (real lot IDs)
-   - Handle timeline regeneration when `--demo` flag is used
-   - Store separate timelines: `output/working/demo_equity_timeline.csv` and `output/working/user_equity_timeline.csv`
+**PRIORITY - CSV Output Overhaul:**
+1. **Remove Redundant CSVs:**
+   - equity_holdings.csv (duplicates equity timeline)
+   - summary.csv (no discount rate, misleading totals)
+   - detailed_calculations.csv (if redundant with other outputs)
+   - yearly_cashflow.csv (too simplistic)
 
-2. **Scenario validation against timeline:**
-   - Validate lot IDs in scenario CSV exist in corresponding timeline
+2. **Fix Existing CSVs:**
+   - action_summary.csv: Add vests/expirations, holding periods, tax treatment
+   - annual_tax_detail.csv: Rename from tax_timeline, show component breakdown
+   - transition_timeline.csv: Fix bugs (only positive numbers, valid transitions)
+   - state_timeline.csv: Ensure current year grants included
+
+3. **Add Critical Tracking CSVs:**
+   - holding_period_tracking.csv: Acquisition/disposition dates, qualifying status
+   - pledge_obligations.csv: Creation, deadline, fulfillment tracking
+   - charitable_carryforward.csv: Vintage years, usage, expiration
+   - tax_component_breakdown.csv: Show ISO/NSO/LTCG/STCG components by year
+
+**Enhanced Scenario Validation:**
+1. **Scenario validation against timeline:**
+   - Validate lot IDs in scenario JSON exist in corresponding timeline
    - Check quantities don't exceed available amounts
    - Ensure exercise actions reference vested lots
    - Provide clear error messages for mismatches
 
-**IMMEDIATE - Detailed Financial Materialization:**
-1. **Design comprehensive CSV column structure:**
-   - Period columns: year, quarter, month, action_date
-   - Action details: action_type, lot_id, quantity, price_per_share
-   - Cash flow: starting_cash, income, exercise_cost, sale_proceeds, donation_value
-   - Tax details: ordinary_income, capital_gains_ltcg, capital_gains_stcg, amt_base, regular_tax, amt_tax
-   - Deductions: charitable_deduction_used, charitable_carryforward, amt_credit_generated, amt_credit_used
-   - Equity position: vested_unexercised, exercised_held, total_shares, total_value
-   - Cumulative metrics: ytd_taxes, ytd_donations, lifetime_taxes, lifetime_donations
+2. **Enhanced error handling and user feedback:**
+   - Show which lots are available for each action type
+   - Suggest corrections for invalid lot IDs
+   - Provide quantity availability warnings
+   - Generate validation summary before execution
 
-2. **Implement detailed calculation tracking:**
-   - Create `MaterializedProjectionState` that captures every intermediate calculation
-   - Track which specific calculator was used for each value
-   - Enable "show your work" functionality for tax calculations
-   - Support drill-down from summary metrics to component calculations
+**Future Enhancements:**
+1. **Profile Enhancement:**
+   - Add future_income_changes for salary changes/promotions
+   - Support time-varying financial parameters
+   - Enable spouse income projections
 
-**Phase 1 - Enhanced Tax Composability:**
-1. **Annual tax aggregation pattern:**
-   - Design year-end tax calculation that combines all actions in single year
-   - Handle complex interactions: W2 + NSO exercise + capital gains + charitable deductions + AMT
-   - Validate tax calculations compose correctly for multi-action years
+2. **Advanced Scenario Features:**
+   - Pledge fulfillment tracking improvements (maximalist vs minimalist)
+   - Multi-year optimization with carryforward awareness
+   - Conditional actions based on price targets or tax thresholds
+   - Generate comparison CSVs highlighting scenario differences
 
-**Phase 2 - Projection Engine Foundation:**
-1. Create projection state models (YearlyState, ProjectionPlan)
-2. Ask user to come up with scenarios
-3. Implement ProjectionCalculator using existing calculators (modification allowed as needed)
-4. Validate Natural Evolution scenario runs correctly
+3. **State Tax Calculations Beyond California:**
+   - Add support for other states with different tax treatments
+   - Handle states with no income tax (WA, TX, FL, etc.)
+   - Support states with different LTCG treatments
 
-  **Related - Tax Composability Design:**
-1. **Design year-end tax calculation pattern:**
-   - Keep atomic calculators for individual actions (exercise, sale, donation)
-   - Add annual tax aggregator that combines all year's actions:
-     ```python
-     def calculate_annual_tax_impact(actions: List[Action], profile: UserProfile) -> TaxSummary:
-         # Aggregate ordinary income (W2 + NSO exercise)
-         # Aggregate capital gains (LTCG/STCG from sales)
-         # Calculate AMT on combined income vs regular tax
-         # Apply charitable deductions against total AGI
-         # Return comprehensive tax summary
-     ```
-   - Validate tax interactions work correctly for complex years
+4. **Advanced Tax Optimization Features:**
+   - Multi-year AMT credit optimization strategies
+   - Tax loss harvesting recommendations
+   - Estimated tax payment calculations
+   - Donor Advised Fund optimization with multi-year planning
 
-2. **Stress test composability:**
-   - Create test scenarios with multiple actions in single year
-   - Validate: exercise ISO + exercise NSO + tender NSO + donate shares
-   - Ensure tax calculations are correct and composable
+**Key Architectural Principles:**
+- Tax calculations are inherently annual but composed from individual actions
+- Timing matters critically for tax treatment (364 vs 366 days = STCG vs LTCG)
+- All inputs from JSON, all outputs to CSV
+- Progressive tax brackets, not flat rates
+- Preserve calculation context through entire pipeline
+- Internal state tracks obligations, external CSVs visualize them
+- Calculators return components for composition, not final tax amounts
+- Action processing is separate from tax calculation
 
-**Phase 3 - Advanced Scenario Features:**
-1. Annual tax aggregation for complex multi-action years (W2 + exercises + sales + donations)
-2. Pledge fulfillment tracking improvements (maximalist vs minimalist interpretation)
-3. AMT credit carryforward tracking across years
-4. Charitable deduction carryforward with 5-year expiration
-5. Generate comparison CSVs that highlight differences between scenarios
-
-**Phase 3 - Calculator Gap Resolution:**
-1. Enhance tax state tracking (AMT credit carryforward, charitable deduction carryforward with additional data structure)
-2. Add pledge obligation tracking per company program rules (maximalist vs minimalist interpretation)
-3. Address option expiration tracking if not already available in user_profile.json
-4. Validate multi-year projections balance correctly
-
-**Phase 4 - Testing & Validation:**
-1. Main execution workflow (projection_analysis.py)
-2. Generate equity_position_timeline.csv as product of user_profile.json
-3. Testing with specified scenarios (to be defined when needed)
-4. Documentation and validation
+**Implementation Status:**
+- ✅ Calculator refactor structure complete
+- ✅ Data structures updated with context
+- 🔄 ProjectionCalculator integration in progress
+- 🔄 CSV outputs need completion
+- 🔄 Complex scenario testing needed
 
 ### Future Vision 🚀
 

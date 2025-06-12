@@ -1,0 +1,94 @@
+{
+  "scenario_name": "002_tender_and_donate",
+  "description": "Complex multi-year strategy with tender participation, charitable donations, and ISO exercises",
+  "actions": [
+    {
+      "action_date": "2025-05-26",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Tender offer participation - LTCG eligible RSU shares for tax efficiency"
+    },
+    {
+      "action_date": "2025-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Donate shares to fulfill pledge obligation from tender (company 3:1 match)"
+    },
+    {
+      "action_date": "2026-06-15",
+      "action_type": "sell",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1500,
+      "price": null,
+      "notes": "Sell ISO shares after LTCG qualification (held >1 year)"
+    },
+    {
+      "action_date": "2026-12-15",
+      "action_type": "donate",
+      "lot_id": "ISO_2023_001",
+      "quantity": 750,
+      "price": null,
+      "notes": "Donate to fulfill pledge from June sale with company match"
+    },
+    {
+      "action_date": "2027-01-15",
+      "action_type": "exercise",
+      "lot_id": "VESTED_ISO",
+      "quantity": 6000,
+      "price": null,
+      "notes": "Exercise half of vested ISOs for diversification"
+    },
+    {
+      "action_date": "2027-11-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2022_001",
+      "quantity": 800,
+      "price": null,
+      "notes": "Sell RSU shares after tax optimization"
+    },
+    {
+      "action_date": "2027-12-20",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 400,
+      "price": null,
+      "notes": "Donate to fulfill pledge from November sale"
+    },
+    {
+      "action_date": "2028-01-20",
+      "action_type": "exercise",
+      "lot_id": "VESTED_ISO",
+      "quantity": 6000,
+      "price": null,
+      "notes": "Exercise remaining vested ISOs"
+    },
+    {
+      "action_date": "2028-06-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Additional charitable donation with company match"
+    },
+    {
+      "action_date": "2029-01-15",
+      "action_type": "sell",
+      "lot_id": "VESTED_ISO_EX_20270115",
+      "quantity": 3000,
+      "price": null,
+      "notes": "Sell some ISO shares after LTCG qualification"
+    },
+    {
+      "action_date": "2029-12-01",
+      "action_type": "donate",
+      "lot_id": "VESTED_ISO_EX_20270115",
+      "quantity": 1500,
+      "price": null,
+      "notes": "Final donation to maximize company match program"
+    }
+  ]
+}

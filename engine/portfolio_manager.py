@@ -21,14 +21,14 @@ from projections.projection_state import (
 from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs, create_comparison_csv
 from loaders.scenario_loader import ScenarioLoader
-from loaders.csv_loader import CSVLoader
 from loaders.profile_loader import ProfileLoader
+from engine.timeline_generator import TimelineGenerator
 
 
 class PriceProjector:
     """Handles price projections using simple growth rates."""
 
-    def __init__(self, price_scenarios_path: str = "data/market_assumptions/price_scenarios.json"):
+    def __init__(self, price_scenarios_path: str = "input_data/market_assumptions/price_scenarios.json"):
         """Load price growth scenarios."""
         with open(price_scenarios_path, 'r') as f:
             self.scenarios_data = json.load(f)
@@ -99,16 +99,16 @@ class PortfolioManager:
     """
 
     def __init__(self):
-        self.csv_loader = CSVLoader()
         self.price_projector = PriceProjector()
         self.profile_loader = ProfileLoader()
+        self.timeline_generator = TimelineGenerator()
         self._user_profile = None
         self._initial_lots = None
         self._data_source = None  # Track whether using 'demo' or 'user' data
         self._current_price_scenario = None  # Track current price scenario
 
-    def load_user_data(self, profile_path: str = "data/user_profile.json",
-                      equity_timeline_path: str = "output/working/equity_position_timeline/equity_position_timeline.csv",
+    def load_user_data(self, profile_path: str = "input_data/user_profile.json",
+                      equity_timeline_path: str = None,
                       force_demo: bool = False):
         """Load user profile and initial equity position with secure fallback to demo data."""
         # Load user profile with secure fallback
@@ -116,6 +116,15 @@ class PortfolioManager:
 
         # Track data source for output path generation
         self._data_source = "user" if is_real_data else "demo"
+        is_demo = not is_real_data
+
+        # Generate timeline for the appropriate data source
+        generated_timeline_path = self.timeline_generator.generate_timeline(profile_data, is_demo=is_demo)
+
+        # Use generated timeline path or fallback to provided path
+        timeline_path = generated_timeline_path if generated_timeline_path else equity_timeline_path
+        if not timeline_path:
+            timeline_path = self.timeline_generator.get_timeline_path(is_demo=is_demo)
 
         # Create UserProfile
         personal = profile_data['personal_information']
@@ -125,9 +134,13 @@ class PortfolioManager:
         charitable = profile_data['charitable_giving']
 
         self._user_profile = UserProfile(
-            ordinary_income_rate=personal['ordinary_income_rate'],
-            ltcg_rate=personal['ltcg_rate'],
-            stcg_rate=personal['stcg_rate'],
+            federal_tax_rate=personal['federal_tax_rate'],
+            federal_ltcg_rate=personal['federal_ltcg_rate'],
+            state_tax_rate=personal['state_tax_rate'],
+            state_ltcg_rate=personal['state_ltcg_rate'],
+            fica_tax_rate=personal['fica_tax_rate'],
+            additional_medicare_rate=personal['additional_medicare_rate'],
+            niit_rate=personal['niit_rate'],
             annual_w2_income=income['annual_w2_income'],
             spouse_w2_income=income['spouse_w2_income'],
             other_income=income['interest_income'] + income['other_income'] + income['dividend_income'],
@@ -142,14 +155,12 @@ class PortfolioManager:
         # Store additional data we might need
         self._profile_data = profile_data
 
-        # Load initial equity position
-        self._initial_lots = self.csv_loader.load_initial_equity_position(equity_timeline_path)
+        # TODO: Load initial equity position directly from profile data
+        # For now, create empty list until we refactor timeline generator
+        self._initial_lots = self._create_initial_lots_from_profile(profile_data)
 
         # Apply exercise dates from user profile to exercised lots
         self._apply_exercise_dates_from_profile()
-
-        # Validate that all exercised lots now have exercise dates
-        self.csv_loader.validate_exercise_dates(self._initial_lots)
 
         return self._user_profile, self._initial_lots
 
@@ -329,8 +340,8 @@ class PortfolioManager:
 
                 # Generate proper output path with data source and price scenario
                 scenario_name = os.path.basename(resolved_path)
-                if scenario_name.endswith('_actions.csv'):
-                    scenario_name = scenario_name[:-12]  # Remove "_actions.csv"
+                if scenario_name.endswith('.json'):
+                    scenario_name = scenario_name[:-5]  # Remove ".json"
 
                 scenario_output_dir = self._generate_output_path(scenario_name, portfolio.price_scenario)
 
@@ -369,14 +380,14 @@ class PortfolioManager:
     def _load_scenario_plan(self, scenario_path: str, start_date: date,
                           end_date: date, price_projections: Dict[int, float]) -> ProjectionPlan:
         """Load scenario and create projection plan."""
-        # New format: scenarios/{data_source}/001_exercise_all_vested_actions.csv
+        # New format: scenarios/{data_source}/001_exercise_all_vested.json
         scenario_base = os.path.basename(scenario_path)
-        if not scenario_base.endswith('_actions.csv'):
-            scenario_base = f"{scenario_base}_actions.csv"
+        if not scenario_base.endswith('.json'):
+            scenario_base = f"{scenario_base}.json"
 
         actions_path = os.path.join(self._get_scenario_directory(), scenario_base)
-        # Extract clean scenario name (remove number prefix and _actions.csv suffix)
-        scenario_name = scenario_base.replace('_actions.csv', '')
+        # Extract clean scenario name (remove number prefix and .json suffix)
+        scenario_name = scenario_base.replace('.json', '')
         if scenario_name[:4].isdigit() and scenario_name[3] == '_':
             scenario_name = scenario_name[4:]  # Remove "001_" prefix
         scenario_name = scenario_name.replace('_', ' ').title()
@@ -395,48 +406,49 @@ class PortfolioManager:
             price_projections=price_projections
         )
 
-        # Load actions
-        import csv
+        # Load actions from JSON
         with open(actions_path, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Skip empty rows or comments
-                if not row.get('action_date') or row['action_date'].strip().startswith('#'):
-                    continue
+            scenario_data = json.load(f)
 
-                # Parse action date
-                action_date = date.fromisoformat(row['action_date'])
+        # Update plan name and description from JSON if available
+        if 'scenario_name' in scenario_data:
+            scenario_name = scenario_data['scenario_name'].replace('_', ' ').title()
+        if 'description' in scenario_data:
+            plan.description = scenario_data['description']
 
-                # Skip actions outside projection period
-                if action_date < start_date or action_date > end_date:
-                    continue
+        # Process actions
+        for action_data in scenario_data.get('actions', []):
+            # Parse action date
+            action_date = date.fromisoformat(action_data['action_date'])
 
-                # Create action with dynamic price determination
-                action_type = ActionType(row['action_type'])
-                lot_id = row['lot_id']
-                quantity = int(row['quantity'])
+            # Skip actions outside projection period
+            if action_date < start_date or action_date > end_date:
+                continue
 
-                # Determine price based on action type and date
-                price = None
-                if row.get('price'):  # Allow manual override
-                    price = float(row['price'])
-                else:
-                    price = self._determine_action_price(
-                        action_type=action_type,
-                        action_date=action_date,
-                        lot_id=lot_id,
-                        price_projections=price_projections
-                    )
+            # Create action with dynamic price determination
+            action_type = ActionType(action_data['action_type'])
+            lot_id = action_data['lot_id']
+            quantity = int(action_data['quantity'])
 
-                action = PlannedAction(
-                    action_date=action_date,
+            # Determine price based on action type and date
+            price = action_data.get('price')
+            if price is None:  # Use dynamic pricing if not specified
+                price = self._determine_action_price(
                     action_type=action_type,
+                    action_date=action_date,
                     lot_id=lot_id,
-                    quantity=quantity,
-                    price=price,
-                    notes=row.get('notes', '')
+                    price_projections=price_projections
                 )
-                plan.add_action(action)
+
+            action = PlannedAction(
+                action_date=action_date,
+                action_type=action_type,
+                lot_id=lot_id,
+                quantity=quantity,
+                price=price,
+                notes=action_data.get('notes', '')
+            )
+            plan.add_action(action)
 
         return plan
 
@@ -497,8 +509,8 @@ class PortfolioManager:
     def _generate_output_path(self, scenario_name: str, price_scenario: str = "moderate") -> str:
         """Generate output path with data source and price scenario."""
         # Extract scenario number and name from filename (e.g., "001_exercise_all_vested" -> "scenario_001_exercise_all_vested")
-        if scenario_name.endswith('_actions.csv'):
-            scenario_name = scenario_name[:-12]  # Remove "_actions.csv"
+        if scenario_name.endswith('.json'):
+            scenario_name = scenario_name[:-5]  # Remove ".json"
 
         scenario_dir = f"scenario_{scenario_name}"
         return f"output/{self._data_source}/{price_scenario}/{scenario_dir}"
@@ -526,8 +538,8 @@ class PortfolioManager:
         """Resolve scenario path based on data source and naming convention."""
         # Resolve scenario name to appropriate data source directory
         scenario_name = scenario_path
-        if not scenario_name.endswith("_actions.csv"):
-            scenario_name = f"{scenario_name}_actions.csv"
+        if not scenario_name.endswith(".json"):
+            scenario_name = f"{scenario_name}.json"
 
         return os.path.join(self._get_scenario_directory(), scenario_name)
 

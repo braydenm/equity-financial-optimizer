@@ -1,0 +1,5 @@
+{
+  "scenario_name": "000_natural_evolution",
+  "description": "Natural Evolution - No actions taken (baseline scenario). This scenario lets equity vest naturally without any exercises, sales, or donations.",
+  "actions": []
+}

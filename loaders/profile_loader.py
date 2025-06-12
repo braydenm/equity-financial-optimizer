@@ -18,9 +18,9 @@ class ProfileLoader:
     """Secure profile loader with automatic fallback to demo data."""
 
     # Standard profile file paths relative to project root
-    USER_PROFILE_PATH = "data/user_profile.json"
-    DEMO_PROFILE_PATH = "data/demo_profile.json"
-    TEMPLATE_PROFILE_PATH = "data/user_profile_template.json"
+    USER_PROFILE_PATH = "input_data/user_profile.json"
+    DEMO_PROFILE_PATH = "input_data/demo_profile.json"
+    TEMPLATE_PROFILE_PATH = "input_data/user_profile_template.json"
 
     def __init__(self, project_root: str = None):
         """Initialize profile loader.
@@ -136,7 +136,9 @@ class ProfileLoader:
         """Validate required fields within each section."""
         # personal_information required fields
         personal = profile_data.get('personal_information', {})
-        required_personal_fields = ['ordinary_income_rate', 'ltcg_rate', 'stcg_rate', 'tax_filing_status', 'state_of_residence']
+        required_personal_fields = ['federal_tax_rate', 'federal_ltcg_rate', 'state_tax_rate', 'state_ltcg_rate',
+                                   'fica_tax_rate', 'additional_medicare_rate', 'niit_rate',
+                                   'tax_filing_status', 'state_of_residence']
         for field in required_personal_fields:
             if field not in personal:
                 raise ValueError(f"Profile missing required field 'personal_information.{field}'")

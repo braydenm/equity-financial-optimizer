@@ -20,7 +20,6 @@ from projections.projection_state import (
     ProjectionPlan, PlannedAction, ShareLot, UserProfile,
     ShareType, LifecycleState, TaxTreatment, ActionType
 )
-from loaders.csv_loader import CSVLoader
 
 
 class ScenarioLoader:
@@ -34,7 +33,6 @@ class ScenarioLoader:
             scenario_dir: Path to directory containing scenario files
         """
         self.scenario_dir = Path(scenario_dir)
-        self.csv_loader = CSVLoader()
 
     def load_scenario(self) -> Tuple[ProjectionPlan, UserProfile]:
         """
@@ -100,9 +98,13 @@ class ScenarioLoader:
         charitable = data['charitable_giving']
 
         return UserProfile(
-            ordinary_income_rate=personal['ordinary_income_rate'],
-            ltcg_rate=personal['ltcg_rate'],
-            stcg_rate=personal['stcg_rate'],
+            federal_tax_rate=personal['federal_tax_rate'],
+            federal_ltcg_rate=personal['federal_ltcg_rate'],
+            state_tax_rate=personal['state_tax_rate'],
+            state_ltcg_rate=personal['state_ltcg_rate'],
+            fica_tax_rate=personal['fica_tax_rate'],
+            additional_medicare_rate=personal['additional_medicare_rate'],
+            niit_rate=personal['niit_rate'],
             annual_w2_income=income['annual_w2_income'],
             spouse_w2_income=income['spouse_w2_income'],
             other_income=income['interest_income'] + income['other_income'] + income['dividend_income'],

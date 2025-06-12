@@ -1,5 +1,9 @@
 """
-Equity Position Timeline Generator
+Equity Position Timeline Generator (Example/Manual Version)
+
+NOTE: Timeline generation is now automated! The portfolio_manager.py automatically
+generates data-source specific timelines when loading profiles. This example shows
+how to manually generate timelines for testing or custom needs.
 
 Generates equity_position_timeline.csv describing all share lots and vesting events.
 Orders by time, then lot_id. Shows current positions and future vesting calendar.
@@ -147,7 +151,14 @@ def create_realistic_lifecycle_csv(profile: Dict[str, Any], current_date: date =
     return rows
 
 def main():
-    """Generate equity position timeline CSV from actual user data."""
+    """Generate equity position timeline CSV from actual user data.
+
+    NOTE: Timeline generation is now automated in portfolio_manager.py!
+    This example is kept for reference and manual testing purposes.
+    When you run scenarios, timelines are automatically generated in:
+    - output/demo/timeline/ for demo data
+    - output/user/timeline/ for user data
+    """
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate equity position timeline CSV')
@@ -190,7 +201,7 @@ def main():
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'equity_position_timeline')
     os.makedirs(output_dir, exist_ok=True)
 
-    # Save to CSV
+    # Save to CSV (NOTE: Automated generation saves to output/{data_source}/timeline/)
     filename = os.path.join(output_dir, 'equity_position_timeline.csv')
     with open(filename, 'w', newline='') as f:
         if lifecycle_rows:

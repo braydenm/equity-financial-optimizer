@@ -48,9 +48,13 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile:
     liquidity_needs = profile_data.get('goals_and_constraints', {}).get('liquidity_needs', {})
 
     return UserProfile(
-        ordinary_income_rate=personal_info.get('ordinary_income_rate', 0.486),
-        ltcg_rate=personal_info.get('ltcg_rate', 0.331),
-        stcg_rate=personal_info.get('stcg_rate', 0.486),
+        federal_tax_rate=personal_info['federal_tax_rate'],
+        federal_ltcg_rate=personal_info['federal_ltcg_rate'],
+        state_tax_rate=personal_info['state_tax_rate'],
+        state_ltcg_rate=personal_info['state_ltcg_rate'],
+        fica_tax_rate=personal_info['fica_tax_rate'],
+        additional_medicare_rate=personal_info['additional_medicare_rate'],
+        niit_rate=personal_info['niit_rate'],
         annual_w2_income=income.get('annual_w2_income', 0),
         spouse_w2_income=income.get('spouse_w2_income', 0),
         other_income=income.get('other_income', 0),
@@ -197,9 +201,13 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     charitable = profile_data.get('charitable_giving', {})
 
     profile = UserProfile(
-        ordinary_income_rate=personal_info.get('ordinary_income_rate', 0.486),
-        ltcg_rate=personal_info.get('ltcg_rate', 0.331),
-        stcg_rate=personal_info.get('stcg_rate', 0.486),
+        federal_tax_rate=personal_info['federal_tax_rate'],
+        federal_ltcg_rate=personal_info['federal_ltcg_rate'],
+        state_tax_rate=personal_info['state_tax_rate'],
+        state_ltcg_rate=personal_info['state_ltcg_rate'],
+        fica_tax_rate=personal_info['fica_tax_rate'],
+        additional_medicare_rate=personal_info['additional_medicare_rate'],
+        niit_rate=personal_info['niit_rate'],
         annual_w2_income=income.get('annual_w2_income', 0),
         spouse_w2_income=income.get('spouse_w2_income', 0),
         current_cash=financial_pos.get('liquid_assets', {}).get('cash', 0),
