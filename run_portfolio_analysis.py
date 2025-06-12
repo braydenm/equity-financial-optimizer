@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Portfolio Analysis Example - Educational demonstration of portfolio execution.
+Portfolio Analysis - Main CLI for equity optimization portfolio execution.
 
-This example shows how to use the portfolio-based approach to scenario analysis.
-For production use, use the main CLI tools: run_portfolio_analysis.py and run_scenario_analysis.py
+Execute and compare multiple equity optimization scenarios defined in portfolios.
 """
 
 import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add current directory to path for imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from engine.portfolio_manager import PortfolioManager, Portfolio
 from projections.projection_output import create_comparison_csv
@@ -98,28 +97,10 @@ def compare_scenarios(results):
                 print(f"  • Charitable Impact: ${metrics['total_donations_all_years']:,.0f}")
 
 
-def execute_single_scenario(scenario_path, price_scenario="moderate", projection_years=5):
-    """Execute and display a single scenario."""
-    manager = PortfolioManager()
-    manager.load_user_data()
-
-    print(f"\nExecuting scenario: {scenario_path}")
-    print(f"Price assumption: {price_scenario} ({projection_years} years)")
-
-    result = manager.execute_single_scenario(
-        scenario_path=scenario_path,
-        price_scenario=price_scenario,
-        projection_years=projection_years
-    )
-
-    print_scenario_results(result, detailed=True)
-    return result
-
-
-def execute_portfolio(portfolio_path, output_dir="output/portfolios"):
+def execute_portfolio(portfolio_path, output_dir=None, use_demo=False):
     """Execute all scenarios in a portfolio."""
     manager = PortfolioManager()
-    manager.load_user_data()
+    manager.load_user_data(force_demo=use_demo)
 
     # Load portfolio definition
     portfolio = manager.create_portfolio_from_json(portfolio_path)
@@ -130,6 +111,10 @@ def execute_portfolio(portfolio_path, output_dir="output/portfolios"):
     print(f"\nScenarios: {len(portfolio.scenario_paths)}")
     print(f"Price Scenario: {portfolio.price_scenario}")
     print(f"Projection Years: {portfolio.projection_years}")
+
+    # Use default output directory if not specified
+    if output_dir is None:
+        output_dir = "output/portfolios"
 
     # Execute all scenarios
     results = manager.execute_portfolio(portfolio, output_dir)
@@ -147,74 +132,65 @@ def execute_portfolio(portfolio_path, output_dir="output/portfolios"):
     return results
 
 
+def list_available_portfolios():
+    """List available portfolio files."""
+    print("EQUITY FINANCIAL OPTIMIZER - PORTFOLIO ANALYSIS")
+    print("="*80)
+
+    print("\nAvailable portfolios:")
+    portfolios_dir = Path("portfolios")
+    if portfolios_dir.exists():
+        for portfolio in sorted(portfolios_dir.glob("*.json")):
+            print(f"  • {portfolio.name}")
+    else:
+        print("  No portfolios found in portfolios/ directory")
+
+    print("\nData sources:")
+    user_profile_exists = Path("data/user_profile.json").exists()
+    demo_profile_exists = Path("data/demo_profile.json").exists()
+
+    if user_profile_exists:
+        print("  🔒 User profile configured (will use your personal data)")
+    else:
+        print("  ⚠️  User profile not found")
+
+    if demo_profile_exists:
+        print("  🧪 Demo profile available (safe example data)")
+    else:
+        print("  ❌ Demo profile missing")
+
+    print("\nUsage examples:")
+    print("  python run_portfolio_analysis.py portfolios/tax_strategies.json")
+    print("  python run_portfolio_analysis.py portfolios/tax_strategies.json --demo")
+    print("  python run_portfolio_analysis.py portfolios/tax_strategies.json --output custom_output/")
 
 
 def main():
     """Main entry point for portfolio analysis."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Execute equity optimization scenarios')
-    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    parser = argparse.ArgumentParser(
+        description='Execute equity optimization portfolio analysis',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s portfolios/tax_strategies.json
+  %(prog)s portfolios/tax_strategies.json --demo
+  %(prog)s portfolios/tax_strategies.json --output custom_results/
+        """
+    )
 
-    # Single scenario command
-    single_parser = subparsers.add_parser('scenario', help='Execute a single scenario')
-    single_parser.add_argument('path', help='Path to scenario directory')
-    single_parser.add_argument('--price', default='moderate',
-                              choices=['conservative', 'moderate', 'aggressive', 'flat', 'historical_tech'],
-                              help='Price growth scenario')
-    single_parser.add_argument('--years', type=int, default=5, help='Projection years')
-
-    # Portfolio command
-    portfolio_parser = subparsers.add_parser('portfolio', help='Execute a portfolio')
-    portfolio_parser.add_argument('path', help='Path to portfolio JSON file')
-    portfolio_parser.add_argument('--output', default='output/portfolios', help='Output directory')
-
-
+    parser.add_argument('portfolio', nargs='?', help='Path to portfolio JSON file')
+    parser.add_argument('--demo', action='store_true',
+                       help='Force use of demo data (safe example data)')
+    parser.add_argument('--output', help='Output directory for results')
 
     args = parser.parse_args()
 
-    if args.command == 'scenario':
-        execute_single_scenario(args.path, args.price, args.years)
-
-    elif args.command == 'portfolio':
-        execute_portfolio(args.path, args.output)
-
+    if args.portfolio:
+        execute_portfolio(args.portfolio, args.output, args.demo)
     else:
-        # Default: show available scenarios and portfolios
-        print("EQUITY FINANCIAL OPTIMIZER")
-        print("="*80)
-        print("Available scenarios:")
-
-        # Show demo scenarios
-        demo_scenarios_dir = Path("scenarios/demo")
-        if demo_scenarios_dir.exists():
-            print("  Demo scenarios (safe example data):")
-            for scenario_file in sorted(demo_scenarios_dir.glob("*_actions.csv")):
-                scenario_name = scenario_file.name.replace("_actions.csv", "")
-                print(f"    • {scenario_name}")
-
-        # Show user scenarios
-        user_scenarios_dir = Path("scenarios/user")
-        if user_scenarios_dir.exists():
-            print("  User scenarios (your personal data):")
-            for scenario_file in sorted(user_scenarios_dir.glob("*_actions.csv")):
-                scenario_name = scenario_file.name.replace("_actions.csv", "")
-                print(f"    • {scenario_name}")
-        else:
-            print("  User scenarios: Not configured (using demo scenarios)")
-
-        print("\nAvailable portfolios:")
-        portfolios_dir = Path("portfolios")
-        if portfolios_dir.exists():
-            for portfolio in sorted(portfolios_dir.glob("*.json")):
-                print(f"  • {portfolio.name}")
-
-        print("\nUsage examples:")
-        print("  python portfolio_analysis.py scenario 001_exercise_all_vested")
-        print("  python portfolio_analysis.py portfolio portfolios/tax_strategies.json")
-        print("\nFor production use:")
-        print("  python run_scenario_analysis.py 001_exercise_all_vested")
-        print("  python run_portfolio_analysis.py portfolios/tax_strategies.json")
+        list_available_portfolios()
 
 
 if __name__ == "__main__":

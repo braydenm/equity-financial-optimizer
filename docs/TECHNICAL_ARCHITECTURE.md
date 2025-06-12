@@ -19,47 +19,74 @@ The system centers around **data-driven scenario planning** where users define s
 
 ```
 Input Data (version controlled):
-├── data/user_profile.json                      # v2.0 financial profile
+├── data/demo_profile.json                      # Safe example data (committable)
+├── data/user_profile_template.json             # Template for new users
 └── data/market_assumptions/price_scenarios.json # Growth rate assumptions
+
+Input Data (git-ignored):
+└── data/user_profile.json                      # v2.0 financial profile (private)
+
+↓ (CLI auto-detects data source or uses --demo flag)
+
+Data Source Detection:
+├── ProfileLoader.load_profile(force_demo=flag)
+├── Auto-detection: user_profile.json exists → user data
+├── Fallback: user_profile.json missing → demo data
+└── Force demo: --demo flag → demo data regardless
 
 ↓ (generate base inventory)
 
-Working Files (generated):
+Working Files (data-source specific):
 └── output/working/equity_position_timeline.csv  # Base share inventory
 
 ↓ (human creates scenarios)
 
-Scenario Definitions (CSV-based):
-├── scenarios/natural_evolution/actions.csv      # Baseline: no actions
-├── scenarios/exercise_all_vested/actions.csv    # Exercise strategy
-├── scenarios/tender_and_donate/actions.csv      # Complex multi-year plan
-└── scenarios/.../actions.csv                    # Many more strategies
+Scenario Definitions (data-source specific):
+├── scenarios/demo/000_natural_evolution_actions.csv    # Safe scenarios
+├── scenarios/demo/001_exercise_all_vested_actions.csv  # Uses demo lot IDs
+├── scenarios/user/000_natural_evolution_actions.csv    # Private scenarios
+└── scenarios/user/001_exercise_all_vested_actions.csv  # Uses real lot IDs
 
-↓ (portfolio manager executes)
+↓ (portfolio manager executes with traceability)
 
-Results (multi-year projections):
-├── output/natural_evolution/
+Results (organized by data source + price scenario):
+├── output/demo/moderate/scenario_000_natural_evolution/
 │   ├── yearly_cashflow.csv
 │   ├── tax_timeline.csv
 │   ├── equity_holdings.csv
-│   └── summary.csv
-└── output/portfolio_comparison.csv
+│   ├── summary.csv
+│   └── metadata.json                           # Full execution traceability
+├── output/user/aggressive/scenario_001_exercise_all_vested/
+│   └── [same structure with user data results]
+└── output/{data_source}/portfolio_comparisons/
+    └── moderate_tax_strategy_comparison.csv
 ```
 
 ## File Organization
 
 ```
-scenarios/                               # Data-driven scenario definitions
-├── README.md                           # How to create scenarios
-├── natural_evolution/                  # Each scenario is a directory
-│   └── actions.csv                    # CSV defining planned actions
-├── exercise_all_vested/
-│   └── actions.csv
-└── tender_and_donate/
-    └── actions.csv
+# Main CLI Tools (Root Level)
+run_portfolio_analysis.py              # Execute and compare multiple scenarios
+run_scenario_analysis.py               # Execute individual scenarios
+
+scenarios/                              # Data-source specific scenario definitions
+├── demo/                              # Safe example scenarios (committable)
+│   ├── 000_natural_evolution_actions.csv     # Baseline: no actions taken
+│   ├── 001_exercise_all_vested_actions.csv   # Exercise all vested options
+│   └── 002_tender_and_donate_actions.csv     # Complex multi-year strategy
+└── user/                              # Personal scenarios (git-ignored)
+    ├── 000_natural_evolution_actions.csv     # Uses real user lot IDs
+    ├── 001_exercise_all_vested_actions.csv   # Uses real user quantities
+    └── 002_tender_and_donate_actions.csv     # Uses real user data
 
 portfolios/                             # Portfolio definitions (JSON)
 └── tax_strategies.json                # Groups scenarios for comparison
+
+output/                                 # Results with full traceability
+├── demo/moderate/scenario_000_natural_evolution/     # Demo data results
+├── user/moderate/scenario_001_exercise_all_vested/   # User data results
+├── {data_source}/portfolio_comparisons/              # Portfolio comparisons
+└── working/equity_position_timeline/                 # Generated timelines
 
 calculators/                            # Core financial computations
 ├── iso_exercise_calculator.py          # AMT calculations, breakeven analysis
@@ -81,18 +108,18 @@ engine/                                 # Portfolio and scenario management
 loaders/                                # Data loading utilities
 ├── csv_loader.py                       # Load equity timeline and actions
 ├── scenario_loader.py                  # Load scenario definitions
+├── profile_loader.py                   # Secure profile loading with demo fallback
 └── __init__.py
 
 data/                                   # User data and assumptions
-├── user_profile.json                   # v2.0 format financial data
-├── market_assumptions/
-│   └── price_scenarios.json           # Growth rate definitions
-└── README.md
+├── user_profile.json                   # v2.0 format financial data (git-ignored)
+├── demo_profile.json                   # Safe example data (committable)
+├── user_profile_template.json          # Template for new users
+└── market_assumptions/
+    └── price_scenarios.json           # Growth rate definitions
 
-examples/                               # Usage demonstrations
-├── portfolio_analysis.py               # Main CLI tool
-├── projection_analysis.py              # Natural evolution demo
-└── multi_scenario_analysis.py          # Legacy multi-scenario runner
+examples/                               # Educational demonstrations
+└── portfolio_analysis.py               # Educational example (use main CLI tools)
 
 tests/                                  # Unit tests with known values
 ├── test_iso_exercise_calculator.py
@@ -105,6 +132,7 @@ docs/                                   # Documentation
 ├── TECHNICAL_ARCHITECTURE.md           # This file
 ├── PORTFOLIO_ARCHITECTURE.md           # Portfolio system design
 ├── DATA_CONTRACT.md                    # Profile format specification
+├── TIMELINE_DATA_MODEL.md              # Timeline data model
 ├── PROJECT_SPEC.md                     # Original requirements
 └── reference/                          # Reference implementations
 ```
@@ -137,7 +165,7 @@ docs/                                   # Documentation
 - `calculate_tender_tax()` - Capital gains with automatic validation
 - `calculate_donation()` - Unified function for cash and share donations
 
-**Design**: Stateless, composable functions with strong typing and validation.
+### Design**: Stateless, composable functions with strong typing and validation.
 
 ### Projection System
 **Purpose**: Multi-year scenario evaluation using core calculators
@@ -147,6 +175,67 @@ docs/                                   # Documentation
 - **`projection_output.py`**: Structured CSV outputs for analysis
 
 **Design**: Takes any `ProjectionPlan` and evaluates it deterministically.
+
+## Main Execution Workflow
+
+### Core Workflow: Data → Scenarios → Projections → Analysis
+
+#### Step 1: Data Source Detection & Timeline Generation
+```
+CLI Tool (--demo flag or auto-detection)
+    ↓
+ProfileLoader.load_profile(force_demo=flag)
+    ↓
+{user|demo}_profile.json → equity_position_timeline.csv
+    ↓
+BaseEquityState (lots, vesting schedule, financial constraints)
+```
+
+#### Step 2: Scenario Resolution
+```
+Scenario Name (e.g., "001_exercise_all_vested")
+    ↓
+Data Source Detection → scenarios/{demo|user}/001_exercise_all_vested_actions.csv
+    ↓
+CSV Actions → ProjectionPlan (complete multi-year action sequence)
+```
+
+#### Step 3: Financial Projection
+```
+ProjectionPlan + UserProfile
+    ↓
+ProjectionCalculator (orchestrates ISO, Sale, Donation calculators)
+    ↓
+YearlyProjection (cash, taxes, donations, obligations, stock value)
+```
+
+#### Step 4: Traceability & Output
+```
+YearlyProjection
+    ↓
+Output Generation with metadata.json
+    ↓
+output/{data_source}/{price_scenario}/scenario_{name}/
+├── yearly_cashflow.csv
+├── tax_timeline.csv  
+├── equity_holdings.csv
+├── summary.csv
+└── metadata.json (execution traceability)
+```
+
+### Enhanced Security & Traceability Features
+
+#### Data Source Isolation
+- **Demo scenarios**: Safe example data using demo lot IDs (committable)
+- **User scenarios**: Personal data using real lot IDs (git-ignored)
+- **Automatic detection**: System chooses appropriate scenario directory
+- **Force demo**: `--demo` flag overrides auto-detection
+
+#### Complete Execution Traceability
+- **metadata.json**: Records data source, price scenario, timestamps, profile version
+- **Structured output paths**: `output/{data_source}/{price_scenario}/scenario_{name}/`
+- **Portfolio comparisons**: Grouped by data source with clear labeling
+- **Audit trail**: Every execution tracked with complete parameter set
 
 ### Price Intelligence System
 **Purpose**: Eliminate manual price entry errors

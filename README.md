@@ -5,14 +5,17 @@ A comprehensive toolkit for optimizing equity compensation decisions with specia
 ## 🚀 Quick Start
 
 ```bash
-# Run a demo comparing baseline with exercise strategies
-python3 examples/portfolio_analysis.py demo
+# Run a portfolio analysis comparing multiple strategies
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json
+
+# Run a portfolio with demo data (safe example data)
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json --demo
 
 # Execute a single scenario with moderate growth assumptions
-python3 examples/portfolio_analysis.py scenario scenarios/exercise_all_vested --price moderate --years 5
+python3 run_scenario_analysis.py 001_exercise_all_vested --price moderate --years 5
 
-# Run a portfolio of tax optimization strategies
-python3 examples/portfolio_analysis.py portfolio portfolios/tax_strategies.json
+# Run a single scenario with demo data
+python3 run_scenario_analysis.py 000_natural_evolution --demo
 ```
 
 ## 🔐 Secure Profile Setup
@@ -28,8 +31,9 @@ The system uses a secure three-file pattern for handling sensitive financial dat
 
 **Option 1: Use Demo Data (Safe)**
 ```bash
-# Just run - system automatically uses demo data
-python3 examples/portfolio_analysis.py demo
+# Run any analysis with demo data using --demo flag
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json --demo
+python3 run_scenario_analysis.py 001_exercise_all_vested --demo
 ```
 
 **Option 2: Use Your Real Data**
@@ -41,7 +45,8 @@ cp data/user_profile_template.json data/user_profile.json
 # (This file is git-ignored and stays private)
 
 # 3. Run scenarios - system automatically detects and uses your data
-python3 examples/portfolio_analysis.py demo
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json
+python3 run_scenario_analysis.py 001_exercise_all_vested
 ```
 
 ### Security Features
@@ -56,7 +61,24 @@ The system will automatically detect which profile to use and inform you:
 
 ## 🎯 Data-Driven Scenario Planning
 
-Create scenarios by defining actions in simple CSV files:
+The system uses numbered scenarios organized by data source for security:
+
+### Scenario Structure
+```
+scenarios/
+├── demo/                    # Safe example scenarios (committable)
+│   ├── 000_natural_evolution_actions.csv
+│   ├── 001_exercise_all_vested_actions.csv
+│   └── 002_tender_and_donate_actions.csv
+└── user/                    # Your personal scenarios (git-ignored)
+    ├── 000_natural_evolution_actions.csv
+    ├── 001_exercise_all_vested_actions.csv
+    └── 002_tender_and_donate_actions.csv
+```
+
+### Creating Scenarios
+
+Define your strategy in CSV files with this format:
 
 ```csv
 action_date,action_type,lot_id,quantity,price,notes
@@ -65,12 +87,15 @@ action_date,action_type,lot_id,quantity,price,notes
 2026-01-15,exercise,VESTED_ISO,5000,,Exercise vested ISOs
 ```
 
-The system automatically determines prices:
+### Automatic Price Intelligence
 - **Exercise**: Uses strike price from equity lots
-    <!-- #Do we need to maintain a forecast of 409a prices for calculating the impacts of exercise decisions? what other factors are non-negotiable in forecasts based on what the calculators require? -->
 - **Sell**: Uses tender price if near tender date, otherwise projected price
 - **Donate**: Uses projected market price
-<!-- What other forecasted values are needed for accurate tax planning for all of these actions? -->
+
+### Action Types
+- **exercise**: Convert vested options to shares (triggers AMT/tax calculations)
+- **sell**: Sell shares (creates capital gains, pledge obligations)
+- **donate**: Donate shares (tax deduction, company match, reduces pledge)
 
 ## 🎁 Why This Matters
 
@@ -85,60 +110,76 @@ This toolkit models complete multi-year scenarios so you can make data-driven de
 ## 📊 Key Features
 
 - **Portfolio-Based Analysis**: Group and compare multiple scenarios with shared assumptions
-- **Data-Driven Scenarios**: Define strategies in CSV files, not code
+- **Data-Source Separation**: Demo vs user scenarios automatically detected for security
+- **Numbered Scenarios**: Clear ordering (000_, 001_, 002_) for systematic strategy comparison
 - **Multi-Year Projections**: Model complete equity lifecycle with dynamic date handling
 - **Comprehensive Tax Modeling**: AMT, capital gains, charitable deductions with proper composability
 - **Donation Impact Optimization**: Company match calculations with AGI limits and carryforward
-- **Pledge Tracking**: Automatic obligation tracking from sales with FIFO discharge
+- **Enhanced Traceability**: Complete metadata tracking for every scenario execution
+- **Secure by Design**: User data isolation with automatic fallback to demo data
 
 ## 🏗️ Project Structure
 
 ```
-scenarios/                # Data-driven scenario definitions
-├── README.md            # How to create scenarios
-├── natural_evolution/   # Baseline do-nothing scenario
-│   └── actions.csv
-├── exercise_all_vested/ # Exercise all vested options
-│   └── actions.csv
-└── tender_and_donate/   # Complex multi-year strategy
-    └── actions.csv
+# Main CLI Tools
+run_portfolio_analysis.py          # Execute and compare multiple scenarios
+run_scenario_analysis.py           # Execute individual scenarios
 
-portfolios/              # Collections of scenarios
-└── tax_strategies.json  # Compare different tax approaches
+scenarios/                          # Data-driven scenario definitions
+├── demo/                          # Safe example scenarios (committable)
+│   ├── 000_natural_evolution_actions.csv
+│   ├── 001_exercise_all_vested_actions.csv
+│   └── 002_tender_and_donate_actions.csv
+└── user/                          # Personal scenarios (git-ignored)
+    ├── 000_natural_evolution_actions.csv
+    ├── 001_exercise_all_vested_actions.csv
+    └── 002_tender_and_donate_actions.csv
 
-calculators/             # Pure financial calculations
-├── iso_exercise_calculator.py     # AMT calculations for ISOs
-├── share_sale_calculator.py       # Capital gains tax calculations
-└── share_donation_calculator.py   # Charitable deductions, company match
+portfolios/                        # Collections of scenarios
+└── tax_strategies.json           # Compare different tax approaches
 
-projections/             # Multi-year projection engine
-├── projection_calculator.py       # Orchestrates calculators across years
-├── projection_state.py           # State tracking data structures
-└── projection_output.py          # CSV output generation
+output/                            # Results with full traceability
+├── demo/moderate/scenario_000_natural_evolution/
+├── user/moderate/scenario_001_exercise_all_vested/
+└── {data_source}/portfolio_comparisons/
 
-engine/                  # Portfolio execution and price handling
-├── portfolio_manager.py          # Execute scenarios and portfolios
+calculators/                       # Pure financial calculations
+├── iso_exercise_calculator.py    # AMT calculations for ISOs
+├── share_sale_calculator.py      # Capital gains tax calculations
+└── share_donation_calculator.py  # Charitable deductions, company match
+
+projections/                       # Multi-year projection engine
+├── projection_calculator.py      # Orchestrates calculators across years
+├── projection_state.py          # State tracking data structures
+└── projection_output.py         # CSV output generation
+
+engine/                           # Portfolio execution and price handling
+├── portfolio_manager.py         # Execute scenarios and portfolios
 └── natural_evolution_generator.py # Generate baseline scenarios
 
-data/                    # User data and market assumptions
-├── user_profile.json            # v2.0 format financial data
+data/                             # User data and market assumptions
+├── user_profile.json           # v2.0 format financial data (git-ignored)
+├── demo_profile.json           # Safe example data
+├── user_profile_template.json  # Template for new users
 └── market_assumptions/
-    └── price_scenarios.json     # Growth rate assumptions
+    └── price_scenarios.json    # Growth rate assumptions
 
-examples/                # Usage demonstrations
-├── portfolio_analysis.py        # Main CLI tool for analysis
-├── projection_analysis.py       # Legacy natural evolution demo
-└── multi_scenario_analysis.py   # Previous multi-scenario runner
+examples/                        # Educational demonstrations
+└── portfolio_analysis.py       # Educational example (use main CLI tools instead)
 ```
 
-## 📋 Creating Scenarios
+## 📋 Creating Custom Scenarios
 
-1. **Create a directory** under `scenarios/`:
+1. **Create your scenario file** in the appropriate directory:
    ```bash
-   mkdir scenarios/my_strategy
+   # For demo scenarios (safe to commit)
+   touch scenarios/demo/003_my_strategy_actions.csv
+   
+   # For personal scenarios (git-ignored, uses your real lot IDs)
+   touch scenarios/user/003_my_strategy_actions.csv
    ```
 
-2. **Create actions.csv** defining your strategy:
+2. **Define your strategy** in the CSV file:
    ```csv
    action_date,action_type,lot_id,quantity,price,notes
    2025-07-01,exercise,VESTED_ISO,5000,,Exercise portion of ISOs
@@ -146,10 +187,22 @@ examples/                # Usage demonstrations
    2026-12-01,donate,LOT-02,500,,Fulfill pledge obligation
    ```
 
-3. **Run the scenario**:
+3. **Run your scenario**:
    ```bash
-   python3 examples/portfolio_analysis.py scenario scenarios/my_strategy
+   # Single scenario execution
+   python3 run_scenario_analysis.py 003_my_strategy
+   
+   # Add to a portfolio for comparison
+   # Edit portfolios/tax_strategies.json to include "003_my_strategy"
+   python3 run_portfolio_analysis.py portfolios/tax_strategies.json
    ```
+
+### Best Practices for Custom Scenarios
+- **Use realistic dates**: Check vesting calendar in your user_profile.json
+- **Match lot IDs**: Ensure lot IDs exist in your equity position timeline
+- **Consider cash flow**: Ensure sufficient cash for exercises and taxes
+- **Document strategy**: Use the notes column to explain your rationale
+- **Test incrementally**: Start with simple scenarios before complex multi-year plans
 
 ## 💡 Price Projections
 
@@ -192,13 +245,16 @@ Define multiple scenarios to compare in a JSON file:
 ### Command Line Interface
 ```bash
 # Show available scenarios and portfolios
-python3 examples/portfolio_analysis.py
+python3 run_scenario_analysis.py
+python3 run_portfolio_analysis.py
 
-# Run with custom price assumptions
-python3 examples/portfolio_analysis.py scenario scenarios/my_strategy --price aggressive --years 7
+# Run single scenarios with custom assumptions
+python3 run_scenario_analysis.py 001_exercise_all_vested --price aggressive --years 7
+python3 run_scenario_analysis.py 000_natural_evolution --demo
 
-# Execute a portfolio
-python3 examples/portfolio_analysis.py portfolio portfolios/tax_strategies.json --output output/my_analysis
+# Execute portfolios
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json
+python3 run_portfolio_analysis.py portfolios/tax_strategies.json --demo --output custom_results/
 ```
 
 ## 📋 Data Format

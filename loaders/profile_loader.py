@@ -34,8 +34,12 @@ class ProfileLoader:
         else:
             self.project_root = Path(project_root)
 
-    def load_profile(self, verbose: bool = True) -> Tuple[Dict[str, Any], bool]:
+    def load_profile(self, verbose: bool = True, force_demo: bool = False) -> Tuple[Dict[str, Any], bool]:
         """Load user profile with secure fallback logic.
+
+        Args:
+            verbose: Whether to print status messages
+            force_demo: If True, force use of demo data regardless of user_profile.json existence
 
         Returns:
             Tuple of (profile_data, is_real_data)
@@ -46,24 +50,30 @@ class ProfileLoader:
             FileNotFoundError: If neither user profile nor demo profile can be loaded
             ValueError: If profile data is invalid
         """
-        # Try to load real user profile first
-        user_profile_path = self.project_root / self.USER_PROFILE_PATH
+        # If force_demo is True, skip user profile and go directly to demo
+        if force_demo:
+            if verbose:
+                print("🧪 Forcing use of demo financial data from demo_profile.json")
+                print("   (Safe example data - no personal information)")
+        else:
+            # Try to load real user profile first
+            user_profile_path = self.project_root / self.USER_PROFILE_PATH
 
-        if user_profile_path.exists():
-            try:
-                profile_data = self._load_json_file(user_profile_path)
-                self._validate_profile_data(profile_data)
+            if user_profile_path.exists():
+                try:
+                    profile_data = self._load_json_file(user_profile_path)
+                    self._validate_profile_data(profile_data)
 
-                if verbose:
-                    print("🔒 Using personal financial data from user_profile.json")
-                    print("   (This file contains sensitive data and is not committed to git)")
+                    if verbose:
+                        print("🔒 Using personal financial data from user_profile.json")
+                        print("   (This file contains sensitive data and is not committed to git)")
 
-                return profile_data, True
+                    return profile_data, True
 
-            except (json.JSONDecodeError, ValueError) as e:
-                if verbose:
-                    print(f"⚠️  Error loading user_profile.json: {e}")
-                    print("   Falling back to demo data...")
+                except (json.JSONDecodeError, ValueError) as e:
+                    if verbose:
+                        print(f"⚠️  Error loading user_profile.json: {e}")
+                        print("   Falling back to demo data...")
 
         # Fallback to demo profile
         demo_profile_path = self.project_root / self.DEMO_PROFILE_PATH
@@ -207,18 +217,19 @@ class ProfileLoader:
 
 
 # Convenience functions for common use cases
-def load_user_profile(project_root: str = None, verbose: bool = True) -> Tuple[Dict[str, Any], bool]:
+def load_user_profile(project_root: str = None, verbose: bool = True, force_demo: bool = False) -> Tuple[Dict[str, Any], bool]:
     """Convenience function to load user profile with fallback.
 
     Args:
         project_root: Path to project root. If None, auto-detects.
         verbose: Whether to print loading status messages.
+        force_demo: If True, force use of demo data regardless of user_profile.json existence.
 
     Returns:
         Tuple of (profile_data, is_real_data)
     """
     loader = ProfileLoader(project_root)
-    return loader.load_profile(verbose=verbose)
+    return loader.load_profile(verbose=verbose, force_demo=force_demo)
 
 
 def get_profile_loader(project_root: str = None) -> ProfileLoader:

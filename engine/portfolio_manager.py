@@ -108,10 +108,11 @@ class PortfolioManager:
         self._current_price_scenario = None  # Track current price scenario
 
     def load_user_data(self, profile_path: str = "data/user_profile.json",
-                      equity_timeline_path: str = "output/working/equity_position_timeline/equity_position_timeline.csv"):
+                      equity_timeline_path: str = "output/working/equity_position_timeline/equity_position_timeline.csv",
+                      force_demo: bool = False):
         """Load user profile and initial equity position with secure fallback to demo data."""
         # Load user profile with secure fallback
-        profile_data, is_real_data = self.profile_loader.load_profile(verbose=True)
+        profile_data, is_real_data = self.profile_loader.load_profile(verbose=True, force_demo=force_demo)
 
         # Track data source for output path generation
         self._data_source = "user" if is_real_data else "demo"
