@@ -46,6 +46,7 @@ data/user_profile.json
 data/user_backgound_info.txt
 input_data/user_profile.json
 input_data/user_background_info.txt
+input_data/user_backgound_info.txt
 docs/reference/equity-donation-matching-faq.md
 docs/reference/tender-offer-may-2025.md
 scenario_config.json
