@@ -9,6 +9,7 @@ import csv
 import os
 from typing import List, Dict, Any
 from projections.projection_state import ProjectionResult, YearlyState, LifecycleState
+from projections.detailed_materialization import materialize_detailed_projection
 
 
 def save_yearly_cashflow_csv(result: ProjectionResult, output_path: str) -> None:
@@ -285,6 +286,9 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     save_equity_holdings_csv(result, f"{output_dir}/{base_name}_equity_holdings.csv")
     save_state_timeline_csv(result, f"{output_dir}/{base_name}_state_timeline.csv")
     save_transition_timeline_csv(result, f"{output_dir}/{base_name}_transition_timeline.csv")
+
+    # Generate detailed financial materialization for full transparency
+    materialize_detailed_projection(result, output_dir, scenario_name)
 
 
 def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> None:

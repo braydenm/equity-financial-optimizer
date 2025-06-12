@@ -86,8 +86,8 @@ def list_available_scenarios():
     demo_scenarios_dir = Path("scenarios/demo")
     if demo_scenarios_dir.exists():
         print("  Demo scenarios (safe example data):")
-        for scenario_file in sorted(demo_scenarios_dir.glob("*_actions.csv")):
-            scenario_name = scenario_file.name.replace("_actions.csv", "")
+        for scenario_file in sorted(demo_scenarios_dir.glob("*.json")):
+            scenario_name = scenario_file.name.replace(".json", "")
             print(f"    • {scenario_name}")
     else:
         print("  Demo scenarios: Not found")
@@ -96,8 +96,8 @@ def list_available_scenarios():
     user_scenarios_dir = Path("scenarios/user")
     if user_scenarios_dir.exists():
         print("  User scenarios (your personal data):")
-        for scenario_file in sorted(user_scenarios_dir.glob("*_actions.csv")):
-            scenario_name = scenario_file.name.replace("_actions.csv", "")
+        for scenario_file in sorted(user_scenarios_dir.glob("*.json")):
+            scenario_name = scenario_file.name.replace(".json", "")
             print(f"    • {scenario_name}")
     else:
         print("  User scenarios: Not configured")
