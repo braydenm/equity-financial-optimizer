@@ -52,7 +52,7 @@ def print_scenario_results(result, detailed=True):
         print(f"\nCASH FLOW SUMMARY:")
         print(f"  {'Year':<6} {'Income':>12} {'Exercise':>12} {'Taxes':>12} {'Ending Cash':>12}")
         print(f"  {'-'*60}")
-        for state in result.yearly_states[-3:]:  # Last 3 years
+        for state in result.yearly_states:  # All years
             print(f"  {state.year:<6} ${state.income:>11,.0f} ${state.exercise_costs:>11,.0f} "
                   f"${state.tax_paid:>11,.0f} ${state.ending_cash:>11,.0f}")
 

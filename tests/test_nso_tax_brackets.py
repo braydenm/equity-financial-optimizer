@@ -40,9 +40,6 @@ def load_demo_profile():
         fica_tax_rate=data['personal_information']['fica_tax_rate'],
         additional_medicare_rate=data['personal_information']['additional_medicare_rate'],
         niit_rate=data['personal_information']['niit_rate'],
-        ordinary_income_rate=data['personal_information']['ordinary_income_rate'],
-        ltcg_rate=data['personal_information']['ltcg_rate'],
-        stcg_rate=data['personal_information']['stcg_rate'],
         # Required financial position fields
         current_cash=data['financial_position']['liquid_assets']['cash'],
         exercise_reserves=data['goals_and_constraints']['liquidity_needs']['exercise_reserves'],
@@ -83,9 +80,10 @@ def test_nso_exercise_tax_calculation():
 
     # OLD APPROACH: Flat rate calculation
     print(f"\n🚫 OLD APPROACH (Flat Rate):")
-    old_tax = bargain_element * profile.ordinary_income_rate
-    print(f"  Tax = Bargain Element × Ordinary Income Rate")
-    print(f"  Tax = ${bargain_element:,.2f} × {profile.ordinary_income_rate:.2%}")
+    combined_rate = profile.federal_tax_rate + profile.state_tax_rate
+    old_tax = bargain_element * combined_rate
+    print(f"  Tax = Bargain Element × Combined Tax Rate")
+    print(f"  Tax = ${bargain_element:,.2f} × {combined_rate:.2%}")
     print(f"  Tax = ${old_tax:,.2f}")
 
     # NEW APPROACH: Component-based with brackets
@@ -162,7 +160,8 @@ def test_nso_exercise_tax_calculation():
     large_bargain_element = large_shares * (current_fmv - strike_price)
 
     # Old approach
-    large_old_tax = large_bargain_element * profile.ordinary_income_rate
+    combined_rate = profile.federal_tax_rate + profile.state_tax_rate
+    large_old_tax = large_bargain_element * combined_rate
 
     # New approach
     large_nso_components = calculate_nso_exercise_components(

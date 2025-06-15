@@ -217,12 +217,25 @@ Base prices come from `user_profile.json`. See `user_profile_template.json` to f
 
 ## 📊 Analyzing Results
 
-The system generates comprehensive CSV outputs:
-- **yearly_cashflow.csv**: Annual income, expenses, taxes, ending cash
-- **tax_timeline.csv**: Regular tax, AMT, credits, deductions by year
-- **equity_holdings.csv**: Final position of all share lots
-- **summary.csv**: High-level metrics for decision making
-- **comparison.csv**: Side-by-side portfolio comparison
+The system generates comprehensive CSV outputs organized by detail level:
+
+### Core Analysis Files
+- **annual_tax_detail.csv**: Complete tax breakdown by component (W2, capital gains, AMT, deductions)
+- **action_summary.csv**: Every action with acquisition dates, holding periods, tax treatment, pledge tracking
+- **annual_summary.csv**: Year-by-year financial summary with key metrics
+
+### State & Transition Tracking
+- **state_timeline.csv**: Share quantities in each lifecycle state over time
+- **transition_timeline.csv**: Share movements between states (vesting, exercising, selling)
+
+### Decision Support Tracking
+- **holding_period_tracking.csv**: Acquisition dates and qualifying disposition status for each lot
+- **pledge_obligations.csv**: Donation commitments from sales with deadlines and fulfillment
+- **charitable_carryforward.csv**: Unused charitable deductions and expiration tracking
+- **tax_component_breakdown.csv**: Detailed tax calculation by income type and lot
+
+### Portfolio Comparison
+- **comparison.csv**: Side-by-side scenario comparison for portfolio analysis
 
 ## 🚀 Advanced Usage
 

@@ -26,7 +26,7 @@ def load_test_profile():
     # TODO: Keep test using demo_profile.json for stable, predictable validation
     profile_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'data', 'demo_profile.json'
+        'input_data', 'demo_profile.json'
     )
 
     with open(profile_path, 'r') as f:
@@ -171,10 +171,15 @@ def test_csv_output(result):
 
     # Check that files were created
     expected_files = [
-        f"{output_dir}/natural_evolution_yearly_cashflow.csv",
-        f"{output_dir}/natural_evolution_tax_timeline.csv",
-        f"{output_dir}/natural_evolution_summary.csv",
-        f"{output_dir}/natural_evolution_equity_holdings.csv"
+        f"{output_dir}/natural_evolution_annual_tax_detail.csv",
+        f"{output_dir}/natural_evolution_state_timeline.csv",
+        f"{output_dir}/natural_evolution_transition_timeline.csv",
+        f"{output_dir}/natural_evolution_action_summary.csv",
+        f"{output_dir}/natural_evolution_annual_summary.csv",
+        f"{output_dir}/natural_evolution_holding_period_tracking.csv",
+        f"{output_dir}/natural_evolution_pledge_obligations.csv",
+        f"{output_dir}/natural_evolution_charitable_carryforward.csv",
+        f"{output_dir}/natural_evolution_tax_component_breakdown.csv"
     ]
 
     all_files_exist = True

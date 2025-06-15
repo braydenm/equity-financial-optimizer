@@ -45,6 +45,9 @@ class DetailedAction:
     strike_price: float = 0.0
     cost_basis: float = 0.0
     holding_period_days: int = 0
+    acquisition_date: Optional[date] = None
+    tax_treatment: str = ""
+    vest_expiration_date: Optional[date] = None
 
     # Financial calculations
     gross_proceeds: float = 0.0
@@ -164,9 +167,9 @@ class DetailedMaterializer:
 
         # Income details
         detailed_year.w2_income = yearly_state.income
-        detailed_year.spouse_income = 0.0  # Not tracked in YearlyState
-        detailed_year.other_income = 0.0  # Not tracked in YearlyState
-        detailed_year.total_ordinary_income = yearly_state.income
+        detailed_year.spouse_income = yearly_state.spouse_income
+        detailed_year.other_income = yearly_state.other_income
+        detailed_year.total_ordinary_income = yearly_state.income + yearly_state.spouse_income + yearly_state.other_income
 
         # Process each action in this year
         year_actions = [a for a in plan.planned_actions if a.action_date.year == yearly_state.year]
@@ -180,7 +183,7 @@ class DetailedMaterializer:
             detailed_year.actions.append(detailed_action)
 
         # Aggregate calculations
-        detailed_year.total_exercise_cost = sum(a.exercise_cost for a in detailed_year.actions)
+        detailed_year.total_exercise_cost = yearly_state.exercise_costs  # Use from YearlyState
         detailed_year.total_gross_proceeds = sum(a.gross_proceeds for a in detailed_year.actions)
         detailed_year.total_capital_gains = sum(a.capital_gain for a in detailed_year.actions)
         detailed_year.total_ordinary_income_from_equity = sum(a.ordinary_income for a in detailed_year.actions)
@@ -247,7 +250,18 @@ class DetailedMaterializer:
             detailed.post_lot_lifecycle = lot.lifecycle_state.value
             detailed.pre_tax_treatment = lot.tax_treatment.value
             detailed.post_tax_treatment = lot.tax_treatment.value
+            detailed.tax_treatment = lot.tax_treatment.value
             detailed.strike_price = lot.strike_price
+
+            # Extract acquisition date and expiration date from lot
+            if hasattr(lot, 'acquisition_date'):
+                detailed.acquisition_date = lot.acquisition_date
+                # Calculate holding period
+                if action.action_type in [ActionType.SELL, ActionType.DONATE]:
+                    detailed.holding_period_days = (action.action_date - lot.acquisition_date).days
+
+            if hasattr(lot, 'expiration_date'):
+                detailed.vest_expiration_date = lot.expiration_date
 
         # Starting cash position
         detailed.pre_cash = yearly_state.starting_cash
@@ -274,6 +288,12 @@ class DetailedMaterializer:
 
                 detailed.capital_gains_tax = max(0, detailed.capital_gain * detailed.tax_rate_applied)
                 detailed.tax_impact = detailed.capital_gains_tax
+
+                # Create pledge from sale
+                from projections.projection_state import UserProfile
+                if hasattr(yearly_state, 'user_profile') or hasattr(self, 'user_profile'):
+                    pledge_pct = getattr(getattr(yearly_state, 'user_profile', getattr(self, 'user_profile', None)), 'pledge_percentage', 0.5)
+                    detailed.pledge_created = detailed.gross_proceeds * pledge_pct
 
         elif action.action_type == ActionType.DONATE:
             detailed.calculator_used = "share_donation_calculator"
@@ -395,22 +415,36 @@ class DetailedMaterializer:
                     'lot_id': action.lot_id,
                     'quantity': action.quantity,
                     'price': round(action.price, 2),
+                    'acquisition_date': action.acquisition_date.isoformat() if action.acquisition_date else '',
+                    'holding_period_days': action.holding_period_days,
+                    'tax_treatment': action.tax_treatment,
                     'calculator': action.calculator_used,
                     'gross_proceeds': round(action.gross_proceeds, 2),
                     'exercise_cost': round(action.exercise_cost, 2),
                     'capital_gain': round(action.capital_gain, 2),
+                    'amt_adjustment': round(action.amt_adjustment, 2),
                     'tax': round(action.total_tax_on_action, 2),
                     'donation_value': round(action.donation_value, 2),
                     'company_match': round(action.company_match, 2),
+                    'pledge_created': round(action.pledge_created, 2),
                     'net_cash_change': round(action.net_cash_change, 2),
+                    'vest_expiration_date': action.vest_expiration_date.isoformat() if action.vest_expiration_date else '',
                     'notes': action.notes
                 })
 
-        if all_actions:
-            fieldnames = list(all_actions[0].keys())
-            with open(output_path, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
+        # Always create the file, even if empty
+        fieldnames = [
+            'year', 'date', 'type', 'lot_id', 'quantity', 'price',
+            'acquisition_date', 'holding_period_days', 'tax_treatment',
+            'calculator', 'gross_proceeds', 'exercise_cost', 'capital_gain',
+            'amt_adjustment', 'tax', 'donation_value', 'company_match',
+            'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes'
+        ]
+
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            if all_actions:
                 writer.writerows(all_actions)
 
     def save_annual_summary_csv(self, detailed_years: List[DetailedYear], output_path: str):
@@ -461,10 +495,12 @@ def materialize_detailed_projection(result: ProjectionResult,
     base_name = scenario_name.lower().replace(' ', '_').replace('-', '_')
 
     # Comprehensive detail with all calculations
-    materializer.save_detailed_csv(
-        detailed_years,
-        f"{output_dir}/{base_name}_detailed_calculations.csv"
-    )
+    # Save all three levels of detail
+    # Commented out - detailed_calculations.csv is redundant with action_summary and annual_summary
+    # materializer.save_detailed_csv(
+    #     detailed_years,
+    #     f"{output_dir}/{base_name}_detailed_calculations.csv"
+    # )
 
     # Action-level summary
     materializer.save_action_level_csv(

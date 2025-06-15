@@ -115,14 +115,31 @@ class ShareSaleComponents:
         if self.sale_price < 0:
             raise ValueError("Sale price cannot be negative")
 
-        # Ensure only one type of gain is set
-        gains_set = sum(1 for g in [self.short_term_gain, self.long_term_gain, self.ordinary_income] if g > 0)
-        if gains_set > 1:
-            raise ValueError("Only one type of gain should be set per sale")
+        # Validate gain types based on disposition type
+        if self.disposition_type == DispositionType.DISQUALIFYING_ISO:
+            # Disqualifying ISO dispositions can have:
+            # 1. Only ordinary income (sale between strike and FMV at exercise)
+            # 2. Ordinary income + capital gain (sale above FMV at exercise)
+            # 3. Only capital loss (sale below strike price)
+            capital_gains_count = sum(1 for g in [self.short_term_gain, self.long_term_gain] if g != 0)
 
-        # Validate disposition type consistency
-        if self.disposition_type == DispositionType.DISQUALIFYING_ISO and self.ordinary_income <= 0:
-            raise ValueError("Disqualifying ISO disposition must have ordinary income")
+            # Check for invalid combinations
+            if capital_gains_count > 1:
+                raise ValueError("Cannot have both short-term and long-term gains in same sale")
+
+            # If there's a capital loss (negative gain), ordinary income should be 0
+            if (self.short_term_gain < 0 or self.long_term_gain < 0) and self.ordinary_income > 0:
+                raise ValueError("Cannot have ordinary income when selling at a loss")
+
+            # If there's ordinary income and capital gain, both should be positive
+            if self.ordinary_income > 0 and capital_gains_count > 0:
+                if self.short_term_gain < 0 or self.long_term_gain < 0:
+                    raise ValueError("Cannot mix ordinary income with capital losses")
+        else:
+            # Non-disqualifying dispositions should have at most one type of gain/loss
+            gains_set = sum(1 for g in [self.short_term_gain, self.long_term_gain, self.ordinary_income] if g != 0)
+            if gains_set > 1:
+                raise ValueError("Non-disqualifying dispositions cannot have multiple types of gains or losses")
 
 
 @dataclass

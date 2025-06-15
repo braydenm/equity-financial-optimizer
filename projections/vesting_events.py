@@ -1,0 +1,121 @@
+"""
+Vesting event data structures for clean data contracts.
+
+This module provides well-defined data types for lifecycle events,
+eliminating the need for dictionary/object dual handling.
+"""
+
+from dataclasses import dataclass
+from datetime import date
+from typing import Optional, List
+
+from projections.projection_state import ShareLot, ShareType
+
+
+@dataclass
+class VestingEvent:
+    """Represents a vesting event for a share lot."""
+
+    lot_id: str
+    vest_date: date
+    quantity: int
+    share_type: ShareType
+    notes: str = ""
+
+    @classmethod
+    def from_lot_transition(cls, lot: ShareLot, vest_date: date) -> 'VestingEvent':
+        """Create VestingEvent from a lot transitioning to vested state."""
+        return cls(
+            lot_id=lot.lot_id,
+            vest_date=vest_date,
+            quantity=lot.quantity,
+            share_type=lot.share_type,
+            notes=f"Natural vesting transition on {vest_date}"
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for CSV export."""
+        return {
+            'lot_id': self.lot_id,
+            'vest_date': self.vest_date.isoformat(),
+            'quantity': self.quantity,
+            'share_type': self.share_type.name,
+            'notes': self.notes
+        }
+
+
+@dataclass
+class ExpirationEvent:
+    """Represents an expiration event for options."""
+
+    lot_id: str
+    expiration_date: date
+    quantity: int
+    share_type: ShareType
+    notes: str = ""
+
+    @classmethod
+    def from_lot(cls, lot: ShareLot, expiration_date: date) -> 'ExpirationEvent':
+        """Create ExpirationEvent from an expiring lot."""
+        return cls(
+            lot_id=lot.lot_id,
+            expiration_date=expiration_date,
+            quantity=lot.quantity,
+            share_type=lot.share_type,
+            notes=f"Options expired on {expiration_date}"
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for CSV export."""
+        return {
+            'lot_id': self.lot_id,
+            'expiration_date': self.expiration_date.isoformat(),
+            'quantity': self.quantity,
+            'share_type': self.share_type.name,
+            'notes': self.notes
+        }
+
+
+def process_natural_vesting(lots: List[ShareLot], year: int) -> List[VestingEvent]:
+    """
+    Process natural vesting transitions for lots in a given year.
+
+    This replaces the dictionary-based approach with proper data types.
+
+    Args:
+        lots: List of share lots to check for vesting
+        year: Current projection year
+
+    Returns:
+        List of VestingEvent objects
+    """
+    from projections.projection_state import LifecycleState
+
+    vesting_events = []
+
+    for lot in lots:
+        # Check if this lot should vest in this year
+        if (lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
+            'VEST_' in lot.lot_id):
+
+            try:
+                # Extract vest date from lot ID (format: VEST_YYYYMMDD_TYPE)
+                date_part = lot.lot_id.split('_')[1]
+                vest_year = int(date_part[:4])
+                vest_month = int(date_part[4:6])
+                vest_day = int(date_part[6:8])
+
+                if vest_year == year:
+                    # This lot vests this year
+                    vest_date = date(vest_year, vest_month, vest_day)
+                    lot.lifecycle_state = LifecycleState.VESTED_NOT_EXERCISED
+
+                    # Create proper vesting event
+                    event = VestingEvent.from_lot_transition(lot, vest_date)
+                    vesting_events.append(event)
+
+            except (IndexError, ValueError):
+                # If we can't parse the date, skip this lot
+                continue
+
+    return vesting_events

@@ -350,35 +350,171 @@ The system uses a component-based annual tax composition architecture that prope
   - ✅ Removed all legacy tax calculation methods from calculators
   - ✅ Updated all profile files and templates to new format
   - ✅ Created comprehensive test suite demonstrating ~25% tax savings from proper calculations
+- **Completed CSV Output Overhaul & Architecture Implementation:**
+  - ✅ Removed redundant CSVs: equity_holdings.csv, summary.csv, yearly_cashflow.csv, detailed_calculations.csv
+  - ✅ Renamed tax_timeline.csv → annual_tax_detail.csv with full component breakdown
+  - ✅ Enhanced action_summary.csv with acquisition dates, holding periods, tax treatment, AMT adjustments, pledge tracking
+  - ✅ Fixed transition_timeline.csv to only show positive values and correct lot transitions
+  - ✅ Added holding_period_tracking.csv for qualifying disposition tracking
+  - ✅ Added pledge_obligations.csv for donation commitment tracking
+  - ✅ Added charitable_carryforward.csv for deduction carryover tracking
+  - ✅ Added tax_component_breakdown.csv showing tax by income type and lot
+  - ✅ Established principle: no external dependencies on CSV outputs (purely for analysis)
+  - ✅ Updated all tests and examples to use new CSV structure
+  - ✅ Fixed all data flow issues: spouse income, exercise costs, charitable donations now properly tracked
+  - ✅ Implemented proper VESTED_ISO → ISO renaming with grouped totals and subtotals
+  - ✅ Created comprehensive test suite with 12 tests covering all CSV features
+  - ✅ Built lifecycle event detection system (lifecycle_events.py) for automatic vesting/expiration
+  - ✅ Centralized pledge calculation logic (pledge_calculator.py) to eliminate duplication
+  - ✅ Enhanced data attachment: annual_tax_components properly linked to YearlyState
+  - ✅ All CSV generation working correctly with user data scenarios
+  - **Completed Lifecycle Event Architecture Simplification (December 2024):**
+    - ✅ Identified that lifecycle event "detection" was unnecessary complexity
+    - ✅ Root cause: PortfolioManager generated comprehensive timelines but ignored them when loading lots
+    - ✅ Created `loaders/equity_loader.py` to load ShareLots directly from profile JSON
+    - ✅ Updated PortfolioManager to use direct profile loading instead of CSV round-trip
+    - ✅ Simplified ProjectionCalculator to use natural vesting (state transitions) instead of detection
+    - ✅ Created proper `VestingEvent` data classes for clean data contracts
+    - ✅ Deleted `projections/lifecycle_events_deprecated.py` - no longer needed
+    - ✅ Deleted `loaders/timeline_loader.py` - replaced by equity_loader.py
+    - ✅ Clean data flow: Profile JSON → EquityLoader → ShareLots → Process → CSV (output only)
+    - ✅ Future vesting events now load naturally as separate lots with `granted_not_vested` state
+    - ✅ Vesting happens as natural state transitions from `granted_not_vested` to `vested_not_exercised`
+  - **Completed Test Suite Refactoring (December 2024):**
+    - ✅ Fixed all failing tests to establish clean baseline before tax refactoring
+    - ✅ Replaced outdated `test_share_sale_calculator.py` with comprehensive component-based tests:
+      - 9 tests covering LTCG/STCG sales, losses, ISO dispositions, RSUs, edge cases
+      - Tests the new `calculate_sale_components()` API properly
+    - ✅ Replaced outdated `test_share_donation_calculator.py` with component-based tests:
+      - 10 tests covering long/short-term holdings, cash/stock donations, company match
+      - Tests both `calculate_share_donation_components()` and `calculate_cash_donation_components()`
+    - ✅ Fixed test data inconsistencies (donation amounts, holding period expectations)
+    - ✅ All 8 test files now passing with proper component-based architecture
 
 ### In Progress 🔄
 
 Currently no major features in progress. The system is stable with:
-- Component-based annual tax calculations
-- Progressive tax brackets properly applied
-- All inputs via JSON, all outputs via CSV
-- Comprehensive test coverage
+- Component-based annual tax calculations with proper progressive brackets
+- Direct JSON-to-object loading (no CSV intermediate format)
+- Natural vesting through state transitions
+- Comprehensive test coverage with all tests passing
+- Clean separation: JSON for inputs, CSV for outputs/visualization only
 
 ### Up Next 📋
 
-**PRIORITY - CSV Output Overhaul:**
-1. **Remove Redundant CSVs:**
-   - equity_holdings.csv (duplicates equity timeline)
-   - summary.csv (no discount rate, misleading totals)
-   - detailed_calculations.csv (if redundant with other outputs)
-   - yearly_cashflow.csv (too simplistic)
+**Tax Constants Consolidation & Calculation Deduplication:**
 
-2. **Fix Existing CSVs:**
-   - action_summary.csv: Add vests/expirations, holding periods, tax treatment
-   - annual_tax_detail.csv: Rename from tax_timeline, show component breakdown
-   - transition_timeline.csv: Fix bugs (only positive numbers, valid transitions)
-   - state_timeline.csv: Ensure current year grants included
+Based on code analysis, several critical improvements are needed for tax calculations:
 
-3. **Add Critical Tracking CSVs:**
-   - holding_period_tracking.csv: Acquisition/disposition dates, qualifying status
-   - pledge_obligations.csv: Creation, deadline, fulfillment tracking
-   - charitable_carryforward.csv: Vintage years, usage, expiration
-   - tax_component_breakdown.csv: Show ISO/NSO/LTCG/STCG components by year
+1. **Create Centralized Tax Constants Module (Extensible Design):**
+   ```python
+   # calculators/tax_constants.py
+   DEFAULT_TAX_YEAR = 2025
+
+   # Simple implementation that's extensible for future years
+   # For now, just 2025 constants, but structure allows easy addition of other years
+
+   # Federal Tax Constants
+   FEDERAL_TAX_BRACKETS = {
+       # Current implementation (2025 values)
+       'single': [...],
+       'married_filing_jointly': [...]
+   }
+
+   # Future extension path (not implemented now):
+   # FEDERAL_TAX_BRACKETS = {
+   #     2025: {'single': [...], 'married_filing_jointly': [...]},
+   #     2026: {'single': [...], 'married_filing_jointly': [...]},
+   # }
+   # def get_federal_brackets(year=DEFAULT_TAX_YEAR, filing_status='single'):
+   #     return FEDERAL_TAX_BRACKETS.get(year, FEDERAL_TAX_BRACKETS[DEFAULT_TAX_YEAR])[filing_status]
+
+   # AMT Constants
+   AMT_EXEMPTION_AMOUNT = {'single': 88100, 'married_filing_jointly': 137000}
+   AMT_PHASEOUT_THRESHOLD = {'single': 649570, 'married_filing_jointly': 1113120}
+   AMT_PHASEOUT_RATE = 0.25  # Extract magic number
+   AMT_RATE_LOW = 0.26
+   AMT_RATE_HIGH = 0.28
+   AMT_THRESHOLD = 239900
+
+   # Charitable Deduction Limits (2024+ rules)
+   CHARITABLE_AGI_LIMITS = {
+       'cash': 0.60,    # Fix: Currently 0.50, should be 0.60
+       'stock': 0.30,   # Correct at 0.30
+   }
+
+   # Module docstring should note the tax year these constants apply to
+   """Tax constants for 2025 tax year calculations.
+
+   Future enhancement: Add year-indexed dictionaries and accessor functions
+   to support multi-year projections with appropriate tax rates per year.
+   """
+   ```
+
+2. **Fix Critical Issues:**
+   - ❌ **AGI Cash Limit Bug**: `annual_tax_calculator.py` uses 0.50 but IRS limit is 0.60
+   - ❌ **AGI Inconsistency**: `projection_output.py` uses 0.60 (correct) vs calculator's 0.50
+   - ❌ **AMT Duplication**: Identical AMT calculations in both `iso_exercise_calculator.py` and `annual_tax_calculator.py`
+
+3. **Create AMT Calculator Module:**
+   ```python
+   # calculators/amt_calculator.py
+   def calculate_amt_exemption_with_phaseout(amt_income, filing_status):
+       """Single source of truth for AMT exemption calculation"""
+
+   def calculate_amt_tax(amt_taxable_income):
+       """Single source of truth for two-tier AMT tax calculation"""
+   ```
+
+4. **Remove Business Logic from CSV Output:**
+   - `projection_output.py` line 422 calculates AGI limits - should only format data
+   - Move any calculations to appropriate calculator modules
+
+5. **Implementation Priority:**
+   - **High**: Fix AGI cash limit to 0.60 (tax calculation error)
+   - **High**: Consolidate AMT calculations (maintenance risk)
+   - **Medium**: Create tax_constants.py module with extensible structure
+   - **Future**: Add year-indexed tax tables when multi-year rate changes are needed
+
+6. **Extensibility Strategy:**
+   - Current: Simple constants with clear documentation of applicable year
+   - Future: Transform to year-indexed dictionaries with accessor functions
+   - Benefit: Can implement simple solution now without refactoring when adding future years
+   - Example future API: `get_tax_bracket(year=2026, filing_status='single')`
+
+**Enhanced Test Coverage:**
+Based on recent test refactoring, the following additional test cases would strengthen the system:
+
+1. **AGI Limit Integration Tests:**
+   - Test the 30% stock / 60% cash AGI limits are properly applied
+   - Would catch bugs like the current cash limit incorrectly set to 50%
+   - Test carryforward calculations when donations exceed limits
+
+2. **AMT Credit Flow Tests:**
+   - Test AMT credit generation in exercise year
+   - Test AMT credit usage in subsequent high-income years
+   - Test AMT credit carryforward and expiration rules
+
+3. **Multi-Year Projection Tests:**
+   - Test scenarios spanning 5+ years with vesting events
+   - Test tax bracket changes between years
+   - Test charitable deduction carryforward across multiple years
+
+4. **Error Handling Tests:**
+   - Test negative share quantities
+   - Test missing required data (e.g., FMV for ISO disqualifying disposition)
+   - Test invalid date ranges and edge cases
+
+5. **Tax Bracket Edge Cases:**
+   - Test income exactly at bracket boundaries
+   - Test very high income scenarios (top brackets)
+   - Test scenarios with multiple income types interacting
+
+6. **Option Expiration Handling:**
+   - Currently `test_transition_timeline_shows_expiration` is skipped
+   - Need to implement natural expiration handling without lifecycle event detection
+   - Options should expire based on grant date + term (typically 10 years)
+   - Add expiration tracking to projection calculator's natural state transitions
 
 **Enhanced Scenario Validation:**
 1. **Scenario validation against timeline:**
@@ -402,7 +538,6 @@ Currently no major features in progress. The system is stable with:
 2. **Advanced Scenario Features:**
    - Pledge fulfillment tracking improvements (maximalist vs minimalist)
    - Multi-year optimization with carryforward awareness
-   - Conditional actions based on price targets or tax thresholds
    - Generate comparison CSVs highlighting scenario differences
 
 3. **State Tax Calculations Beyond California:**
@@ -412,7 +547,6 @@ Currently no major features in progress. The system is stable with:
 
 4. **Advanced Tax Optimization Features:**
    - Multi-year AMT credit optimization strategies
-   - Tax loss harvesting recommendations
    - Estimated tax payment calculations
    - Donor Advised Fund optimization with multi-year planning
 
@@ -425,13 +559,18 @@ Currently no major features in progress. The system is stable with:
 - Internal state tracks obligations, external CSVs visualize them
 - Calculators return components for composition, not final tax amounts
 - Action processing is separate from tax calculation
+- **Lifecycle events are data, not detection**: Vesting events pre-computed in timeline, not detected at runtime
+- **Simple data flow**: Timeline contains all lots (current and future), projection processes them naturally
+- **CSVs are write-only**: All inputs from JSON, CSVs purely for output visualization
+- **Strong data contracts**: Well-defined data classes instead of dictionary/object dual handling
 
 **Implementation Status:**
 - ✅ Calculator refactor structure complete
-- ✅ Data structures updated with context
-- 🔄 ProjectionCalculator integration in progress
-- 🔄 CSV outputs need completion
-- 🔄 Complex scenario testing needed
+- ✅ Component-based architecture with proper data contracts
+- ✅ Natural vesting through state transitions (no detection needed)
+- ✅ Direct JSON-to-object loading (eliminated CSV intermediate format)
+- ✅ All tests passing with comprehensive coverage
+- ✅ Ready for tax constants consolidation refactoring
 
 ### Future Vision 🚀
 

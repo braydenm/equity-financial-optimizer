@@ -36,6 +36,8 @@ from calculators.components import (
     DonationComponents,
     AnnualTaxComponents
 )
+from projections.vesting_events import process_natural_vesting, VestingEvent
+from projections.pledge_calculator import PledgeCalculator
 
 
 class ProjectionCalculator:
@@ -77,7 +79,8 @@ class ProjectionCalculator:
         # Process each year in the projection
         for year in range(plan.start_date.year, plan.end_date.year + 1):
             year_start_cash = current_cash
-            year_income = self.profile.annual_w2_income + self.profile.spouse_w2_income + self.profile.other_income
+            year_w2_income = self.profile.annual_w2_income
+            year_total_income = self.profile.annual_w2_income + self.profile.spouse_w2_income + self.profile.other_income
             year_exercise_costs = 0.0
             year_tax_paid = 0.0
             year_donation_value = 0.0
@@ -98,7 +101,7 @@ class ProjectionCalculator:
             yearly_state = YearlyState(
                 year=year,
                 starting_cash=year_start_cash,
-                income=year_income,
+                income=year_w2_income,  # Store just W2 income
                 exercise_costs=0.0,
                 tax_paid=0.0,
                 donation_value=0.0,
@@ -110,15 +113,21 @@ class ProjectionCalculator:
                 shares_sold=deepcopy(cumulative_shares_sold),
                 shares_donated=deepcopy(cumulative_shares_donated),
                 pledge_state=pledge_state,
-                total_net_worth=0.0
+                total_net_worth=0.0,
+                annual_tax_components=annual_components,
+                spouse_income=self.profile.spouse_w2_income,
+                other_income=self.profile.other_income
             )
+
+            vesting_events = process_natural_vesting(current_lots, year)
+
+            # Track vesting events for CSV output
+            yearly_state.vesting_events = vesting_events
+            yearly_state.expiration_events = []  # Claude TODO: Add expiration handling based on specified expiration date on the parent grant object.
 
             # Process each action chronologically
             for action in sorted(year_actions, key=lambda a: a.action_date):
-                if action.action_type == ActionType.VEST:
-                    current_lots = self._process_vesting(action, current_lots, plan)
-
-                elif action.action_type == ActionType.EXERCISE:
+                if action.action_type == ActionType.EXERCISE:
                     exercise_result = self._process_exercise(action, current_lots, annual_components)
                     year_exercise_costs += exercise_result['exercise_cost']
                     current_cash -= exercise_result['exercise_cost']
@@ -127,15 +136,13 @@ class ProjectionCalculator:
                     sale_result = self._process_sale(action, current_lots, annual_components, yearly_state)
                     current_cash += sale_result['gross_proceeds']  # Tax will be calculated at year-end
 
-                    # Create pledge obligation from this sale
-                    obligation = PledgeObligation(
-                        parent_transaction_id=f"{action.lot_id}_{action.action_date}",
-                        commencement_date=action.action_date,
-                        deadline_date=date(action.action_date.year + 3, action.action_date.month, action.action_date.day),
-                        total_pledge_obligation=sale_result['gross_proceeds'] * self.profile.pledge_percentage,
+                    # Create pledge obligation using centralized calculator
+                    obligation = PledgeCalculator.calculate_obligation(
                         shares_sold=action.quantity,
+                        sale_price=action.price if action.price else 0,
                         pledge_percentage=self.profile.pledge_percentage,
-                        outstanding_obligation=sale_result['gross_proceeds'] * self.profile.pledge_percentage
+                        sale_date=action.action_date,
+                        lot_id=action.lot_id
                     )
                     pledge_state.add_obligation(obligation)
 
@@ -174,7 +181,7 @@ class ProjectionCalculator:
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward
 
             # Calculate end of year cash
-            year_end_cash = year_start_cash + year_income - year_exercise_costs - year_tax_paid
+            year_end_cash = year_start_cash + year_total_income - year_exercise_costs - year_tax_paid
             current_cash = year_end_cash
 
             # Update AMT credits for next year
@@ -196,6 +203,7 @@ class ProjectionCalculator:
 
             # Update yearly state with final values
             yearly_state.exercise_costs = year_exercise_costs
+            yearly_state.annual_tax_components = annual_components
             yearly_state.tax_paid = year_tax_paid
             yearly_state.donation_value = year_donation_value
             yearly_state.ending_cash = year_end_cash
@@ -223,26 +231,7 @@ class ProjectionCalculator:
 
         return result
 
-    def _process_vesting(self, action: PlannedAction, current_lots: List[ShareLot],
-                        plan: ProjectionPlan) -> List[ShareLot]:
-        """Process a vesting action by adding new lot."""
-        # Create new vested lot
-        # Strike price must be explicitly provided for vesting events
-        if not action.price:
-            raise ValueError(f"Strike price must be specified for vesting action on {action.lot_id}")
 
-        new_lot = ShareLot(
-            lot_id=action.lot_id,
-            share_type=ShareType.ISO if 'ISO' in action.lot_id else ShareType.NSO,
-            quantity=action.quantity,
-            strike_price=action.price,
-            grant_date=action.action_date,
-            lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-            tax_treatment=TaxTreatment.NA
-        )
-
-        current_lots.append(new_lot)
-        return current_lots
 
     def _process_exercise(self, action: PlannedAction, current_lots: List[ShareLot],
                          annual_components: AnnualTaxComponents) -> Dict[str, float]:

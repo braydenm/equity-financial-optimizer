@@ -7,98 +7,75 @@ for analysis and comparison.
 
 import csv
 import os
+from datetime import date
 from typing import List, Dict, Any
 from projections.projection_state import ProjectionResult, YearlyState, LifecycleState
 from projections.detailed_materialization import materialize_detailed_projection
 
 
-def save_yearly_cashflow_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save yearly cash flow data to CSV."""
+
+
+def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save detailed annual tax breakdown to CSV."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(output_path, 'w', newline='') as f:
-        fieldnames = ['year', 'starting_cash', 'income', 'exercise_costs', 'tax_paid', 'donation_value', 'ending_cash']
+        fieldnames = [
+            'year', 'w2_income', 'spouse_income', 'nso_ordinary_income',
+            'short_term_gains', 'long_term_gains', 'iso_bargain_element',
+            'regular_tax', 'amt_tax', 'total_tax',
+            'amt_credits_generated', 'amt_credits_used',
+            'charitable_deduction_cash', 'charitable_deduction_stock'
+        ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
         for state in result.yearly_states:
+            # Extract component details from annual tax components
+            nso_ordinary = 0
+            stcg = 0
+            ltcg = 0
+            iso_bargain = 0
+            charitable_cash = 0
+            charitable_stock = 0
+
+            if state.annual_tax_components:
+                # Extract from NSO exercises
+                nso_ordinary = sum(getattr(e, 'bargain_element', 0) for e in state.annual_tax_components.nso_exercise_components)
+
+                # Extract from sales
+                for sale in state.annual_tax_components.sale_components:
+                    stcg += getattr(sale, 'short_term_gain', 0)
+                    ltcg += getattr(sale, 'long_term_gain', 0)
+                    nso_ordinary += getattr(sale, 'ordinary_income', 0)  # From disqualifying dispositions
+
+                # Extract from ISO exercises
+                iso_bargain = sum(getattr(e, 'bargain_element', 0) for e in state.annual_tax_components.iso_exercise_components)
+
+                # Extract charitable deductions
+                charitable_cash = getattr(state.annual_tax_components, 'charitable_deductions_cash', 0)
+                charitable_stock = getattr(state.annual_tax_components, 'charitable_deductions_stock', 0)
+
             writer.writerow({
                 'year': state.year,
-                'starting_cash': round(state.starting_cash, 2),
-                'income': round(state.income, 2),
-                'exercise_costs': round(state.exercise_costs, 2),
-                'tax_paid': round(state.tax_paid, 2),
-                'donation_value': round(state.donation_value, 2),
-                'ending_cash': round(state.ending_cash, 2)
-            })
-
-
-def save_tax_timeline_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save tax timeline data to CSV."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = ['year', 'regular_tax', 'amt_tax', 'total_tax', 'amt_credits_generated', 'amt_credits_used', 'charitable_deduction']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for state in result.yearly_states:
-            writer.writerow({
-                'year': state.year,
+                'w2_income': round(result.user_profile.annual_w2_income if result.user_profile else state.income, 2),
+                'spouse_income': round(state.spouse_income, 2),
+                'nso_ordinary_income': round(nso_ordinary, 2),
+                'short_term_gains': round(stcg, 2),
+                'long_term_gains': round(ltcg, 2),
+                'iso_bargain_element': round(iso_bargain, 2),
                 'regular_tax': round(state.tax_state.regular_tax, 2),
                 'amt_tax': round(state.tax_state.amt_tax, 2),
                 'total_tax': round(state.tax_state.total_tax, 2),
                 'amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
                 'amt_credits_used': round(state.tax_state.amt_credits_used, 2),
-                'charitable_deduction': round(state.charitable_state.current_year_deduction, 2)
+                'charitable_deduction_cash': round(charitable_cash, 2),
+                'charitable_deduction_stock': round(charitable_stock, 2)
             })
 
 
-def save_summary_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save summary metrics to CSV."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = ['total_cash_final', 'total_taxes_all_years', 'total_donations_all_years',
-                     'total_equity_value_final', 'pledge_fulfillment_maximalist', 'pledge_fulfillment_minimalist',
-                     'outstanding_obligation']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        metrics = result.summary_metrics
-        writer.writerow({
-            'total_cash_final': round(metrics.get('total_cash_final', 0), 2),
-            'total_taxes_all_years': round(metrics.get('total_taxes_all_years', 0), 2),
-            'total_donations_all_years': round(metrics.get('total_donations_all_years', 0), 2),
-            'total_equity_value_final': round(metrics.get('total_equity_value_final', 0), 2),
-            'pledge_fulfillment_maximalist': round(metrics.get('pledge_fulfillment_maximalist', 0), 4),
-            'pledge_fulfillment_minimalist': round(metrics.get('pledge_fulfillment_minimalist', 0), 4),
-            'outstanding_obligation': round(metrics.get('outstanding_obligation', 0), 2)
-        })
 
 
-def save_equity_holdings_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save final equity holdings to CSV."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    final_state = result.get_final_state()
-    if not final_state:
-        return
-
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = ['lot_id', 'share_type', 'quantity', 'strike_price', 'lifecycle_state', 'tax_treatment']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for lot in final_state.equity_holdings:
-            writer.writerow({
-                'lot_id': lot.lot_id,
-                'share_type': lot.share_type.value,
-                'quantity': lot.quantity,
-                'strike_price': round(lot.strike_price, 2),
-                'lifecycle_state': lot.lifecycle_state.value,
-                'tax_treatment': lot.tax_treatment.value
-            })
 
 
 def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
@@ -106,6 +83,32 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
     dir_path = os.path.dirname(output_path)
     if dir_path:
         os.makedirs(dir_path, exist_ok=True)
+
+    # Helper function to create group total rows
+    def _create_group_total_row(group_lots: List[str], yearly_states: List[YearlyState], years: List[str]) -> Dict[str, Any]:
+        """Create a TOTAL row for a group of related lots."""
+        base_id = group_lots[0].replace('VESTED_', '').split('_EX_')[0]
+        display_base_id = base_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO')
+
+        row = {'Lot_ID': f'{display_base_id}_GROUP', 'State': 'TOTAL'}
+
+        for year in years:
+            yearly_state = next((s for s in yearly_states if str(s.year) == year), None)
+            if yearly_state:
+                total = 0
+                for lot_id in group_lots:
+                    # Find lot quantity
+                    lot = next((l for l in yearly_state.equity_holdings if l.lot_id == lot_id), None)
+                    if lot:
+                        total += lot.quantity
+                    # Add disposed quantities
+                    total += yearly_state.shares_sold.get(lot_id, 0)
+                    total += yearly_state.shares_donated.get(lot_id, 0)
+                row[year] = total
+            else:
+                row[year] = 0
+
+        return row
 
     # Collect all unique lot IDs across all years, including from disposal tracking
     all_lot_ids = set()
@@ -116,11 +119,22 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
         all_lot_ids.update(state.shares_sold.keys())
         all_lot_ids.update(state.shares_donated.keys())
 
-    # Sort lot IDs for consistent output
-    sorted_lot_ids = sorted(all_lot_ids)
+    # Also include initial lots to catch granted shares
+    if result.plan and hasattr(result.plan, 'initial_lots'):
+        for lot in result.plan.initial_lots:
+            all_lot_ids.add(lot.lot_id)
+
+    # Sort lot IDs for consistent output, grouping related lots
+    def lot_sort_key(lot_id):
+        # Group ISO/NSO lots with their exercised versions
+        base_id = lot_id.replace('VESTED_', '').split('_EX_')[0]
+        is_exercised = '_EX_' in lot_id
+        return (base_id, is_exercised, lot_id)
+
+    sorted_lot_ids = sorted(all_lot_ids, key=lot_sort_key)
 
     # Define states to track
-    states = ['Granted', 'Vested', 'Exercised', 'Disposed_Sold', 'Disposed_Donated', 'Expired', 'TOTAL']
+    states = ['Granted', 'Vested', 'Exercised', 'Disposed_Sold', 'Disposed_Donated', 'Expired']
 
     # Prepare fieldnames: Lot_ID, State, then one column per year
     years = [str(state.year) for state in result.yearly_states]
@@ -130,10 +144,43 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
+        # Track when we need to add group totals
+        last_base_id = None
+        group_lots = []
+
         # For each lot and state, track quantities across years
         for lot_id in sorted_lot_ids:
-            for state_name in states:
-                row = {'Lot_ID': lot_id, 'State': state_name}
+            # Rename VESTED_ISO to ISO and VESTED_NSO to NSO
+            display_lot_id = lot_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO')
+
+            # Check if we're starting a new group
+            base_id = lot_id.replace('VESTED_', '').split('_EX_')[0]
+            if base_id != last_base_id and last_base_id is not None and group_lots:
+                # Write group total for previous group
+                if len(group_lots) > 1 or '_EX_' in group_lots[0]:
+                    writer.writerow(_create_group_total_row(group_lots, result.yearly_states, years))
+                group_lots = []
+
+            last_base_id = base_id
+            group_lots.append(lot_id)
+
+            # Skip TOTAL rows for parent lots (ISO, NSO) that have no quantity
+            has_quantity = False
+            for yearly_state in result.yearly_states:
+                lot = next((l for l in yearly_state.equity_holdings if l.lot_id == lot_id), None)
+                if lot and lot.quantity > 0:
+                    has_quantity = True
+                    break
+
+            if not '_EX_' in lot_id and not has_quantity:
+                # For parent lots with no shares, only show states, no TOTAL
+                state_list = states
+            else:
+                # For lots with shares or exercised lots, show states plus SUBTOTAL
+                state_list = states + ['SUBTOTAL']
+
+            for state_name in state_list:
+                row = {'Lot_ID': display_lot_id, 'State': state_name}
 
                 for yearly_state in result.yearly_states:
                     year = str(yearly_state.year)
@@ -145,6 +192,9 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
                     if state_name == 'Granted':
                         # Granted shares are those not yet vested
                         if lot and lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
+                            quantity = lot.quantity
+                        # Also check for lots that will vest in the future based on ID
+                        elif lot_id.startswith('VEST_') and lot and lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
                             quantity = lot.quantity
                     elif state_name == 'Vested':
                         # Vested but unexercised
@@ -164,8 +214,8 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
                         # Check if past expiration date
                         # For now, mark as 0 - this would need expiration date tracking
                         quantity = 0
-                    elif state_name == 'TOTAL':
-                        # Total is the sum of all states for this lot
+                    elif state_name == 'SUBTOTAL':
+                        # Subtotal is the sum of all states for this lot
                         # Current holdings + disposed shares
                         current_quantity = lot.quantity if lot else 0
                         sold_quantity = yearly_state.shares_sold.get(lot_id, 0)
@@ -175,6 +225,344 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
                     row[year] = quantity
 
                 writer.writerow(row)
+
+        # Write final group total if needed
+        if group_lots and (len(group_lots) > 1 or '_EX_' in group_lots[0]):
+            writer.writerow(_create_group_total_row(group_lots, result.yearly_states, years))
+
+
+def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save holding period tracking for tax treatment determination."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    final_state = result.get_final_state()
+    if not final_state:
+        return
+
+    with open(output_path, 'w', newline='') as f:
+        fieldnames = [
+            'lot_id', 'acquisition_date', 'acquisition_type', 'current_quantity',
+            'days_held', 'holding_status', 'iso_qualifying_date', 'notes'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Calculate from final state
+        calculation_date = final_state.year * 10000 + 1231  # Year-end date
+        calc_date = date(final_state.year, 12, 31)
+
+        for lot in final_state.equity_holdings:
+            # Determine acquisition date and type
+            acquisition_date = None
+            acquisition_type = ''
+            iso_qualifying_date = None
+
+            if hasattr(lot, 'acquisition_date'):
+                acquisition_date = lot.acquisition_date
+            elif hasattr(lot, 'exercise_date'):
+                acquisition_date = lot.exercise_date
+                acquisition_type = 'exercise'
+            elif hasattr(lot, 'vest_date'):
+                acquisition_date = lot.vest_date
+                acquisition_type = 'vest'
+            elif hasattr(lot, 'grant_date'):
+                acquisition_date = lot.grant_date
+                acquisition_type = 'grant'
+
+            # Calculate days held
+            days_held = 0
+            if acquisition_date:
+                days_held = (calc_date - acquisition_date).days
+
+            # Determine holding status
+            holding_status = 'short-term' if days_held <= 365 else 'long-term'
+
+            # For ISOs, calculate qualifying disposition date
+            if lot.share_type.value == 'ISO' and acquisition_date:
+                # ISO qualifying requires 2 years from grant AND 1 year from exercise
+                if hasattr(lot, 'grant_date') and hasattr(lot, 'exercise_date'):
+                    if lot.grant_date and lot.exercise_date:
+                        two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2)
+                        one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1)
+                        iso_qualifying_date = max(two_years_from_grant, one_year_from_exercise)
+
+            # Build notes about tax treatment
+            notes = []
+            if lot.share_type.value == 'ISO' and iso_qualifying_date:
+                if calc_date >= iso_qualifying_date:
+                    notes.append('Qualifying disposition eligible')
+                else:
+                    days_until_qualify = (iso_qualifying_date - calc_date).days
+                    notes.append(f'Disqualifying - {days_until_qualify} days until qualifying')
+
+            writer.writerow({
+                'lot_id': lot.lot_id,
+                'acquisition_date': acquisition_date.isoformat() if acquisition_date else '',
+                'acquisition_type': acquisition_type,
+                'current_quantity': lot.quantity,
+                'days_held': days_held,
+                'holding_status': holding_status,
+                'iso_qualifying_date': iso_qualifying_date.isoformat() if iso_qualifying_date else '',
+                'notes': '; '.join(notes)
+            })
+
+
+def save_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save pledge obligations tracking from share sales."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    final_state = result.get_final_state()
+    if not final_state or not hasattr(final_state, 'pledge_state'):
+        return
+
+    with open(output_path, 'w', newline='') as f:
+        fieldnames = [
+            'obligation_id', 'creation_date', 'source_sale_lot', 'sale_proceeds',
+            'pledge_percentage', 'pledge_amount', 'deadline_date',
+            'fulfilled_amount', 'remaining_amount', 'days_until_deadline'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Get current date for deadline calculation
+        calc_date = date(final_state.year, 12, 31)
+
+        # Write all obligations
+        for obligation in final_state.pledge_state.obligations:
+            days_until_deadline = (obligation.deadline_date - calc_date).days
+
+            writer.writerow({
+                'obligation_id': obligation.parent_transaction_id,
+                'creation_date': obligation.commencement_date.isoformat(),
+                'source_sale_lot': obligation.parent_transaction_id.rsplit('_', 1)[0] if '_' in obligation.parent_transaction_id else obligation.parent_transaction_id, ##CLaude TODO: Confirm this isn't assuming always the second underscore since there might be other naming conventions used.
+                'sale_proceeds': round(obligation.total_pledge_obligation / obligation.pledge_percentage if obligation.pledge_percentage > 0 else 0, 2),
+                'pledge_percentage': round(obligation.pledge_percentage, 4),
+                'pledge_amount': round(obligation.total_pledge_obligation, 2),
+                'deadline_date': obligation.deadline_date.isoformat(),
+                'fulfilled_amount': round(obligation.donations_made, 2),
+                'remaining_amount': round(obligation.outstanding_obligation, 2),
+                'days_until_deadline': days_until_deadline
+            })
+
+
+def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save charitable deduction carryforward tracking."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    with open(output_path, 'w', newline='') as f:
+        fieldnames = [
+            'year', 'cash_donations', 'stock_donations', 'agi',
+            'cash_limit', 'stock_limit', 'cash_used', 'stock_used',
+            'cash_carryforward', 'stock_carryforward', 'carryforward_expiration_year'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Track carryforward across years
+        cumulative_cash_carryforward = {}  # year -> amount
+        cumulative_stock_carryforward = {}  # year -> amount
+
+        for state in result.yearly_states:
+            # Get AGI for this year
+            agi = 0
+            cash_donations = 0
+            stock_donations = 0
+            cash_used = 0
+            stock_used = 0
+
+            # Extract donation data from state
+            if state.donation_value > 0:
+                # State tracks total donation value
+                stock_donations = state.donation_value
+
+            # Extract detailed data from annual tax components if available
+            if state.annual_tax_components:
+                # Calculate AGI from all income sources
+                w2_income = state.income
+                spouse_income = state.spouse_income
+                other_income = state.other_income
+
+                # Extract capital gains
+                stcg = 0
+                ltcg = 0
+                for sale in getattr(state.annual_tax_components, 'sale_components', []):
+                    stcg += getattr(sale, 'short_term_gain', 0)
+                    ltcg += getattr(sale, 'long_term_gain', 0)
+
+                # NSO exercise creates ordinary income
+                nso_ordinary = 0
+                for nso in getattr(state.annual_tax_components, 'nso_exercise_components', []):
+                    nso_ordinary += getattr(nso, 'bargain_element', 0)
+
+                agi = w2_income + spouse_income + other_income + stcg + ltcg + nso_ordinary
+
+                # Get detailed donation breakdown if available
+                donation_components = getattr(state.annual_tax_components, 'donation_components', [])
+                if donation_components:
+                    # Reset if we have detailed data
+                    stock_donations = 0
+                    cash_donations = 0
+
+                    for donation in donation_components:
+                        donation_value = getattr(donation, 'donation_value', 0)
+                        deduction_type = getattr(donation, 'deduction_type', 'stock')
+                        if deduction_type == 'stock':
+                            stock_donations += donation_value
+                        else:
+                            cash_donations += donation_value
+
+                # Add cash donations
+                for cash_donation in getattr(state.annual_tax_components, 'cash_donation_components', []):
+                    cash_donations += getattr(cash_donation, 'amount', 0)
+            else:
+                # Fallback AGI calculation
+                agi = state.income + state.spouse_income + state.other_income
+
+            # AGI limits for charitable deductions
+            cash_limit = agi * 0.60  # 60% AGI limit for cash
+            stock_limit = agi * 0.30  # 30% AGI limit for appreciated stock
+
+            # Get deductions actually used from charitable state
+            if state.charitable_state and state.charitable_state.current_year_deduction > 0:
+                total_deduction = state.charitable_state.current_year_deduction
+                # Split between cash and stock based on donation ratio
+                if (cash_donations + stock_donations) > 0:
+                    stock_ratio = stock_donations / (cash_donations + stock_donations)
+                    stock_used = min(stock_donations, total_deduction * stock_ratio, stock_limit)
+                    cash_used = min(cash_donations, total_deduction * (1 - stock_ratio), cash_limit)
+                else:
+                    cash_used = 0
+                    stock_used = 0
+            else:
+                # Apply limits directly
+                stock_used = min(stock_donations, stock_limit)
+                cash_used = min(cash_donations, cash_limit)
+
+            # Calculate carryforward
+            cash_carryforward = max(0, cash_donations - cash_used)
+            stock_carryforward = max(0, stock_donations - stock_used)
+
+            # Track cumulative carryforward
+            if cash_carryforward > 0:
+                cumulative_cash_carryforward[state.year] = cash_carryforward
+            if stock_carryforward > 0:
+                cumulative_stock_carryforward[state.year] = stock_carryforward
+
+            # Carryforward expires after 5 years
+            carryforward_expiration = state.year + 5 if (cash_carryforward > 0 or stock_carryforward > 0) else ''
+
+            writer.writerow({
+                'year': state.year,
+                'cash_donations': round(cash_donations, 2),
+                'stock_donations': round(stock_donations, 2),
+                'agi': round(agi, 2),
+                'cash_limit': round(cash_limit, 2),
+                'stock_limit': round(stock_limit, 2),
+                'cash_used': round(cash_used, 2),
+                'stock_used': round(stock_used, 2),
+                'cash_carryforward': round(cash_carryforward, 2),
+                'stock_carryforward': round(stock_carryforward, 2),
+                'carryforward_expiration_year': carryforward_expiration
+            })
+
+
+def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save detailed tax component breakdown by type."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    with open(output_path, 'w', newline='') as f:
+        fieldnames = [
+            'year', 'component_type', 'lot_id', 'amount',
+            'federal_tax', 'state_tax', 'total_tax'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Process each year
+        for state in result.yearly_states:
+            # Extract tax rates (simplified - would be better from profile)
+            federal_ordinary_rate = 0.37
+            federal_ltcg_rate = 0.20
+            state_rate = 0.093
+
+            # ISO Exercise components
+            if state.annual_tax_components and hasattr(state.annual_tax_components, 'iso_exercise_components'):
+                for component in state.annual_tax_components.iso_exercise_components:
+                    bargain_element = getattr(component, 'bargain_element', 0)
+                    if bargain_element > 0:
+                        writer.writerow({
+                            'year': state.year,
+                            'component_type': 'ISO_exercise',
+                            'lot_id': getattr(component, 'lot_id', ''),
+                            'amount': round(bargain_element, 2),
+                            'federal_tax': 0,  # AMT adjustment, not regular tax
+                            'state_tax': 0,
+                            'total_tax': 0
+                        })
+
+            # NSO Exercise components (ordinary income)
+            if state.annual_tax_components and hasattr(state.annual_tax_components, 'nso_exercise_components'):
+                for component in state.annual_tax_components.nso_exercise_components:
+                    bargain_element = getattr(component, 'bargain_element', 0)
+                    if bargain_element > 0:
+                        federal_tax = bargain_element * federal_ordinary_rate
+                        state_tax = bargain_element * state_rate
+                        writer.writerow({
+                            'year': state.year,
+                            'component_type': 'NSO_exercise',
+                            'lot_id': getattr(component, 'lot_id', ''),
+                            'amount': round(bargain_element, 2),
+                            'federal_tax': round(federal_tax, 2),
+                            'state_tax': round(state_tax, 2),
+                            'total_tax': round(federal_tax + state_tax, 2)
+                        })
+
+            # Sale components (capital gains)
+            if state.annual_tax_components and hasattr(state.annual_tax_components, 'sale_components'):
+                for component in state.annual_tax_components.sale_components:
+                    stcg = getattr(component, 'short_term_gain', 0)
+                    ltcg = getattr(component, 'long_term_gain', 0)
+
+                    if stcg > 0:
+                        federal_tax = stcg * federal_ordinary_rate
+                        state_tax = stcg * state_rate
+                        writer.writerow({
+                            'year': state.year,
+                            'component_type': 'STCG',
+                            'lot_id': getattr(component, 'lot_id', ''),
+                            'amount': round(stcg, 2),
+                            'federal_tax': round(federal_tax, 2),
+                            'state_tax': round(state_tax, 2),
+                            'total_tax': round(federal_tax + state_tax, 2)
+                        })
+
+                    if ltcg > 0:
+                        federal_tax = ltcg * federal_ltcg_rate
+                        state_tax = ltcg * state_rate
+                        writer.writerow({
+                            'year': state.year,
+                            'component_type': 'LTCG',
+                            'lot_id': getattr(component, 'lot_id', ''),
+                            'amount': round(ltcg, 2),
+                            'federal_tax': round(federal_tax, 2),
+                            'state_tax': round(state_tax, 2),
+                            'total_tax': round(federal_tax + state_tax, 2)
+                        })
+
+            # Ordinary income from W2
+            w2_income = getattr(state, 'income', 0)
+            if w2_income > 0:
+                federal_tax = w2_income * federal_ordinary_rate
+                state_tax = w2_income * state_rate
+                writer.writerow({
+                    'year': state.year,
+                    'component_type': 'W2_income',
+                    'lot_id': 'N/A',
+                    'amount': round(w2_income, 2),
+                    'federal_tax': round(federal_tax, 2),
+                    'state_tax': round(state_tax, 2),
+                    'total_tax': round(federal_tax + state_tax, 2)
+                })
 
 
 def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> None:
@@ -191,6 +579,16 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
         # Also include lots that may have been fully disposed
         all_lot_ids.update(state.shares_sold.keys())
         all_lot_ids.update(state.shares_donated.keys())
+        # Include lots from vesting/expiration events
+        for event in getattr(state, 'vesting_events', []):
+            all_lot_ids.add(event.lot_id)
+        for event in getattr(state, 'expiration_events', []):
+            all_lot_ids.add(event.lot_id)
+
+    # Also need to check initial lots from the plan to catch grants
+    if result.plan and hasattr(result.plan, 'initial_lots'):
+        for lot in result.plan.initial_lots:
+            all_lot_ids.add(lot.lot_id)
 
     sorted_lot_ids = sorted(all_lot_ids)
 
@@ -207,8 +605,11 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
 
         # For each lot and transition type
         for lot_id in sorted_lot_ids:
+            # Rename VESTED_ISO to ISO and VESTED_NSO to NSO for display
+            display_lot_id = lot_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO') ##Claude TODO: Instead of doing a find/replace, change the original names upstream to 'ISO' and 'NSO' consistently
+
             for transition in transitions:
-                row = {'Lot_ID': lot_id, 'Transition': transition}
+                row = {'Lot_ID': display_lot_id, 'Transition': transition}
 
                 # For each year, calculate transitions
                 for i, yearly_state in enumerate(result.yearly_states):
@@ -216,24 +617,48 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
                     quantity = 0
 
                     if i == 0:
-                        # First year - compare with initial state
-                        # For the first year, we need to check against the original plan's initial lots
-                        # and also check for any sales/donations that happened in year 1
+                        # First year - need to detect initial grants and vests
                         curr_lot = next((l for l in yearly_state.equity_holdings if l.lot_id == lot_id), None)
+
+                        # Check initial lots from plan
+                        initial_lot = None
+                        if result.plan and hasattr(result.plan, 'initial_lots'):
+                            initial_lot = next((l for l in result.plan.initial_lots if l.lot_id == lot_id), None)
 
                         # Check for sales/donations in first year
                         if transition == 'Selling':
                             quantity = yearly_state.shares_sold.get(lot_id, 0)
                         elif transition == 'Donating':
                             quantity = yearly_state.shares_donated.get(lot_id, 0)
+                        # Check for vesting events
+                        elif transition == 'Vesting':
+                            # Check tracked vesting events
+                            for event in getattr(yearly_state, 'vesting_events', []):
+                                if event.lot_id == lot_id:
+                                    quantity = event.quantity
+                                    break
+                            # Also check state changes
+                            if quantity == 0 and curr_lot and curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
+                                if initial_lot and initial_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
+                                    quantity = curr_lot.quantity
+                        # Check for expiring
+                        elif transition == 'Expiring':
+                            for event in getattr(yearly_state, 'expiration_events', []):
+
+
+                                if event.lot_id == lot_id:
+                                    quantity = event.quantity
+                                    break
                         elif curr_lot:
+                            # Check for granting in year 1
                             if transition == 'Granting' and curr_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
-                                quantity = curr_lot.quantity
-                            elif transition == 'Vesting' and curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
-                                quantity = curr_lot.quantity
-                            elif transition == 'Exercising' and curr_lot.lifecycle_state == LifecycleState.EXERCISED_NOT_DISPOSED:
-                                # Check if this is a new exercise lot (contains _EX_)
-                                if '_EX_' in lot_id:
+                                # If lot wasn't in initial state or had fewer shares, it was granted
+                                if not initial_lot or initial_lot.quantity < curr_lot.quantity:
+                                    quantity = curr_lot.quantity - (initial_lot.quantity if initial_lot else 0)
+
+                            # Check for exercising
+                            elif transition == 'Exercising':
+                                if '_EX_' in lot_id and curr_lot.lifecycle_state == LifecycleState.EXERCISED_NOT_DISPOSED:
                                     quantity = curr_lot.quantity
                     else:
                         # Compare with previous year to detect transitions
@@ -241,25 +666,74 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
                         curr_lot = next((l for l in yearly_state.equity_holdings if l.lot_id == lot_id), None)
                         prev_lot = next((l for l in prev_state.equity_holdings if l.lot_id == lot_id), None)
 
-                        # Detect transitions based on lifecycle state changes
-                        if curr_lot and prev_lot:
-                            if (transition == 'Vesting' and
+                        # Check tracked vesting events first
+                        if transition == 'Vesting':
+                            for event in getattr(yearly_state, 'vesting_events', []):
+                                if event.lot_id == lot_id:
+                                    quantity = event.quantity
+                                    break
+                        elif transition == 'Expiring':
+                            for event in getattr(yearly_state, 'expiration_events', []):
+
+
+                                if event.lot_id == lot_id:
+                                    quantity = event.quantity
+                                    break
+
+                        # If no tracked events, detect state changes
+                        if quantity == 0 and curr_lot and prev_lot:
+                            # Granting - increase in granted shares
+                            if (transition == 'Granting' and
+                                curr_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
                                 prev_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
-                                curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED):
-                                quantity = curr_lot.quantity
-                            elif (transition == 'Exercising' and
-                                  prev_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED):
-                                # When exercising, the vested lot quantity decreases
-                                quantity = -(prev_lot.quantity - (curr_lot.quantity if curr_lot else 0))
+                                curr_lot.quantity > prev_lot.quantity):
+                                quantity = curr_lot.quantity - prev_lot.quantity
+
+                            # Vesting - transition from granted to vested (fallback if not in events)
+                            elif transition == 'Vesting' and quantity == 0:
+                                if (prev_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
+                                    curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED):
+                                    quantity = curr_lot.quantity
+                                elif (prev_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
+                                      curr_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED and
+                                      prev_lot.quantity > curr_lot.quantity):
+                                    # Partial vesting - granted quantity decreased
+                                    quantity = prev_lot.quantity - curr_lot.quantity
+
+                            # Exercising - vested shares decreased or exercise lot created
+                            elif transition == 'Exercising':
+                                if (prev_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED and
+                                    curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED and
+                                    prev_lot.quantity > curr_lot.quantity):
+                                    # Partial exercise
+                                    quantity = prev_lot.quantity - curr_lot.quantity
+
                         elif curr_lot and not prev_lot:
                             # New lot appeared
                             if transition == 'Granting' and curr_lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
                                 quantity = curr_lot.quantity
                             elif transition == 'Vesting' and curr_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
+                                # Lot appeared as vested (e.g., from a vest event)
                                 quantity = curr_lot.quantity
                             elif transition == 'Exercising' and '_EX_' in lot_id:
                                 # New exercise lot created
                                 quantity = curr_lot.quantity
+
+                        elif prev_lot and not curr_lot:
+                            # Lot disappeared - check if expired
+                            if transition == 'Expiring':
+                                # First check tracked expiration events
+                                for event in getattr(yearly_state, 'expiration_events', []):
+                                    if event.lot_id == lot_id:
+                                        quantity = event.quantity
+                                        break
+                                # If not in events, calculate from state
+                                if quantity == 0:
+                                    # Make sure it wasn't sold or donated
+                                    total_sold = yearly_state.shares_sold.get(lot_id, 0)
+                                    total_donated = yearly_state.shares_donated.get(lot_id, 0)
+                                    if prev_lot.quantity > total_sold + total_donated:
+                                        quantity = prev_lot.quantity - total_sold - total_donated
 
                         # Track disposals using year-over-year changes
                         if transition == 'Selling':
@@ -271,7 +745,7 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
                             curr_donated = yearly_state.shares_donated.get(lot_id, 0)
                             quantity = curr_donated - prev_donated
 
-                    row[year] = quantity
+                    row[year] = quantity if quantity > 0 else 0  # Only show positive transitions
 
                 writer.writerow(row)
 
@@ -280,14 +754,19 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     """Save all projection CSVs for a scenario."""
     base_name = scenario_name.lower().replace(' ', '_').replace('-', '_')
 
-    save_yearly_cashflow_csv(result, f"{output_dir}/{base_name}_yearly_cashflow.csv")
-    save_tax_timeline_csv(result, f"{output_dir}/{base_name}_tax_timeline.csv")
-    save_summary_csv(result, f"{output_dir}/{base_name}_summary.csv")
-    save_equity_holdings_csv(result, f"{output_dir}/{base_name}_equity_holdings.csv")
+    # Core timeline and state tracking CSVs
+    save_annual_tax_detail_csv(result, f"{output_dir}/{base_name}_annual_tax_detail.csv")
     save_state_timeline_csv(result, f"{output_dir}/{base_name}_state_timeline.csv")
     save_transition_timeline_csv(result, f"{output_dir}/{base_name}_transition_timeline.csv")
 
-    # Generate detailed financial materialization for full transparency
+    # New tracking CSVs
+    save_holding_period_tracking_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
+    save_pledge_obligations_csv(result, f"{output_dir}/{base_name}_pledge_obligations.csv")
+    save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
+    save_tax_component_breakdown_csv(result, f"{output_dir}/{base_name}_tax_component_breakdown.csv")
+
+    # Generate detailed financial materialization for transparency
+    # This creates action_summary.csv and annual_summary.csv (keeping these)
     materialize_detailed_projection(result, output_dir, scenario_name)
 
 

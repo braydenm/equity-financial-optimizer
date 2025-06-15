@@ -22,6 +22,7 @@ from projections.projection_calculator import ProjectionCalculator
 from projections.projection_output import save_all_projection_csvs, create_comparison_csv
 from loaders.scenario_loader import ScenarioLoader
 from loaders.profile_loader import ProfileLoader
+from loaders.equity_loader import EquityLoader
 from engine.timeline_generator import TimelineGenerator
 
 
@@ -102,6 +103,7 @@ class PortfolioManager:
         self.price_projector = PriceProjector()
         self.profile_loader = ProfileLoader()
         self.timeline_generator = TimelineGenerator()
+        self.equity_loader = EquityLoader()
         self._user_profile = None
         self._initial_lots = None
         self._data_source = None  # Track whether using 'demo' or 'user' data
@@ -118,14 +120,11 @@ class PortfolioManager:
         self._data_source = "user" if is_real_data else "demo"
         is_demo = not is_real_data
 
-        # Generate timeline for the appropriate data source
+        # Generate timeline for CSV output visualization (not for loading)
         generated_timeline_path = self.timeline_generator.generate_timeline(profile_data, is_demo=is_demo)
 
-        # Use generated timeline path or fallback to provided path
-        timeline_path = generated_timeline_path if generated_timeline_path else equity_timeline_path
-        if not timeline_path:
-            timeline_path = self.timeline_generator.get_timeline_path(is_demo=is_demo)
-
+        # Store profile data for later use
+        self._profile_data = profile_data
         # Create UserProfile
         personal = profile_data['personal_information']
         income = profile_data['income']
@@ -155,90 +154,20 @@ class PortfolioManager:
         # Store additional data we might need
         self._profile_data = profile_data
 
-        # TODO: Load initial equity position directly from profile data
-        # For now, create empty list until we refactor timeline generator
-        self._initial_lots = self._create_initial_lots_from_profile(profile_data)
+        # Load initial lots directly from profile data
+        self._initial_lots = self.equity_loader.load_lots_from_profile(profile_data)
 
-        # Apply exercise dates from user profile to exercised lots
-        self._apply_exercise_dates_from_profile()
+        # Log loading summary
+        summary = self.equity_loader.summarize_lots(self._initial_lots)
+        print(f"📊 Loaded {summary['total_lots']} lots with {summary['total_shares']} total shares from profile")
+        print(f"   - By state: {summary['by_lifecycle_state']}")
+        print(f"   - By type: {summary['by_share_type']}")
 
         return self._user_profile, self._initial_lots
 
-    def _create_initial_lots_from_profile(self, profile_data: Dict[str, Any]) -> List[ShareLot]:
-        """Create initial share lots from profile data."""
-        lots = []
-        equity_pos = profile_data.get('equity_position', {})
 
-        # Create lots for exercised shares
-        for lot_data in equity_pos.get('exercised_lots', []):
-            lot = ShareLot(
-                lot_id=lot_data['lot_id'],
-                share_type=ShareType.ISO if lot_data['type'] == 'ISO' else ShareType.NSO if lot_data['type'] == 'NSO' else ShareType.RSU,
-                quantity=lot_data['shares'],
-                strike_price=lot_data['strike_price'],
-                grant_date=None,  # Could be extracted from grants if needed
-                exercise_date=datetime.fromisoformat(lot_data['exercise_date']).date() if lot_data.get('exercise_date') else None,
-                lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
-                tax_treatment=TaxTreatment.NA,  # Will be determined based on holding period
-                fmv_at_exercise=lot_data.get('fmv_at_exercise')
-            )
-            lots.append(lot)
 
-        # Create lots for vested unexercised options
-        vested = equity_pos.get('vested_unexercised', {})
 
-        # Get strike price from original grants
-        original_grants = equity_pos.get('original_grants', [])
-        strike_price = original_grants[0]['strike_price'] if original_grants else 0.0
-
-        if vested.get('iso_shares', 0) > 0:
-            lots.append(ShareLot(
-                lot_id='VESTED_ISO',
-                share_type=ShareType.ISO,
-                quantity=vested['iso_shares'],
-                strike_price=strike_price,
-                grant_date=None,
-                exercise_date=None,
-                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA,
-                fmv_at_exercise=None
-            ))
-
-        if vested.get('nso_shares', 0) > 0:
-            lots.append(ShareLot(
-                lot_id='VESTED_NSO',
-                share_type=ShareType.NSO,
-                quantity=vested['nso_shares'],
-                strike_price=strike_price,
-                grant_date=None,
-                exercise_date=None,
-                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA,
-                fmv_at_exercise=None
-            ))
-
-        return lots
-
-    def _apply_exercise_dates_from_profile(self):
-        """Apply exercise dates from user profile to initial lots."""
-        if not self._profile_data or not self._initial_lots:
-            return
-
-        exercised_lots_data = self._profile_data.get('equity_position', {}).get('exercised_lots', [])
-
-        # Create mapping of lot_id to exercise_date
-        exercise_dates = {}
-        for lot_data in exercised_lots_data:
-            lot_id = lot_data.get('lot_id')
-            exercise_date_str = lot_data.get('exercise_date')
-            if lot_id and exercise_date_str:
-                from datetime import datetime
-                exercise_dates[lot_id] = datetime.fromisoformat(exercise_date_str).date()
-
-        # Apply exercise dates to matching lots
-        for lot in self._initial_lots:
-            if lot.lot_id in exercise_dates:
-                lot.exercise_date = exercise_dates[lot.lot_id]
 
     def execute_single_scenario(self, scenario_path: str,
                               price_scenario: str = "moderate",

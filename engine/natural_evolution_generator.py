@@ -38,7 +38,7 @@ def load_equity_timeline(timeline_path: str) -> List[Dict[str, Any]]:
 def load_user_profile_simplified(profile_path: str) -> UserProfile:
     """Load user profile and extract key parameters for projections."""
     with open(profile_path, 'r') as f:
-        profile_data = json.load(f)
+        profile_data = json.load(f) #Claude TODO: Does this look like we are loading the profile twice in this file in a way that is redundant?
 
     personal_info = profile_data.get('personal_information', {})
     income = profile_data.get('income', {})

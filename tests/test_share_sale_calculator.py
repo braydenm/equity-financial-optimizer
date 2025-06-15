@@ -1,152 +1,371 @@
+#!/usr/bin/env python3
 """
-Tests for the share sale calculator.
+Tests for the share sale calculator component-based API.
+
+These tests validate the calculate_sale_components() method which extracts
+tax components from share sales for annual tax aggregation.
 """
 
 import sys
 import os
+from datetime import date, timedelta
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from calculators.share_sale_calculator import ShareSaleCalculator
+from calculators.components import ShareSaleComponents, DispositionType
 
 
-def test_basic_tender_calculation():
-    """Test basic tender tax calculation."""
-    
-    # Sample lots
-    lots = [
-        {
-            'lot_id': 'LOT-001',
-            'shares': 1000,
-            'strike_price': 10.0,
-            'current_status': 'LTCG_eligible'
-        },
-        {
-            'lot_id': 'LOT-002',
-            'shares': 500,
-            'strike_price': 5.0,
-            'current_status': 'STCG'
-        }
-    ]
-    
-    # Sell specific lots
-    lot_selections = {
-        'LOT-001': 500,  # 500 LTCG shares
-        'LOT-002': 300   # 300 STCG shares
-    }
-    
-    tax_rates = {
-        'ltcg_rate': 0.243,      # 24.3% LTCG
-        'ordinary_income_rate': 0.486  # 48.6% STCG
-    }
-    
-    tender_price = 25.0
-    
-    result = ShareSaleCalculator.calculate_tender_tax(
-        lots, lot_selections, tender_price, tax_rates
+def test_basic_stock_sale_ltcg():
+    """Test basic stock sale with long-term capital gains."""
+    print("\nTest: Basic Stock Sale (LTCG)")
+    print("-" * 50)
+
+    # Sale after 1+ year = LTCG
+    acquisition_date = date(2022, 1, 1)
+    sale_date = date(2023, 6, 1)
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="STOCK-001",
+        sale_date=sale_date,
+        shares_to_sell=1000,
+        sale_price=50.0,
+        cost_basis=20.0,
+        acquisition_date=acquisition_date,
+        acquisition_type='purchase',
+        is_iso=False
     )
-    
-    print("Basic Tender Calculation Test")
-    print("=" * 50)
-    print(f"Shares sold: {result['shares_sold']}")
-    print(f"Gross proceeds: ${result['gross_proceeds']:,.2f}")
-    print(f"LTCG gain: ${result['ltcg_gain']:,.2f}")
-    print(f"STCG gain: ${result['stcg_gain']:,.2f}")
-    print(f"Total tax: ${result['total_tax']:,.2f}")
-    print(f"Net proceeds: ${result['net_proceeds']:,.2f}")
-    print(f"Effective tax rate: {result['effective_tax_rate']:.1%}")
-    
-    # Verify calculations
-    assert result['shares_sold'] == 800
-    assert result['gross_proceeds'] == 20000  # 800 * 25
-    
-    # LTCG: 500 shares * (25 - 10) = 7500 gain * 0.243 = 1822.50
-    assert abs(result['ltcg_tax'] - 1822.50) < 0.01
-    
-    # STCG: 300 shares * (25 - 5) = 6000 gain * 0.486 = 2916.00
-    assert abs(result['stcg_tax'] - 2916.00) < 0.01
-    
-    print("\n✓ All calculations verified")
+
+    # Verify components
+    assert isinstance(result, ShareSaleComponents)
+    assert result.lot_id == "STOCK-001"
+    assert result.shares_sold == 1000
+    assert result.sale_price == 50.0
+    assert result.cost_basis == 20.0
+    assert result.gross_proceeds == 50000.0  # 1000 * 50
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == 30000.0  # 1000 * (50 - 20)
+    assert result.long_term_gain == 30000.0
+    assert result.short_term_gain == 0.0
+    assert result.ordinary_income == 0.0
+
+    print(f"✓ Gross proceeds: ${result.gross_proceeds:,.2f}")
+    print(f"✓ Total gain: ${total_gain:,.2f}")
+    print(f"✓ Long-term gain: ${result.long_term_gain:,.2f}")
 
 
-def test_lot_validation():
-    """Test lot selection validation."""
-    
-    lots = [
-        {
-            'lot_id': 'LOT-001',
-            'shares': 1000,
-            'strike_price': 10.0
-        }
-    ]
-    
-    # Test valid selection
-    valid_selection = {'LOT-001': 500}
-    is_valid, errors = ShareSaleCalculator.validate_lot_selection(lots, valid_selection)
-    assert is_valid
-    assert len(errors) == 0
-    
-    # Test invalid selections
-    invalid_selections = [
-        ({'LOT-999': 100}, "Lot LOT-999 not found"),
-        ({'LOT-001': 2000}, "requested 2000 shares but only 1000 available"),
-        ({'LOT-001': -5}, "shares to sell must be non-negative")
-    ]
-    
-    print("\nLot Validation Tests")
-    print("=" * 50)
-    
-    for selection, expected_error in invalid_selections:
-        is_valid, errors = ShareSaleCalculator.validate_lot_selection(lots, selection)
-        assert not is_valid
-        assert any(expected_error in error for error in errors)
-        print(f"✓ Correctly rejected: {selection} - {errors[0]}")
+def test_basic_stock_sale_stcg():
+    """Test basic stock sale with short-term capital gains."""
+    print("\nTest: Basic Stock Sale (STCG)")
+    print("-" * 50)
 
+    # Sale within 1 year = STCG
+    acquisition_date = date(2023, 1, 1)
+    sale_date = date(2023, 6, 1)
 
-# Donation impact testing removed - will be in separate donation_impact.py tests
-
-
-def test_edge_cases():
-    """Test edge cases and error handling."""
-    
-    print("\nEdge Case Tests")
-    print("=" * 50)
-    
-    # Empty lot selection
-    result = ShareSaleCalculator.calculate_tender_tax(
-        [], {}, 25.0, {'ltcg_rate': 0.243}
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="STOCK-002",
+        sale_date=sale_date,
+        shares_to_sell=500,
+        sale_price=30.0,
+        cost_basis=25.0,
+        acquisition_date=acquisition_date,
+        acquisition_type='purchase',
+        is_iso=False
     )
-    assert result['shares_sold'] == 0
-    assert result['total_tax'] == 0
-    print("✓ Empty selection handled correctly")
-    
-    # Zero shares in selection
-    lots = [{'lot_id': 'LOT-001', 'shares': 100, 'strike_price': 10}]
-    result = ShareSaleCalculator.calculate_tender_tax(
-        lots, {'LOT-001': 0}, 25.0, {'ltcg_rate': 0.243}
+
+    # Verify components
+    assert result.shares_sold == 500
+    assert result.gross_proceeds == 15000.0  # 500 * 30
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == 2500.0  # 500 * (30 - 25)
+    assert result.short_term_gain == 2500.0
+    assert result.long_term_gain == 0.0
+    assert result.ordinary_income == 0.0
+
+    print(f"✓ Gross proceeds: ${result.gross_proceeds:,.2f}")
+    print(f"✓ Total gain: ${total_gain:,.2f}")
+    print(f"✓ Short-term gain: ${result.short_term_gain:,.2f}")
+
+
+def test_stock_sale_at_loss():
+    """Test stock sale at a loss."""
+    print("\nTest: Stock Sale at Loss")
+    print("-" * 50)
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="STOCK-003",
+        sale_date=date(2023, 6, 1),
+        shares_to_sell=1000,
+        sale_price=15.0,
+        cost_basis=25.0,
+        acquisition_date=date(2022, 1, 1),
+        acquisition_type='purchase',
+        is_iso=False
     )
-    assert result['shares_sold'] == 0
-    print("✓ Zero shares handled correctly")
-    
-    # Missing tax rates (should use defaults)
-    result = ShareSaleCalculator.calculate_tender_tax(
-        lots, {'LOT-001': 50}, 25.0, {}
+
+    # Verify loss calculation
+    assert result.gross_proceeds == 15000.0  # 1000 * 15
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == -10000.0  # 1000 * (15 - 25)
+    assert result.long_term_gain == -10000.0  # Long-term loss
+    assert result.short_term_gain == 0.0
+
+    print(f"✓ Gross proceeds: ${result.gross_proceeds:,.2f}")
+    print(f"✓ Total loss: ${total_gain:,.2f}")
+    print(f"✓ Long-term loss: ${result.long_term_gain:,.2f}")
+
+
+def test_iso_qualifying_disposition():
+    """Test ISO qualifying disposition (held 2+ years from grant, 1+ year from exercise)."""
+    print("\nTest: ISO Qualifying Disposition")
+    print("-" * 50)
+
+    grant_date = date(2020, 1, 1)
+    exercise_date = date(2022, 1, 1)
+    sale_date = date(2023, 6, 1)  # > 2 years from grant, > 1 year from exercise
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="ISO-001",
+        sale_date=sale_date,
+        shares_to_sell=1000,
+        sale_price=50.0,
+        cost_basis=10.0,  # Strike price
+        acquisition_date=exercise_date,
+        acquisition_type='exercise',
+        is_iso=True,
+        grant_date=grant_date,
+        exercise_date=exercise_date,
+        fmv_at_exercise=30.0
     )
-    assert result['total_tax'] > 0  # Should use default rates
-    print("✓ Missing tax rates handled with defaults")
+
+    # Verify qualifying disposition
+    assert result.is_qualifying_disposition == True
+    assert result.disposition_type.name == "QUALIFYING_ISO"
+    assert result.gross_proceeds == 50000.0
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == 40000.0  # 1000 * (50 - 10)
+    assert result.long_term_gain == 40000.0  # All gain is LTCG
+    assert result.short_term_gain == 0.0
+    assert result.ordinary_income == 0.0  # No ordinary income for qualifying
+
+    print(f"✓ Disposition type: {result.disposition_type.name}")
+    print(f"✓ Total gain: ${total_gain:,.2f}")
+    print(f"✓ Long-term gain: ${result.long_term_gain:,.2f}")
+
+
+def test_iso_disqualifying_disposition():
+    """Test ISO disqualifying disposition (sold too early)."""
+    print("\nTest: ISO Disqualifying Disposition")
+    print("-" * 50)
+
+    grant_date = date(2022, 1, 1)
+    exercise_date = date(2022, 6, 1)
+    sale_date = date(2023, 1, 1)  # < 1 year from exercise = disqualifying
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="ISO-002",
+        sale_date=sale_date,
+        shares_to_sell=1000,
+        sale_price=50.0,
+        cost_basis=10.0,  # Strike price
+        acquisition_date=exercise_date,
+        acquisition_type='exercise',
+        is_iso=True,
+        grant_date=grant_date,
+        exercise_date=exercise_date,
+        fmv_at_exercise=30.0
+    )
+
+    # Verify disqualifying disposition
+    assert result.is_qualifying_disposition == False
+    assert result.disposition_type.name == "DISQUALIFYING_ISO"
+    assert result.gross_proceeds == 50000.0
+
+    # Ordinary income = min(sale price - strike, FMV at exercise - strike) * shares
+    # = min(50 - 10, 30 - 10) * 1000 = min(40, 20) * 1000 = 20000
+    assert result.ordinary_income == 20000.0
+
+    # Remaining gain is STCG: (50 - 30) * 1000 = 20000
+    assert result.short_term_gain == 20000.0
+    assert result.long_term_gain == 0.0
+
+    print(f"✓ Disposition type: {result.disposition_type.name}")
+    print(f"✓ Ordinary income: ${result.ordinary_income:,.2f}")
+    print(f"✓ Short-term gain: ${result.short_term_gain:,.2f}")
+
+
+def test_iso_disqualifying_sale_below_fmv():
+    """Test ISO disqualifying disposition where sale price < FMV at exercise."""
+    print("\nTest: ISO Disqualifying Sale Below FMV")
+    print("-" * 50)
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="ISO-003",
+        sale_date=date(2023, 1, 1),
+        shares_to_sell=500,
+        sale_price=25.0,  # Below FMV at exercise
+        cost_basis=10.0,
+        acquisition_date=date(2022, 6, 1),
+        acquisition_type='exercise',
+        is_iso=True,
+        grant_date=date(2022, 1, 1),
+        exercise_date=date(2022, 6, 1),
+        fmv_at_exercise=30.0
+    )
+
+    # When sale price < FMV at exercise, ordinary income is limited to actual gain
+    # Ordinary income = (25 - 10) * 500 = 7500
+    assert result.ordinary_income == 7500.0
+    assert result.short_term_gain == 0.0  # No capital gain since sale < FMV
+    assert result.long_term_gain == 0.0
+
+    print(f"✓ Ordinary income: ${result.ordinary_income:,.2f}")
+    print(f"✓ No capital gain (sale below FMV at exercise)")
+
+
+def test_rsu_sale():
+    """Test RSU sale (always has zero cost basis for employee)."""
+    print("\nTest: RSU Sale")
+    print("-" * 50)
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="RSU-001",
+        sale_date=date(2023, 6, 1),
+        shares_to_sell=1000,
+        sale_price=40.0,
+        cost_basis=0.0,  # RSUs typically have zero cost basis
+        acquisition_date=date(2022, 1, 1),
+        acquisition_type='release',
+        is_iso=False
+    )
+
+    assert result.gross_proceeds == 40000.0
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == 40000.0  # All proceeds are gain for RSUs
+    assert result.long_term_gain == 40000.0
+    assert result.short_term_gain == 0.0
+
+    print(f"✓ Gross proceeds: ${result.gross_proceeds:,.2f}")
+    print(f"✓ Total gain: ${total_gain:,.2f} (100% of proceeds for RSU)")
+
+
+def test_zero_shares():
+    """Test edge case of selling zero shares."""
+    print("\nTest: Zero Shares")
+    print("-" * 50)
+
+    result = ShareSaleCalculator.calculate_sale_components(
+        lot_id="EDGE-001",
+        sale_date=date(2023, 6, 1),
+        shares_to_sell=0,
+        sale_price=50.0,
+        cost_basis=20.0,
+        acquisition_date=date(2022, 1, 1),
+        acquisition_type='purchase',
+        is_iso=False
+    )
+
+    assert result.shares_sold == 0
+    assert result.gross_proceeds == 0.0
+    total_gain = result.short_term_gain + result.long_term_gain
+    assert total_gain == 0.0
+    assert result.long_term_gain == 0.0
+    assert result.short_term_gain == 0.0
+
+    print("✓ All values correctly zero for zero shares")
+
+
+def test_holding_period_edge_cases():
+    """Test edge cases around the 1-year holding period boundary."""
+    print("\nTest: Holding Period Edge Cases")
+    print("-" * 50)
+
+    acquisition_date = date(2022, 1, 1)
+
+    # Exactly 365 days = still STCG
+    sale_date_365 = acquisition_date + timedelta(days=365)
+    result_365 = ShareSaleCalculator.calculate_sale_components(
+        lot_id="EDGE-002",
+        sale_date=sale_date_365,
+        shares_to_sell=100,
+        sale_price=30.0,
+        cost_basis=20.0,
+        acquisition_date=acquisition_date,
+        acquisition_type='purchase',
+        is_iso=False
+    )
+
+    assert result_365.holding_period_days == 365
+    assert result_365.short_term_gain == 1000.0  # Still short-term
+    assert result_365.long_term_gain == 0.0
+
+    print(f"✓ 365 days: Still STCG (gain: ${result_365.short_term_gain:,.2f})")
+
+    # 366 days = LTCG
+    sale_date_366 = acquisition_date + timedelta(days=366)
+    result_366 = ShareSaleCalculator.calculate_sale_components(
+        lot_id="EDGE-003",
+        sale_date=sale_date_366,
+        shares_to_sell=100,
+        sale_price=30.0,
+        cost_basis=20.0,
+        acquisition_date=acquisition_date,
+        acquisition_type='purchase',
+        is_iso=False
+    )
+
+    assert result_366.holding_period_days == 366
+    assert result_366.long_term_gain == 1000.0  # Now long-term
+    assert result_366.short_term_gain == 0.0
+
+    print(f"✓ 366 days: Now LTCG (gain: ${result_366.long_term_gain:,.2f})")
 
 
 def run_all_tests():
-    """Run all tender calculator tests."""
-    print("Running Tender Calculator Tests")
+    """Run all share sale calculator tests."""
     print("=" * 70)
-    
-    test_basic_tender_calculation()
-    test_lot_validation()
-    test_edge_cases()
-    
+    print("SHARE SALE CALCULATOR TESTS")
+    print("=" * 70)
+
+    tests = [
+        test_basic_stock_sale_ltcg,
+        test_basic_stock_sale_stcg,
+        test_stock_sale_at_loss,
+        test_iso_qualifying_disposition,
+        test_iso_disqualifying_disposition,
+        test_iso_disqualifying_sale_below_fmv,
+        test_rsu_sale,
+        test_zero_shares,
+        test_holding_period_edge_cases,
+    ]
+
+    passed = 0
+    failed = 0
+
+    for test_func in tests:
+        try:
+            test_func()
+            passed += 1
+        except AssertionError as e:
+            print(f"\n❌ FAILED: {test_func.__name__}")
+            print(f"   {str(e)}")
+            failed += 1
+        except Exception as e:
+            print(f"\n❌ ERROR in {test_func.__name__}: {type(e).__name__}: {str(e)}")
+            failed += 1
+
     print("\n" + "=" * 70)
-    print("All tests passed! ✅")
+    print(f"RESULTS: {passed} passed, {failed} failed out of {len(tests)} tests")
+
+    if failed == 0:
+        print("🎉 All tests passed!")
+        return True
+    else:
+        print(f"❌ {failed} test(s) failed")
+        return False
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

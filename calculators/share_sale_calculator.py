@@ -105,21 +105,33 @@ class ShareSaleCalculator:
                 # Calculate original bargain element
                 original_bargain_element = shares_to_sell * (fmv_at_exercise - cost_basis)
 
-                # Ordinary income is lesser of:
-                # 1. Total gain on sale, or
-                # 2. Original bargain element at exercise
-                ordinary_income = min(total_gain, original_bargain_element)
-
-                # Any remaining gain is capital gain
-                remaining_gain = total_gain - ordinary_income
-                if remaining_gain > 0:
+                # Handle different price scenarios for disqualifying disposition
+                if total_gain <= 0:
+                    # Selling at a loss (sale price <= strike price)
+                    ordinary_income = 0
+                    # The entire loss is a capital loss
                     if is_long_term:
-                        long_term_gain = remaining_gain
+                        long_term_gain = total_gain  # This will be negative
                     else:
-                        short_term_gain = remaining_gain
+                        short_term_gain = total_gain  # This will be negative
+                    amt_adjustment_reversal = 0
+                else:
+                    # Selling at a gain (sale price > strike price)
+                    # Ordinary income is lesser of:
+                    # 1. Total gain on sale, or
+                    # 2. Original bargain element at exercise
+                    ordinary_income = min(total_gain, original_bargain_element)
 
-                # AMT adjustment reversal for the portion that becomes ordinary income
-                amt_adjustment_reversal = ordinary_income
+                    # Any remaining gain is capital gain
+                    remaining_gain = total_gain - ordinary_income
+                    if remaining_gain > 0:
+                        if is_long_term:
+                            long_term_gain = remaining_gain
+                        else:
+                            short_term_gain = remaining_gain
+
+                    # AMT adjustment reversal for the portion that becomes ordinary income
+                    amt_adjustment_reversal = ordinary_income
         else:
             # Regular sale - use standard LTCG/STCG rules
             if is_long_term:

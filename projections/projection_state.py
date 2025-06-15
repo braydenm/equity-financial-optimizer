@@ -8,9 +8,11 @@ donation obligations.
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
 from enum import Enum
+
+
 
 
 class ShareType(Enum):
@@ -113,7 +115,16 @@ class PledgeObligation:
         # shares_donated / (shares_sold + shares_donated) = pledge_percentage
         # Solving for shares_donated:
         # shares_donated = (pledge_percentage * shares_sold) / (1 - pledge_percentage)
+        if self.pledge_percentage >= 1:
+            return float('inf')  # Cannot fulfill 100% or more pledge
         return int((self.pledge_percentage * self.shares_sold) / (1 - self.pledge_percentage))
+
+    @property
+    def maximalist_obligation_shares(self) -> float:
+        """Dollar value of shares required under maximalist interpretation at current price."""
+        # This should be calculated based on share count * current price
+        # Not as a percentage of proceeds
+        return self.maximalist_shares_required  # Caller must multiply by price
 
     @property
     def maximalist_fulfillment(self) -> float:
@@ -218,6 +229,17 @@ class YearlyState:
 
     # Additional metrics
     total_net_worth: float = 0.0
+
+    # Annual tax components for detailed reporting
+    annual_tax_components: Optional[Any] = None
+
+    # Additional income tracking
+    spouse_income: float = 0.0
+    other_income: float = 0.0
+
+    # Lifecycle event tracking
+    vesting_events: List['VestingEvent'] = field(default_factory=list)
+    expiration_events: List['ExpirationEvent'] = field(default_factory=list)
 
     def get_equity_value_by_type(self, share_type: ShareType) -> float:
         """Calculate total value of holdings by share type."""
