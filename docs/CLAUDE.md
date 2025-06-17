@@ -145,6 +145,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Carryforwards not tracked separately by donation type (cash vs stock)
 - Option expiration handling needs natural state transition implementation
 - Ordering rules for charitable deductions could be more explicit
+- Cash flow projections incomplete - only includes primary W2 income, missing spouse income, investment income, living expenses, tax withholdings, and AMT credit usage
 
 ### Inline TODOs in Code
 - Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py)
@@ -156,9 +157,12 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Redundant profile loading check needed in natural evolution generator
 
 ### Immediate Priorities
-1. Multi-state tax support beyond California
-2. ESPP (Employee Stock Purchase Plan) calculations
-3. Tax loss harvesting optimization
-4. Estate planning features (step-up basis, gifting)
-5. Estimated tax payment calculations
-6. Enhanced carryforward tracking (separate by type)
+**Comprehensive Cash Flow Accuracy** - Update ProjectionCalculator to include:
+   - All income sources from user profile (spouse W2, interest, dividends)
+   - Living expenses from monthly_cash_flow section
+   - Tax withholdings vs gross tax liability calculation (estimated_taxes section)
+   - AMT credit carryforward usage from tax_situation
+   - Investment growth modeling for taxable_investments balance
+   - Accurate initial cash position from liquid_assets
+   This will update both CSV outputs and text summaries with realistic cash projections
+Partner with the user on a few detailed scenarios under consideration to stress test the model end to end and provide feedback on the accuracy and usability of the tool.
