@@ -348,24 +348,60 @@ portfolio_analysis.py demo
 - Custom price models can be implemented
 - Output formats can be enhanced
 
-## Future Enhancements
+## Charitable Basis Election Implementation
 
-### Near Term
-- Annual tax aggregation for complex multi-action years
-- Improved pledge tracking (maximalist vs minimalist)
-- AMT credit carryforward across years
-- Charitable deduction carryforward with expiration
+### Overview
+The charitable basis election feature allows users to elect IRC Section 170(b)(1)(C)(iii) treatment for stock donations, choosing to deduct cost basis instead of FMV in exchange for a higher AGI limit (50% vs 30%).
 
-### Medium Term
-- Scenario generation tools (parameter sweeps)
-- Monte Carlo price variations
-- Integration with financial planning tools
-- Web-based scenario builder
+### Technical Design
+- **Per-Year Configuration**: Elections specified in scenario JSON as `charitable_basis_election_years` array
+- **All-or-Nothing Annual Choice**: Applies to all stock donations in specified tax years
+- **Component-Based Flow**: Election flag flows from scenario → projection → annual tax calculator
 
-### Long Term
-- AI-assisted scenario generation
-- Optimization algorithms for specific goals
-- Real-time market data integration
-- Multi-user collaboration features
+### Data Flow
+1. **Scenario Definition**: User specifies election years in `tax_elections` section
+2. **Projection Processing**: `ProjectionCalculator` checks if current year has election
+3. **Tax Calculation**: `AnnualTaxCalculator` receives `elect_basis_deduction` flag
+4. **Deduction Logic**: When elected, uses `cost_basis * shares` instead of FMV
+5. **AGI Limits**: Applies 50% limit for basis election vs 30% for FMV
+
+### Implementation Details
+
+#### Scenario JSON Structure
+```json
+{
+  "tax_elections": {
+    "charitable_basis_election_years": [2025, 2026, 2027]
+  }
+}
+```
+
+#### Calculator Updates
+- **AnnualTaxCalculator._apply_charitable_deduction_limits()**:
+  - Added `elect_basis_deduction` parameter
+  - Calculates deduction as basis when elected
+  - Applies appropriate AGI limit (50% vs 30%)
+
+#### CSV Output Enhancement
+- **charitable_carryforward.csv** includes:
+  - `basis_election`: Yes/No indicator per year
+  - `stock_deduction_type`: "Basis" or "FMV"
+  - Correct stock limit display based on election
+
+### Key Design Decisions
+1. **Explicit Configuration**: No automatic recommendation - users must choose
+2. **Annual Granularity**: Matches IRS rules for annual elections
+3. **Transparent Reporting**: CSV clearly shows election impact
+
+### When Basis Election Helps
+- Stock donations exceed 30% AGI limit but within 50%
+- Low appreciation stock (basis > 60% of FMV)
+- Need to maximize current year deductions
+
+### Testing Coverage
+- High vs low appreciation scenarios
+- Mixed stock and cash donations
+- Federal and California calculations
+- Portfolio comparison demonstrations
 
 The portfolio-based architecture provides a solid foundation for equity optimization while maintaining simplicity through data-driven design and intelligent defaults.

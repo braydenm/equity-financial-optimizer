@@ -23,47 +23,54 @@ from calculators.components import (
 )
 from projections.projection_state import UserProfile
 
-# Import tax constants from ISO calculator
-from calculators.iso_exercise_calculator import (
+# Import tax constants from centralized module
+from calculators.tax_constants import (
     FEDERAL_TAX_BRACKETS,
     FEDERAL_STANDARD_DEDUCTION,
-    AMT_EXEMPTION_AMOUNT,
-    AMT_PHASEOUT_THRESHOLD,
-    AMT_THRESHOLD,
-    AMT_RATE_LOW,
-    AMT_RATE_HIGH,
-    CA_TAX_BRACKETS,
-    CA_STANDARD_DEDUCTION,
-    CA_AMT_EXEMPTION,
-    CA_AMT_RATE,
-    CA_AMT_PHASEOUT_START,
-    CA_AMT_PHASEOUT_RATE,
+    FEDERAL_LTCG_BRACKETS,
+    CALIFORNIA_TAX_BRACKETS,
+    CALIFORNIA_STANDARD_DEDUCTION,
+    CALIFORNIA_AMT_EXEMPTION,
+    CALIFORNIA_AMT_RATE,
+    CALIFORNIA_AMT_PHASEOUT_START,
+    CALIFORNIA_AMT_PHASEOUT_RATE,
+    FEDERAL_CHARITABLE_AGI_LIMITS,
+    CALIFORNIA_CHARITABLE_AGI_LIMITS
+)
+
+# Import AMT calculation functions
+from calculators.amt_calculator import (
+    calculate_amt_for_annual_tax,
     calculate_tax_from_brackets
 )
 
-# Federal Long-Term Capital Gains Tax Brackets (2024)
-FEDERAL_LTCG_BRACKETS = {
-    'single': [
-        (44625, 0.00),   # 0% bracket
-        (492300, 0.15),  # 15% bracket
-        (float('inf'), 0.20)  # 20% bracket
-    ],
-    'married_filing_jointly': [
-        (89250, 0.00),   # 0% bracket
-        (553850, 0.15),  # 15% bracket
-        (float('inf'), 0.20)  # 20% bracket
-    ],
-    'married_filing_separately': [
-        (44625, 0.00),   # 0% bracket
-        (276900, 0.15),  # 15% bracket
-        (float('inf'), 0.20)  # 20% bracket
-    ],
-    'head_of_household': [
-        (59750, 0.00),   # 0% bracket
-        (523050, 0.15),  # 15% bracket
-        (float('inf'), 0.20)  # 20% bracket
-    ]
-}
+
+def calculate_california_tax_from_brackets(income: float, brackets: list) -> float:
+    """
+    Calculate tax using California-style progressive tax brackets.
+
+    California brackets are in format (lower, upper, rate) unlike federal
+    brackets which are in format (threshold, rate).
+
+    Args:
+        income: Taxable income
+        brackets: List of (lower, upper, rate) tuples
+
+    Returns:
+        Total tax owed
+    """
+    if income <= 0:
+        return 0.0
+
+    tax = 0.0
+    for lower, upper, rate in brackets:
+        if income > lower:
+            taxable_amount = min(upper, income) - lower
+            tax += taxable_amount * rate
+            if income <= upper:
+                break
+
+    return tax
 
 
 @dataclass
@@ -139,17 +146,23 @@ class AnnualTaxCalculator:
     - Determining effective and marginal tax rates
     """
 
-    # Charitable deduction AGI limits
-    AGI_LIMIT_CASH = 0.50  # 50% for cash donations
-    AGI_LIMIT_STOCK = 0.30  # 30% for appreciated stock #Claude TODO: Check if it's a bit redundant that we speficy this in both this calculator as well as the share_donation_calculator? are a bunch of the computations being redone multiple times?
+    # Federal charitable deduction AGI limits - using centralized constants
+    FEDERAL_AGI_LIMIT_CASH = FEDERAL_CHARITABLE_AGI_LIMITS['cash']  # 60% for cash donations (2025)
+    FEDERAL_AGI_LIMIT_STOCK = FEDERAL_CHARITABLE_AGI_LIMITS['stock']  # 30% for appreciated stock
+
+    # California charitable deduction AGI limits
+    CA_AGI_LIMIT_CASH = CALIFORNIA_CHARITABLE_AGI_LIMITS['cash']  # 50% for cash donations
+    CA_AGI_LIMIT_STOCK = CALIFORNIA_CHARITABLE_AGI_LIMITS['stock']  # 30% for appreciated stock
 
     def calculate_annual_tax(
         self,
         year: int,
         user_profile: UserProfile,
-        w2_income: float,
-        spouse_income: float = 0.0,
-        other_ordinary_income: float = 0.0,
+        w2_income: float = 0,
+        spouse_income: float = 0,
+        other_ordinary_income: float = 0,
+        short_term_gains: float = 0,
+        long_term_gains: float = 0,
         exercise_components: Optional[List[ISOExerciseComponents]] = None,
         nso_exercise_components: Optional[List[NSOExerciseComponents]] = None,
         sale_components: Optional[List[ShareSaleComponents]] = None,
@@ -157,9 +170,10 @@ class AnnualTaxCalculator:
         cash_donation_components: Optional[List[CashDonationComponents]] = None,
         filing_status: Optional[str] = None,
         include_california: Optional[bool] = None,
-        existing_amt_credit: float = 0.0,
-        carryforward_cash_deduction: float = 0.0,
-        carryforward_stock_deduction: float = 0.0
+        existing_amt_credit: float = 0,
+        carryforward_cash_deduction: float = 0,
+        carryforward_stock_deduction: float = 0,
+        elect_basis_deduction: bool = False
     ) -> AnnualTaxResult:
         """
         Calculate comprehensive annual tax from components.
@@ -180,6 +194,7 @@ class AnnualTaxCalculator:
             existing_amt_credit: AMT credit from prior years
             carryforward_cash_deduction: Charitable cash deduction carryforward
             carryforward_stock_deduction: Charitable stock deduction carryforward
+            elect_basis_deduction: If True, use cost basis instead of FMV for stock donations (To raise donation AGI limit)
 
         Returns:
             AnnualTaxResult with comprehensive tax calculation
@@ -211,16 +226,28 @@ class AnnualTaxCalculator:
         # Calculate AGI
         agi = total_ordinary + total_gains
 
-        # Calculate charitable deductions with AGI limits
-        deduction_result = self._apply_charitable_deduction_limits(
+        # Calculate federal charitable deductions with federal AGI limits
+        federal_deduction_result = self._apply_charitable_deduction_limits(
             agi, donation_components, cash_donation_components,
-            carryforward_cash_deduction, carryforward_stock_deduction
+            carryforward_cash_deduction, carryforward_stock_deduction,
+            cash_limit_pct=self.FEDERAL_AGI_LIMIT_CASH,
+            stock_limit_pct=0.50 if elect_basis_deduction else self.FEDERAL_AGI_LIMIT_STOCK, #Claude TODO: Pull from tax constants.
+            elect_basis_deduction=elect_basis_deduction
+        )
+
+        # Calculate California charitable deductions with California AGI limits
+        ca_deduction_result = self._apply_charitable_deduction_limits(
+            agi, donation_components, cash_donation_components,
+            carryforward_cash_deduction, carryforward_stock_deduction,
+            cash_limit_pct=self.CA_AGI_LIMIT_CASH,
+            stock_limit_pct=0.50 if elect_basis_deduction else self.CA_AGI_LIMIT_STOCK, #Claude TODO: Pull from tax constants.
+            elect_basis_deduction=elect_basis_deduction
         )
 
         # Calculate federal tax
         federal_result = self._calculate_federal_tax(
             ordinary_income, cap_gains, exercise_components,
-            deduction_result.total_deduction_used,
+            federal_deduction_result.total_deduction_used,
             filing_status, user_profile, existing_amt_credit
         )
 
@@ -228,7 +255,7 @@ class AnnualTaxCalculator:
         if include_california:
             ca_result = self._calculate_california_tax(
                 ordinary_income, cap_gains, exercise_components,
-                deduction_result.total_deduction_used,
+                ca_deduction_result.total_deduction_used,
                 filing_status
             )
         else:
@@ -282,8 +309,8 @@ class AnnualTaxCalculator:
             total_tax=total_tax,
             effective_tax_rate=effective_rate,
             marginal_tax_rate=marginal_rate,
-            # Deductions
-            charitable_deduction_result=deduction_result,
+            # Deductions (using federal for the main result)
+            charitable_deduction_result=federal_deduction_result,
             standard_deduction_used=FEDERAL_STANDARD_DEDUCTION[filing_status],
             # Components
             exercise_components=exercise_components,
@@ -329,11 +356,36 @@ class AnnualTaxCalculator:
         donation_components: List[DonationComponents],
         cash_donation_components: List[CashDonationComponents],
         carryforward_cash: float,
-        carryforward_stock: float
+        carryforward_stock: float,
+        cash_limit_pct: float = None,
+        stock_limit_pct: float = None,
+        elect_basis_deduction: bool = False
     ) -> CharitableDeductionResult:
-        """Apply AGI limits to charitable deductions."""
+        """Apply AGI limits to charitable deductions.
+
+        Args:
+            agi: Adjusted gross income
+            donation_components: Stock donations
+            cash_donation_components: Cash donations
+            carryforward_cash: Cash donation carryforward
+            carryforward_stock: Stock donation carryforward
+            cash_limit_pct: Cash donation AGI limit percentage (defaults to federal)
+            stock_limit_pct: Stock donation AGI limit percentage (defaults to federal)
+            elect_basis_deduction: If True, use cost basis instead of FMV for stock donations
+        """
+        # Use federal limits as default if not specified
+        if cash_limit_pct is None:
+            cash_limit_pct = self.FEDERAL_AGI_LIMIT_CASH
+        if stock_limit_pct is None:
+            stock_limit_pct = self.FEDERAL_AGI_LIMIT_STOCK
+
         # Calculate total donations by type
-        stock_donations = sum(d.donation_value for d in donation_components)
+        if elect_basis_deduction:
+            # When electing basis, use cost basis instead of FMV
+            stock_donations = sum(d.cost_basis * d.shares_donated for d in donation_components)
+        else:
+            # Default: use FMV (donation_value)
+            stock_donations = sum(d.donation_value for d in donation_components)
         cash_donations = sum(d.amount for d in cash_donation_components)
 
         # Add carryforwards
@@ -341,14 +393,14 @@ class AnnualTaxCalculator:
         total_cash_available = cash_donations + carryforward_cash
 
         # Apply AGI limits
-        stock_limit = agi * self.AGI_LIMIT_STOCK
-        cash_limit = agi * self.AGI_LIMIT_CASH
+        stock_limit = agi * stock_limit_pct
+        cash_limit = agi * cash_limit_pct
 
         # Stock deductions use 30% limit
         stock_used = min(total_stock_available, stock_limit)
         stock_carryforward = total_stock_available - stock_used
 
-        # Cash deductions use 50% limit (minus any stock deductions)
+        # Cash deductions use specified limit (minus any stock deductions)
         cash_limit_after_stock = max(0, cash_limit - stock_used)
         cash_used = min(total_cash_available, cash_limit_after_stock)
         cash_carryforward = total_cash_available - cash_used
@@ -396,36 +448,22 @@ class AnnualTaxCalculator:
         )
         regular_tax = regular_tax_on_ordinary + ltcg_tax
 
-        # AMT calculation
-        amt_income = agi + cap_gains['iso_bargain_element']  # Add ISO bargain element
+        # AMT calculation using centralized AMT calculator
+        amt_result = calculate_amt_for_annual_tax(
+            agi=agi,
+            iso_bargain_element=cap_gains['iso_bargain_element'],
+            filing_status=filing_status,
+            existing_amt_credit=existing_amt_credit,
+            regular_tax_before_credits=regular_tax
+        )
 
-        # Calculate AMT exemption with phaseout
-        exemption = AMT_EXEMPTION_AMOUNT[filing_status]
-        phaseout_threshold = AMT_PHASEOUT_THRESHOLD[filing_status]
-
-        if amt_income > phaseout_threshold:
-            exemption_phaseout = (amt_income - phaseout_threshold) * 0.25
-            exemption = max(exemption - exemption_phaseout, 0)
-
-        amt_taxable_income = max(amt_income - exemption, 0)
-
-        # Calculate AMT using two-tier rate structure
-        if amt_taxable_income <= AMT_THRESHOLD:
-            amt = amt_taxable_income * AMT_RATE_LOW
-        else:
-            amt = AMT_THRESHOLD * AMT_RATE_LOW + (amt_taxable_income - AMT_THRESHOLD) * AMT_RATE_HIGH
-
-        # Apply existing AMT credit
-        regular_tax_after_credit = max(0, regular_tax - existing_amt_credit)
-        amt_credit_used = regular_tax - regular_tax_after_credit
-
-        # Determine which tax applies
-        is_amt = amt > regular_tax_after_credit
-        tax_owed = max(amt, regular_tax_after_credit)
-        amt_credit_generated = max(0, amt - regular_tax) if is_amt else 0
-
-        # Calculate AMT credit carryforward
-        amt_credit_carryforward = existing_amt_credit - amt_credit_used + amt_credit_generated
+        amt_income = amt_result['amt_income']
+        amt = amt_result['amt']
+        is_amt = amt_result['is_amt']
+        tax_owed = amt_result['tax_owed']
+        amt_credit_generated = amt_result['amt_credit_generated']
+        amt_credit_used = amt_result['amt_credit_used']
+        amt_credit_carryforward = amt_result['amt_credit_carryforward']
 
         return {
             'taxable_income': taxable_income,
@@ -453,21 +491,21 @@ class AnnualTaxCalculator:
 
         # Regular CA tax
         ca_agi = total_ordinary + total_cap_gains
-        ca_taxable_income = max(0, ca_agi - CA_STANDARD_DEDUCTION[filing_status] - charitable_deduction)
-        ca_regular_tax = calculate_tax_from_brackets(
-            ca_taxable_income, CA_TAX_BRACKETS[filing_status]
+        ca_taxable_income = max(0, ca_agi - CALIFORNIA_STANDARD_DEDUCTION[filing_status] - charitable_deduction)
+        ca_regular_tax = calculate_california_tax_from_brackets(
+            ca_taxable_income, CALIFORNIA_TAX_BRACKETS[filing_status]
         )
 
         # CA AMT
         ca_amt_income = ca_agi + cap_gains['iso_bargain_element']
-        ca_amt_exemption = CA_AMT_EXEMPTION[filing_status]
+        ca_amt_exemption = CALIFORNIA_AMT_EXEMPTION[filing_status]
 
         # Apply phaseout
-        if ca_amt_income > CA_AMT_PHASEOUT_START[filing_status]:
-            ca_amt_exemption -= (ca_amt_income - CA_AMT_PHASEOUT_START[filing_status]) * CA_AMT_PHASEOUT_RATE
+        if ca_amt_income > CALIFORNIA_AMT_PHASEOUT_START[filing_status]:
+            ca_amt_exemption -= (ca_amt_income - CALIFORNIA_AMT_PHASEOUT_START[filing_status]) * CALIFORNIA_AMT_PHASEOUT_RATE
             ca_amt_exemption = max(0, ca_amt_exemption)
 
-        ca_amt = max(0, ca_amt_income - ca_amt_exemption) * CA_AMT_RATE
+        ca_amt = max(0, ca_amt_income - ca_amt_exemption) * CALIFORNIA_AMT_RATE
         is_ca_amt = ca_amt > ca_regular_tax
         ca_tax_owed = max(ca_regular_tax, ca_amt)
 
@@ -511,23 +549,20 @@ class AnnualTaxCalculator:
         remaining_ltcg = ltcg_amount
 
         # Apply LTCG tax brackets
-        previous_threshold = 0
-        for threshold, rate in ltcg_brackets:
-            if income_level >= threshold:
+        for lower, upper, rate in ltcg_brackets:
+            if income_level >= upper:
                 # Already above this bracket, skip
-                previous_threshold = threshold
                 continue
 
             # Calculate how much LTCG falls in this bracket
-            bracket_room = threshold - max(income_level, previous_threshold)
+            bracket_start = max(income_level, lower)
+            bracket_room = upper - bracket_start
             ltcg_in_bracket = min(remaining_ltcg, bracket_room)
 
             if ltcg_in_bracket > 0:
                 ltcg_tax += ltcg_in_bracket * rate
                 remaining_ltcg -= ltcg_in_bracket
                 income_level += ltcg_in_bracket
-
-            previous_threshold = threshold
 
             if remaining_ltcg <= 0:
                 break
@@ -553,7 +588,7 @@ class AnnualTaxCalculator:
         # Add CA marginal if applicable
         ca_marginal = 0.0
         if include_california:
-            for lower, upper, rate in CA_TAX_BRACKETS[filing_status]:
+            for lower, upper, rate in CALIFORNIA_TAX_BRACKETS[filing_status]:
                 if ordinary_income > lower:
                     ca_marginal = rate
                 if ordinary_income <= upper:

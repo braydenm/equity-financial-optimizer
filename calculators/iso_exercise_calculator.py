@@ -14,6 +14,30 @@ from dataclasses import dataclass
 from datetime import date
 from calculators.components import ISOExerciseComponents, NSOExerciseComponents
 
+# Import tax constants from centralized module
+from calculators.tax_constants import (
+    FEDERAL_TAX_BRACKETS,
+    FEDERAL_STANDARD_DEDUCTION,
+    AMT_EXEMPTION_AMOUNT,
+    AMT_PHASEOUT_THRESHOLD,
+    AMT_THRESHOLD,
+    AMT_RATE_LOW,
+    AMT_RATE_HIGH,
+    AMT_PHASEOUT_RATE,
+    CALIFORNIA_TAX_BRACKETS,
+    CALIFORNIA_STANDARD_DEDUCTION,
+    CALIFORNIA_AMT_EXEMPTION,
+    CALIFORNIA_AMT_RATE,
+    CALIFORNIA_AMT_PHASEOUT_START,
+    CALIFORNIA_AMT_PHASEOUT_RATE
+)
+
+# Import AMT calculation functions
+from calculators.amt_calculator import (
+    calculate_federal_amt as calculate_federal_amt_centralized,
+    AMTCalculationResult
+)
+
 
 @dataclass
 class AMTCalculation:
@@ -53,77 +77,18 @@ class TaxEstimate:
     total_cash_needed: float
 
 
-# 2025 Tax Constants
-FEDERAL_TAX_BRACKETS = {
-    'single': [
-        (0, 11925, 0.10), (11926, 48475, 0.12), (48476, 103350, 0.22),
-        (103351, 197300, 0.24), (197301, 250525, 0.32), (250526, 626350, 0.35),
-        (626351, float('inf'), 0.37)
-    ],
-    'married_filing_jointly': [
-        (0, 23850, 0.10), (23851, 96950, 0.12), (96951, 206700, 0.22),
-        (206701, 394600, 0.24), (394601, 487450, 0.32), (487451, 751600, 0.35),
-        (751601, float('inf'), 0.37)
-    ]
-}
-
-FEDERAL_STANDARD_DEDUCTION = {
-    'single': 15000,
-    'married_filing_jointly': 30000
-}
-
-# AMT Parameters
-AMT_EXEMPTION_AMOUNT = {
-    'single': 88100,
-    'married_filing_jointly': 137000
-}
-
-AMT_PHASEOUT_THRESHOLD = {
-    'single': 626350,
-    'married_filing_jointly': 1252700
-}
-
-AMT_THRESHOLD = 239100
-AMT_RATE_LOW = 0.26
-AMT_RATE_HIGH = 0.28
-
-# California Tax Brackets (2025 estimated)
-CA_TAX_BRACKETS = {
-    'single': [
-        (0, 11110, 0.01), (11111, 26293, 0.02), (26294, 41478, 0.04),
-        (41479, 57362, 0.06), (57363, 72523, 0.08), (72524, 370100, 0.093),
-        (370101, 444746, 0.103), (444747, 744580, 0.113), (744581, float('inf'), 0.123)
-    ],
-    'married_filing_jointly': [
-        (0, 22220, 0.01), (22221, 52585, 0.02), (52586, 82956, 0.04),
-        (82957, 114723, 0.06), (114724, 145047, 0.08), (145048, 740200, 0.093),
-        (740201, 889491, 0.103), (889492, 1489160, 0.113), (1489161, float('inf'), 0.123)
-    ]
-}
-
-CA_STANDARD_DEDUCTION = {
-    'single': 5540,
-    'married_filing_jointly': 11080
-}
-
-# California AMT Parameters
-CA_AMT_EXEMPTION = {
-    'single': 85084,
-    'married_filing_jointly': 109288
-}
-CA_AMT_RATE = 0.07
-CA_AMT_PHASEOUT_START = {
-    'single': 328049,
-    'married_filing_jointly': 437381
-}
-CA_AMT_PHASEOUT_RATE = 0.25
 
 
-def calculate_tax_from_brackets(
+
+def calculate_tax_from_brackets_ca(
     income: float,
     brackets: List[Tuple[float, float, float]]
 ) -> float:
-    """Calculate tax based on income and tax brackets."""
+    """Calculate tax based on income and California-style tax brackets.
+
+    California brackets are in format (lower, upper, rate) which matches
+    the format used by federal brackets after the refactoring.
+    """
     if income <= 0:
         return 0
 
@@ -144,49 +109,23 @@ def calculate_federal_amt(
     iso_bargain_element: float,
     filing_status: str = 'single'
 ) -> AMTCalculation:
-    """Calculate federal AMT impact from ISO exercise."""
-    # Regular tax calculation (without ISO gain)
-    agi = wages + other_income
-    taxable_income = max(0, agi - FEDERAL_STANDARD_DEDUCTION[filing_status])
-    regular_tax = calculate_tax_from_brackets(
-        taxable_income,
-        FEDERAL_TAX_BRACKETS[filing_status]
+    """Calculate federal AMT impact from ISO exercise using centralized AMT calculator."""
+    # Use the centralized AMT calculator
+    result = calculate_federal_amt_centralized(
+        ordinary_income=wages + other_income,
+        amt_adjustments=iso_bargain_element,
+        capital_gains=0.0,  # No capital gains at exercise time (gains only occur when shares are sold)
+        filing_status=filing_status,
+        existing_amt_credit=0.0  # No existing credit for exercise estimates
     )
 
-    # AMT calculation (with ISO gain)
-    amt_income = wages + other_income + iso_bargain_element
-
-    # Calculate AMT exemption with phaseout
-    exemption = AMT_EXEMPTION_AMOUNT[filing_status]
-    phaseout_threshold = AMT_PHASEOUT_THRESHOLD[filing_status]
-
-    if amt_income > phaseout_threshold:
-        exemption_phaseout = (amt_income - phaseout_threshold) * 0.25
-        exemption = max(exemption - exemption_phaseout, 0)
-
-    amt_taxable_income = max(amt_income - exemption, 0)
-
-    # Calculate AMT using two-tier rate structure
-    if amt_taxable_income <= AMT_THRESHOLD:
-        amt = amt_taxable_income * AMT_RATE_LOW
-    else:
-        amt = AMT_THRESHOLD * AMT_RATE_LOW + (amt_taxable_income - AMT_THRESHOLD) * AMT_RATE_HIGH
-
-    # Determine if AMT applies
-    is_amt = amt > regular_tax
-    total_tax = max(regular_tax, amt)
-    amt_credit_generated = amt - regular_tax if is_amt else 0
-
-    # Calculate effective tax on the ISO exercise
-    # This is the additional tax caused by exercising
-    effective_tax = total_tax - regular_tax if iso_bargain_element > 0 else 0
-
+    # Convert to the expected AMTCalculation format
     return AMTCalculation(
-        regular_tax=regular_tax,
-        amt=amt,
-        is_amt=is_amt,
-        amt_credit_generated=amt_credit_generated,
-        effective_tax_on_exercise=effective_tax
+        regular_tax=result.regular_tax,
+        amt=result.amt_tax,
+        is_amt=result.is_amt,
+        amt_credit_generated=result.amt_credit_generated,
+        effective_tax_on_exercise=result.effective_amt_on_adjustment
     )
 
 
@@ -199,22 +138,22 @@ def calculate_california_amt(
     """Calculate California AMT impact from ISO exercise."""
     # Regular CA tax (ISO gain NOT included)
     ca_agi = wages + other_income
-    ca_taxable_income = max(0, ca_agi - CA_STANDARD_DEDUCTION[filing_status])
-    ca_regular_tax = calculate_tax_from_brackets(
+    ca_taxable_income = max(0, ca_agi - CALIFORNIA_STANDARD_DEDUCTION[filing_status])
+    ca_regular_tax = calculate_tax_from_brackets_ca(
         ca_taxable_income,
-        CA_TAX_BRACKETS[filing_status]
+        CALIFORNIA_TAX_BRACKETS[filing_status]
     )
 
     # CA AMT (ISO gain IS included)
     ca_amti = wages + other_income + iso_bargain_element
-    ca_amt_exemption = CA_AMT_EXEMPTION[filing_status]
+    ca_amt_exemption = CALIFORNIA_AMT_EXEMPTION[filing_status]
 
     # Apply phaseout
-    if ca_amti > CA_AMT_PHASEOUT_START[filing_status]:
-        ca_amt_exemption -= (ca_amti - CA_AMT_PHASEOUT_START[filing_status]) * CA_AMT_PHASEOUT_RATE
+    if ca_amti > CALIFORNIA_AMT_PHASEOUT_START[filing_status]:
+        ca_amt_exemption -= (ca_amti - CALIFORNIA_AMT_PHASEOUT_START[filing_status]) * CALIFORNIA_AMT_PHASEOUT_RATE
         ca_amt_exemption = max(0, ca_amt_exemption)
 
-    ca_amt = max(0, ca_amti - ca_amt_exemption) * CA_AMT_RATE
+    ca_amt = max(0, ca_amti - ca_amt_exemption) * CALIFORNIA_AMT_RATE
     is_ca_amt = ca_amt > ca_regular_tax
     total_ca_tax = max(ca_regular_tax, ca_amt)
 

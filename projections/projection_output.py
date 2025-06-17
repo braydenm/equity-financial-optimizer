@@ -353,7 +353,8 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
         fieldnames = [
             'year', 'cash_donations', 'stock_donations', 'agi',
             'cash_limit', 'stock_limit', 'cash_used', 'stock_used',
-            'cash_carryforward', 'stock_carryforward', 'carryforward_expiration_year'
+            'cash_carryforward', 'stock_carryforward', 'carryforward_expiration_year',
+            'basis_election', 'stock_deduction_type'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -369,6 +370,11 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             stock_donations = 0
             cash_used = 0
             stock_used = 0
+
+            # Check if basis election applies this year
+            basis_election = False
+            if hasattr(result, 'plan') and result.plan and 'charitable_basis_election_years' in result.plan.tax_elections:
+                basis_election = state.year in result.plan.tax_elections['charitable_basis_election_years']
 
             # Extract donation data from state
             if state.donation_value > 0:
@@ -420,7 +426,7 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
 
             # AGI limits for charitable deductions
             cash_limit = agi * 0.60  # 60% AGI limit for cash
-            stock_limit = agi * 0.30  # 30% AGI limit for appreciated stock
+            stock_limit = agi * (0.50 if basis_election else 0.30)  # 50% if basis election, 30% for FMV. #Claude TODO: Pull from tax constants and differentiate federal from state
 
             # Get deductions actually used from charitable state
             if state.charitable_state and state.charitable_state.current_year_deduction > 0:
@@ -462,6 +468,8 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 'stock_used': round(stock_used, 2),
                 'cash_carryforward': round(cash_carryforward, 2),
                 'stock_carryforward': round(stock_carryforward, 2),
+                'basis_election': 'Yes' if basis_election else 'No',
+                'stock_deduction_type': 'Basis' if basis_election else 'FMV',
                 'carryforward_expiration_year': carryforward_expiration
             })
 

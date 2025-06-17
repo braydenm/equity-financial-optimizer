@@ -1,0 +1,10 @@
+{
+  "portfolio_name": "basis_election_comparison",
+  "description": "Compare the tax impact of electing basis deduction vs standard FMV deduction for charitable donations",
+  "data_source": "demo",
+  "price_scenario": "moderate",
+  "scenarios": [
+    "004_basis_election_example",
+    "005_no_basis_election_comparison"
+  ]
+}

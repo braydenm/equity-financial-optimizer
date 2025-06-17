@@ -157,6 +157,12 @@ class ProjectionCalculator:
 
             # Calculate annual tax using aggregated components
             annual_components.aggregate_components()
+
+            # Check if basis election applies for this year #Claude TODO: Improve docs here.
+            elect_basis = False
+            if 'charitable_basis_election_years' in plan.tax_elections:
+                elect_basis = year in plan.tax_elections['charitable_basis_election_years']
+
             tax_result = self.annual_tax_calculator.calculate_annual_tax(
                 year=year,
                 user_profile=self.profile,
@@ -167,7 +173,8 @@ class ProjectionCalculator:
                 nso_exercise_components=annual_components.nso_exercise_components,
                 sale_components=annual_components.sale_components,
                 donation_components=annual_components.donation_components,
-                existing_amt_credit=amt_credits_remaining
+                existing_amt_credit=amt_credits_remaining,
+                elect_basis_deduction=elect_basis
             )
 
             year_tax_paid = tax_result.total_tax

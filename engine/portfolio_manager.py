@@ -345,6 +345,10 @@ class PortfolioManager:
         if 'description' in scenario_data:
             plan.description = scenario_data['description']
 
+        # Load tax elections if present
+        if 'tax_elections' in scenario_data:
+            plan.tax_elections = scenario_data['tax_elections']
+
         # Process actions
         for action_data in scenario_data.get('actions', []):
             # Parse action date

@@ -16,16 +16,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from calculators.iso_exercise_calculator import (
     calculate_federal_amt,
     calculate_california_amt,
-    estimate_iso_exercise_tax,
+    estimate_iso_exercise_tax
+)
+
+from calculators.tax_constants import (
     AMT_EXEMPTION_AMOUNT,
     AMT_PHASEOUT_THRESHOLD,
     AMT_THRESHOLD,
     AMT_RATE_LOW,
     AMT_RATE_HIGH,
-    CA_AMT_EXEMPTION,
-    CA_AMT_PHASEOUT_START,
-    CA_AMT_PHASEOUT_RATE,
-    CA_AMT_RATE
+    CALIFORNIA_AMT_EXEMPTION,
+    CALIFORNIA_AMT_PHASEOUT_START,
+    CALIFORNIA_AMT_PHASEOUT_RATE,
+    CALIFORNIA_AMT_RATE
 )
 
 
@@ -198,13 +201,13 @@ def test_california_amt():
     ca_amt_income = wages + other_income + iso_bargain_element
 
     print(f"CA AMT income: ${ca_amt_income:,}")
-    print(f"CA AMT exemption (base): ${CA_AMT_EXEMPTION['single']:,}")
-    print(f"CA AMT phaseout starts at: ${CA_AMT_PHASEOUT_START['single']:,}")
+    print(f"CA AMT exemption (base): ${CALIFORNIA_AMT_EXEMPTION['single']:,}")
+    print(f"CA AMT phaseout starts at: ${CALIFORNIA_AMT_PHASEOUT_START['single']:,}")
 
     # Check if phaseout applies
-    if ca_amt_income > CA_AMT_PHASEOUT_START['single']:
-        phaseout = (ca_amt_income - CA_AMT_PHASEOUT_START['single']) * CA_AMT_PHASEOUT_RATE
-        exemption = max(0, CA_AMT_EXEMPTION['single'] - phaseout)
+    if ca_amt_income > CALIFORNIA_AMT_PHASEOUT_START['single']:
+        phaseout = (ca_amt_income - CALIFORNIA_AMT_PHASEOUT_START['single']) * CALIFORNIA_AMT_PHASEOUT_RATE
+        exemption = max(0, CALIFORNIA_AMT_EXEMPTION['single'] - phaseout)
         print(f"Phaseout amount: ${phaseout:,.2f}")
         print(f"Exemption after phaseout: ${exemption:,.2f}")
 

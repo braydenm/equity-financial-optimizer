@@ -1,0 +1,66 @@
+{
+  "scenario_name": "004_basis_election_example",
+  "description": "Demonstrates charitable basis election for low-appreciation stock donations",
+  "tax_elections": {
+    "charitable_basis_election_years": [2025, 2026, 2027],
+    "election_notes": "Electing to deduct cost basis instead of FMV for stock donations in these years. This increases AGI limit from 30% to 50% for stock donations."
+  },
+  "actions": [
+    {
+      "action_date": "2025-03-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Sell some highly appreciated RSUs for diversification"
+    },
+    {
+      "action_date": "2025-06-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate low-appreciation RSUs (basis ~70% of FMV) - basis election beneficial"
+    },
+    {
+      "action_date": "2025-09-15",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 800,
+      "price": null,
+      "notes": "Donate recently acquired RSUs with minimal appreciation"
+    },
+    {
+      "action_date": "2026-01-15",
+      "action_type": "exercise",
+      "lot_id": "VESTED_ISO",
+      "quantity": 5000,
+      "price": null,
+      "notes": "Exercise ISOs early in year for potential future donations"
+    },
+    {
+      "action_date": "2026-11-15",
+      "action_type": "sell",
+      "lot_id": "ISO_2023_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Sell qualified ISOs for cash needs"
+    },
+    {
+      "action_date": "2027-03-01",
+      "action_type": "donate",
+      "lot_id": "VESTED_ISO_EX_20260115",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate shares from 2026 exercise after minimal appreciation"
+    },
+    {
+      "action_date": "2027-12-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2022_001",
+      "quantity": 1200,
+      "price": null,
+      "notes": "Year-end sale for tax planning"
+    }
+  ]
+}

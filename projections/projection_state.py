@@ -275,6 +275,9 @@ class ProjectionPlan:
     # Market assumptions
     price_projections: Dict[int, float] = field(default_factory=dict)  # year -> price
 
+    # Tax elections
+    tax_elections: Dict[str, Any] = field(default_factory=dict)  # Optional tax elections like charitable_basis_election_years
+
     def add_action(self, action: PlannedAction) -> None:
         """Add a planned action to the plan."""
         self.planned_actions.append(action)
