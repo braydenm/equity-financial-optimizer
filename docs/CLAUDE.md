@@ -146,6 +146,15 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Option expiration handling needs natural state transition implementation
 - Ordering rules for charitable deductions could be more explicit
 
+### Inline TODOs in Code
+- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py)
+- Option expiration tracking not implemented in projection calculator
+- Lot ID parsing in pledge obligations assumes specific underscore convention
+- Tax limit percentages in CSV generation should differentiate federal vs state
+- Forward reference in ProjectionResult needs documentation
+- Price projections loading from external source not implemented (natural_evolution_generator.py)
+- Redundant profile loading check needed in natural evolution generator
+
 ### Immediate Priorities
 1. Multi-state tax support beyond California
 2. ESPP (Employee Stock Purchase Plan) calculations

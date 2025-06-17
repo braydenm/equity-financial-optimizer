@@ -19,12 +19,12 @@ The system centers around **data-driven scenario planning** where users define s
 
 ```
 Input Data (version controlled):
-├── data/demo_profile.json                      # Safe example data (committable)
-├── data/user_profile_template.json             # Template for new users
-└── data/market_assumptions/price_scenarios.json # Growth rate assumptions
+├── input_data/demo_profile.json                # Safe example data (committable)
+├── input_data/user_profile_template.json       # Template for new users
+└── input_data/market_assumptions/price_scenarios.json # Growth rate assumptions
 
 Input Data (git-ignored):
-└── data/user_profile.json                      # v2.0 financial profile (private)
+└── input_data/user_profile.json                # v2.0 financial profile (private)
 
 ↓ (CLI auto-detects data source or uses --demo flag)
 
@@ -111,7 +111,7 @@ loaders/                                # Data loading utilities
 ├── profile_loader.py                   # Secure profile loading with demo fallback
 └── __init__.py
 
-data/                                   # User data and assumptions
+input_data/                             # User data and assumptions
 ├── user_profile.json                   # v2.0 format financial data (git-ignored)
 ├── demo_profile.json                   # Safe example data (committable)
 ├── user_profile_template.json          # Template for new users

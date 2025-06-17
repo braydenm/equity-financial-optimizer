@@ -59,11 +59,9 @@ scenario_config.json
 # User-specific scenarios (contain personal lot IDs and quantities)
 scenarios/user/
 
-# Private output data (contains sensitive financial information)
-output/working/
-output/scenarios/
-output/projections/
-output/user/
+# All output data (contains sensitive financial information and analysis results)
+output/
+!output/.gitkeep
 
 # Build outputs
 out/

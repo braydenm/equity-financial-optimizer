@@ -39,7 +39,7 @@ python3 run_scenario_analysis.py 001_exercise_all_vested --demo
 **Option 2: Use Your Real Data**
 ```bash
 # 1. Copy template to create your private profile
-cp data/user_profile_template.json data/user_profile.json
+cp input_data/user_profile_template.json input_data/user_profile.json
 
 # 2. Edit user_profile.json with your real financial information
 # (This file is git-ignored and stays private)
@@ -157,7 +157,7 @@ engine/                           # Portfolio execution and price handling
 ├── portfolio_manager.py         # Execute scenarios and portfolios
 └── natural_evolution_generator.py # Generate baseline scenarios
 
-data/                             # User data and market assumptions
+input_data/                       # User data and market assumptions
 ├── user_profile.json           # v2.0 format financial data (git-ignored)
 ├── demo_profile.json           # Safe example data
 ├── user_profile_template.json  # Template for new users
@@ -206,7 +206,7 @@ examples/                        # Educational demonstrations
 
 ## 💡 Price Projections
 
-Price growth scenarios are defined in `data/market_assumptions/price_scenarios.json`:
+Price growth scenarios are defined in `input_data/market_assumptions/price_scenarios.json`:
 - **conservative**: 15% annual growth
 - **moderate**: 25% annual growth (default)
 - **aggressive**: 40% annual growth
