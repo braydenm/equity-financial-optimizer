@@ -185,6 +185,9 @@ class ProjectionCalculator:
             if 'charitable_basis_election_years' in plan.tax_elections:
                 elect_basis = year in plan.tax_elections['charitable_basis_election_years']
 
+            # Extract charitable carryforward for current year
+            current_year_carryforward = charitable_carryforward.get(year, 0.0)
+
             tax_result = self.annual_tax_calculator.calculate_annual_tax(
                 year=year,
                 user_profile=self.profile,
@@ -196,6 +199,7 @@ class ProjectionCalculator:
                 sale_components=annual_components.sale_components,
                 donation_components=annual_components.donation_components,
                 existing_amt_credit=amt_credits_remaining,
+                carryforward_stock_deduction=current_year_carryforward,
                 elect_basis_deduction=elect_basis
             )
 
@@ -221,8 +225,19 @@ class ProjectionCalculator:
                            - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
 
-            # Calculate charitable deduction state
-            charitable_state = self._calculate_charitable_state(year_donation_value, charitable_carryforward, year)
+            # Update charitable carryforward tracking with new carryforward amounts
+            new_carryforward = tax_result.charitable_deduction_result.total_carryforward
+            if new_carryforward > 0:
+                # Add carryforward for next year
+                next_year = year + 1
+                charitable_carryforward[next_year] = charitable_carryforward.get(next_year, 0) + new_carryforward
+
+            # Remove current year carryforward since it's been used
+            if year in charitable_carryforward:
+                del charitable_carryforward[year]
+
+            # Calculate charitable deduction state using AGI-limited amounts from tax calculation
+            charitable_state = self._calculate_charitable_state(year_donation_value, charitable_carryforward, year, tax_result)
 
             # Pledge state is already maintained and updated throughout the year
             # No additional calculation needed
@@ -491,13 +506,19 @@ class ProjectionCalculator:
 
     def _calculate_charitable_state(self, year_donation: float,
                                   carryforward: Dict[int, float],
-                                  year: int) -> CharitableDeductionState:
-        """Calculate charitable deduction state with carryforward."""
-        # Simple implementation - can be enhanced. Must consider expiration.
+                                  year: int,
+                                  tax_result) -> CharitableDeductionState:
+        """Calculate charitable deduction state with carryforward using AGI-limited amounts."""
+        # Use the AGI-limited deduction amount from the tax calculation result
+        # instead of the raw donation amount to properly respect AGI limits
+        agi_limited_deduction = tax_result.charitable_deduction_result.total_deduction_used
+
+        # The carryforward tracking is already handled in the main projection loop
+        # We just need to return the current state
         return CharitableDeductionState(
-            current_year_deduction=year_donation,
+            current_year_deduction=agi_limited_deduction,
             carryforward_remaining=carryforward.copy(),
-            total_available=year_donation + sum(carryforward.values())
+            total_available=agi_limited_deduction + sum(carryforward.values())
         )
 
     def _calculate_pledge_state(self, pledge_state: PledgeState, year: int) -> PledgeState:
