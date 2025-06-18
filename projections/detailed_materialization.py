@@ -128,6 +128,9 @@ class DetailedYear:
     exercised_shares: int = 0
     total_equity_value: float = 0.0
 
+    # Option expiration tracking
+    opportunity_cost: float = 0.0
+
 
 class DetailedMaterializer:
     """Materializes detailed financial calculations for full transparency."""
@@ -211,13 +214,20 @@ class DetailedMaterializer:
         # Equity position
         detailed_year.vested_unexercised_shares = sum(
             lot.quantity for lot in yearly_state.equity_holdings
-            if lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED
+            if lot.lifecycle_state.value == 'vested_not_exercised'
         )
         detailed_year.exercised_shares = sum(
             lot.quantity for lot in yearly_state.equity_holdings
-            if lot.lifecycle_state == LifecycleState.EXERCISED_NOT_DISPOSED
+            if lot.lifecycle_state.value == 'exercised_not_disposed'
         )
         detailed_year.total_equity_value = yearly_state.total_equity_value
+
+        # Calculate opportunity cost from expiration events
+        detailed_year.opportunity_cost = 0.0
+        if hasattr(yearly_state, 'expiration_events') and yearly_state.expiration_events:
+            for event in yearly_state.expiration_events:
+                if hasattr(event, 'opportunity_cost'):
+                    detailed_year.opportunity_cost += event.opportunity_cost
 
         return detailed_year
 
@@ -467,7 +477,8 @@ class DetailedMaterializer:
                 'total_tax': round(year.total_tax_liability, 2),
                 'ending_cash': round(year.ending_cash, 2),
                 'equity_value': round(year.total_equity_value, 2),
-                'net_worth': round(year.ending_cash + year.total_equity_value, 2)
+                'net_worth': round(year.ending_cash + year.total_equity_value, 2),
+                'opportunity_cost': round(year.opportunity_cost, 2)
             })
 
         if summaries:

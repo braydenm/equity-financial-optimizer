@@ -157,7 +157,7 @@ class TestOptionExpiration(unittest.TestCase):
                 grant_date=date(2022, 1, 1),
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
                 tax_treatment=TaxTreatment.NA,
-                expiration_date=None  # No expiration
+                expiration_date=date(2035, 1, 1)  # Far future expiration
             )
         ]
 

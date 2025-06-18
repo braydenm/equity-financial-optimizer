@@ -69,7 +69,8 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
                 strike_price=10.0,
                 grant_date=date(2023, 1, 1),
                 lifecycle_state=LifecycleState.GRANTED_NOT_VESTED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=date(2033, 1, 1)
             ),
             # Future vesting event that remains granted throughout test period
             ShareLot(
@@ -79,7 +80,8 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
                 strike_price=10.0,
                 grant_date=date(2024, 1, 1),
                 lifecycle_state=LifecycleState.GRANTED_NOT_VESTED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=date(2034, 1, 1)
             ),
             # Vested ISOs (should be renamed from VESTED_ISO to ISO)
             ShareLot(
@@ -89,7 +91,8 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
                 strike_price=5.0,
                 grant_date=date(2022, 1, 1),
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=date(2032, 1, 1)
             ),
             # Exercised shares ready to sell
             ShareLot(
@@ -112,7 +115,8 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
                 strike_price=15.0,
                 grant_date=date(2020, 1, 1),
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=date(2030, 1, 1)
             )
         ],
         initial_cash=100000

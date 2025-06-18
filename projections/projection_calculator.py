@@ -333,7 +333,8 @@ class ProjectionCalculator:
             exercise_date=action.action_date,
             cost_basis=lot.strike_price,
             fmv_at_exercise=current_price,  # Critical for disqualifying disposition calculations
-            taxes_paid=0.0  # Tax will be calculated at year-end
+            taxes_paid=0.0,  # Tax will be calculated at year-end
+            expiration_date=lot.expiration_date  # Preserve expiration date from parent lot
         )
 
         # Add the new exercised lot to current lots

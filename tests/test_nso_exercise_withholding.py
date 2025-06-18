@@ -182,17 +182,19 @@ def test_iso_vs_nso_distinction():
         strike_price=5.0,
         grant_date=date(2022, 1, 1),
         lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-        tax_treatment=TaxTreatment.NA
+        tax_treatment=TaxTreatment.NA,
+        expiration_date=date(2032, 1, 1)
     )
 
     nso_lot = ShareLot(
         lot_id="TEST_NSO",
         share_type=ShareType.NSO,
-        quantity=1000,
-        strike_price=5.0,
+        quantity=2000,
+        strike_price=10.0,
         grant_date=date(2022, 1, 1),
         lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-        tax_treatment=TaxTreatment.NA
+        tax_treatment=TaxTreatment.NA,
+        expiration_date=date(2032, 1, 1)
     )
 
     # Create projection plan
@@ -270,7 +272,8 @@ def test_projection_integration():
         strike_price=5.0,
         grant_date=date(2022, 1, 1),
         lifecycle_state=LifecycleState.GRANTED_NOT_VESTED,
-        tax_treatment=TaxTreatment.NA
+        tax_treatment=TaxTreatment.NA,
+        expiration_date=date(2032, 1, 1)
     )
 
     # Create plan

@@ -142,6 +142,7 @@ class EquityLoader:
 
         # Get strike price from original grants
         strike_price = self._get_strike_price_from_grants(equity_position)
+        expiration_date = self._get_expiration_date_from_grants(equity_position)
 
         for event in vesting_calendar:
             vest_date = datetime.fromisoformat(event['date']).date()
@@ -168,7 +169,8 @@ class EquityLoader:
                 grant_date=grant_date,
                 exercise_date=None,
                 lifecycle_state=lifecycle_state,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=expiration_date if share_type != ShareType.RSU else None
             )
             lots.append(lot)
 

@@ -170,8 +170,8 @@ def process_natural_expiration(lots: List[ShareLot], year: int, market_price: fl
             was_exercisable = lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED
             lot.lifecycle_state = LifecycleState.EXPIRED
 
-            # Create expiration event with market price for opportunity cost calculation
-            event = ExpirationEvent.from_lot(lot, lot.expiration_date, market_price)
+            # Create expiration event with market price for opportunity cost calculation (only for vested options)
+            event = ExpirationEvent.from_lot(lot, lot.expiration_date, market_price if was_exercisable else 0.0)
 
             if was_exercisable and event.opportunity_cost > 0:
                 event.notes = f"Vested options expired on {lot.expiration_date} - OPPORTUNITY COST: ${event.opportunity_cost:,.2f} (${event.per_share_loss:.2f}/share)"

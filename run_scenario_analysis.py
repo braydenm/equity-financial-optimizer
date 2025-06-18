@@ -49,6 +49,22 @@ def print_scenario_results(result, detailed=True):
         print(f"  🎯 Vested Unexercised: {vested_unexercised:,} shares")
         print(f"  ✅ Exercised Shares: {exercised_shares:,} shares")
 
+        # Display opportunity cost warnings if any exist
+        total_opportunity_cost = metrics.get('total_opportunity_cost', 0)
+        total_expired_shares = metrics.get('total_expired_shares', 0)
+        expiration_details = metrics.get('expiration_details', [])
+
+        if total_opportunity_cost > 0:
+            print(f"\n⚠️  OPTION EXPIRATION WARNINGS:")
+            print(f"  💸 Total Opportunity Cost: ${total_opportunity_cost:,.2f}")
+            print(f"  📉 Total Expired Shares: {total_expired_shares:,} shares")
+            print(f"  📊 Average Loss per Share: ${total_opportunity_cost/total_expired_shares:.2f}")
+
+            for detail in expiration_details:
+                print(f"  🔥 {detail['year']}: {detail['quantity']:,} shares expired - LOST ${detail['opportunity_cost']:,.0f} (${detail['per_share_loss']:.2f}/share)")
+
+            print(f"  ⚡ Consider exercising valuable vested options before expiration!")
+
         # Comprehensive financial summary
         print(f"\nFINANCIAL SUMMARY:")
         print(f"  {'Year':<6} {'Income':>10} {'Expenses':>10} {'Exercise':>10} {'Sales':>10} {'Tax':>10} {'Donations':>10} {'Net Flow':>10} {'Eff Tax%':>9}")

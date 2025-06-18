@@ -65,6 +65,34 @@ class ShareLot:
     fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
     expiration_date: Optional[date] = None  # Expiration date for options
 
+    def __post_init__(self):
+        """Validate ShareLot constraints after initialization."""
+        # Options (ISO and NSO) must have expiration dates
+        if self.share_type in [ShareType.ISO, ShareType.NSO] and self.expiration_date is None:
+            raise ValueError(
+                f"ShareLot {self.lot_id}: Options (ISO/NSO) must have an expiration_date. "
+                f"Share type {self.share_type.value} requires expiration_date to be set."
+            )
+
+        # Validate that options cannot expire before vesting
+        if (self.share_type in [ShareType.ISO, ShareType.NSO] and
+            self.expiration_date is not None and
+            self.lot_id.startswith('VEST_')):
+            try:
+                # Extract vest date from lot ID (format: VEST_YYYYMMDD_TYPE)
+                date_part = self.lot_id.split('_')[1]
+                vest_date = date(int(date_part[:4]), int(date_part[4:6]), int(date_part[6:8]))
+
+                # Ensure expiration is after vesting
+                if self.expiration_date <= vest_date:
+                    raise ValueError(
+                        f"ShareLot {self.lot_id}: Options cannot expire before vesting. "
+                        f"Vest date {vest_date} must be before expiration date {self.expiration_date}."
+                    )
+            except (IndexError, ValueError):
+                # If we can't parse the date, skip this validation
+                pass
+
 
 @dataclass
 class PlannedAction:
@@ -341,13 +369,38 @@ class ProjectionResult:
             fulfilled_obligations = sum(1 for obs in final_state.pledge_state.obligations if obs.maximalist_fulfillment >= 1.0)
             pledge_fulfillment_max = fulfilled_obligations / total_obligations if total_obligations > 0 else 0.0
 
+        # Calculate option expiration opportunity costs
+        total_opportunity_cost = 0.0
+        total_expired_shares = 0
+        expiration_details = []
+
+        for state in self.yearly_states:
+            if hasattr(state, 'expiration_events') and state.expiration_events:
+                for event in state.expiration_events:
+                    if hasattr(event, 'opportunity_cost') and hasattr(event, 'quantity'):
+                        opportunity_cost = event.opportunity_cost if hasattr(event, 'opportunity_cost') else 0
+                        if opportunity_cost > 0:
+                            total_opportunity_cost += opportunity_cost
+                            total_expired_shares += event.quantity
+                            expiration_details.append({
+                                'year': state.year,
+                                'lot_id': event.lot_id,
+                                'quantity': event.quantity,
+                                'opportunity_cost': opportunity_cost,
+                                'per_share_loss': event.per_share_loss if hasattr(event, 'per_share_loss') else 0,
+                                'notes': event.notes if hasattr(event, 'notes') else ''
+                            })
+
         self.summary_metrics = {
             'total_cash_final': final_state.ending_cash if final_state else 0,
             'total_taxes_all_years': total_taxes,
             'total_donations_all_years': total_donations,
             'total_equity_value_final': final_state.total_equity_value if final_state else 0,
             'pledge_fulfillment_maximalist': pledge_fulfillment_max,
-            'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0
+            'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,
+            'total_opportunity_cost': total_opportunity_cost,
+            'total_expired_shares': total_expired_shares,
+            'expiration_details': expiration_details
         }
 
 

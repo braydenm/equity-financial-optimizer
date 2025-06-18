@@ -82,7 +82,8 @@ class TestCSVGeneration(unittest.TestCase):
                     strike_price=10.0,
                     grant_date=date(2024, 1, 1),
                     lifecycle_state=LifecycleState.GRANTED_NOT_VESTED,
-                    tax_treatment=TaxTreatment.NA
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=date(2034, 1, 1)
                 ),
                 # Lot that will vest automatically
                 ShareLot(
@@ -92,7 +93,8 @@ class TestCSVGeneration(unittest.TestCase):
                     strike_price=8.0,
                     grant_date=date(2024, 6, 15),
                     lifecycle_state=LifecycleState.GRANTED_NOT_VESTED,
-                    tax_treatment=TaxTreatment.NA
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=date(2034, 6, 15)
                 ),
                 # Vested ISOs ready to exercise
                 ShareLot(
@@ -102,7 +104,8 @@ class TestCSVGeneration(unittest.TestCase):
                     strike_price=5.0,
                     grant_date=date(2022, 1, 1),
                     lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                    tax_treatment=TaxTreatment.NA
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=date(2032, 1, 1)
                 ),
                 # Exercised shares ready to sell
                 ShareLot(
@@ -125,7 +128,8 @@ class TestCSVGeneration(unittest.TestCase):
                     strike_price=15.0,
                     grant_date=date(2016, 6, 1),  # 10 years = expires 2026
                     lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                    tax_treatment=TaxTreatment.NA
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=date(2026, 6, 1)
                 )
             ],
             initial_cash=100000
