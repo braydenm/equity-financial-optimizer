@@ -62,6 +62,13 @@
 - Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping
 - Updated test suite to work with new lot naming conventions
 - Portfolio analysis reveals Exercise Aggressive strategy achieves 53.7% higher net worth than Natural Evolution baseline
+
+## Financial Calculation Validation & Accuracy Fixes
+- Fixed critical AMT credit carryforward bug where credits weren't being properly carried forward year-over-year in projection_calculator.py
+- Fixed investment growth calculation error where unrealized gains were incorrectly added to liquid cash balance
+- Investment growth now properly stays in investment balance as unrealized gains, improving cash flow accuracy
+- AMT credits from user profile now correctly apply to first projection year with proper documentation
+- Validated AMT credit generation, usage, and carryforward logic matches tax regulations
 - Eliminated all conditional field checking throughout codebase
 - Standardized field names across all components
 - Implemented v2.0 data contract with canonical field names
@@ -196,8 +203,6 @@
 - Accurate initial cash position from liquid_assets
 - Enhanced CSV outputs and text summaries with realistic cash projections
 
-
-
 ## NSO Bargain Element Fix
 - Fixed portfolio_manager._determine_action_price() to return FMV for exercises instead of strike price
 - NSO exercises now correctly calculate bargain element (FMV - strike price)
@@ -206,3 +211,7 @@
 - All sales and donations continue using projected prices correctly
 - Added test_nso_exercise_withholding.py to verify NSO withholding calculations
 - All existing tests continue to pass
+
+### Minor Fixes
+- Fixed AMT credit carryforward bug where credits weren't being properly carried forward year-over-year
+- Fixed investment growth incorrectly being added to liquid cash - now stays in investment balance as unrealized gains

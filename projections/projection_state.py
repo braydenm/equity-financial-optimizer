@@ -339,7 +339,7 @@ class ProjectionPlan:
 class ProjectionResult:
     """Results from evaluating a projection plan."""
     plan: ProjectionPlan
-    user_profile: 'UserProfile'  # Added to maintain tax rates through materialization #TODO explain this forward reference, is this the simplest implementation or a risk of bugs?
+    user_profile: 'UserProfile'  # Added to maintain tax rates through materialization #Claude TODO: explain this forward reference, is this the simplest implementation or a risk of bugs?
     yearly_states: List[YearlyState]
     summary_metrics: Dict[str, Any] = field(default_factory=dict)
 

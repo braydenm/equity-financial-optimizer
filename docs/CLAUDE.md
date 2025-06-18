@@ -155,9 +155,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
 - Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
 - Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
-- AMT credit carryforward timing - confirm which year the credits apply to (projection_calculator.py)
 - Improve documentation for basis election logic (projection_calculator.py)
-- Confirm whether investment growth should be considered liquid cash (projection_calculator.py)
 - Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
 - Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)

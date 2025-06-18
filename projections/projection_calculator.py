@@ -77,7 +77,8 @@ class ProjectionCalculator:
         current_investments = self.profile.taxable_investments
 
         # Initialize carryforward states
-        amt_credits_remaining = self.profile.amt_credit_carryforward #Claude TODO: Confirm which year the credits in profile are to be applied to and whether that applies to the current year
+        # AMT credits from profile apply to the first projection year
+        amt_credits_remaining = self.profile.amt_credit_carryforward
         charitable_carryforward = {}  # year -> amount
         pledge_state = PledgeState()
         cumulative_shares_sold = {}  # Track cumulative sales across years
@@ -211,15 +212,14 @@ class ProjectionCalculator:
 
             # Update AMT credits for next year
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward
+            year_tax_state.amt_credits_remaining = amt_credits_remaining
 
             # Calculate end of year cash including all income/expenses
+            # Note: Investment growth stays in investments, not added to liquid cash
             year_expenses = self.profile.get_annual_expenses()
-            year_end_cash = (year_start_cash + year_total_income + investment_growth
-                           - year_exercise_costs - year_tax_paid - year_expenses) ##Claude TODO: Confirm whether investment growth should be considered liquid cash
+            year_end_cash = (year_start_cash + year_total_income
+                           - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
-
-            # Update AMT credits for next year
-            amt_credits_remaining = year_tax_state.amt_credits_remaining
 
             # Calculate charitable deduction state
             charitable_state = self._calculate_charitable_state(year_donation_value, charitable_carryforward, year)
