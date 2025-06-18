@@ -198,6 +198,79 @@ def print_scenario_results(result, detailed=True):
                 print(f"    Total Fulfilled: ${total_fulfilled:,.0f} ({fulfillment_pct:.1f}%)")
                 print(f"    Outstanding: ${final_state.pledge_state.total_outstanding_obligation:,.0f}")
 
+def print_raw_data_tables(result):
+    """Print raw data tables that map 1:1 to CSV outputs."""
+    print(f"\n{'='*80}")
+    print("RAW DATA TABLES")
+    print(f"{'='*80}")
+    print("The following tables contain raw data that maps directly to CSV outputs.")
+    print("Data is formatted for easy copy/paste into spreadsheets (no $ or % symbols).")
+
+    # 1. ANNUAL CASH FLOW TABLE
+    print(f"\n{'-'*80}")
+    print("ANNUAL CASH FLOW (→ yearly_cashflow.csv)")
+    print(f"{'-'*80}")
+    print(f"{'Year':<6} {'Income':<12} {'Expenses':<12} {'Exercise':<12} {'Tax':<12} {'Donations':<12} {'End_Cash':<12}")
+    print(f"{'-'*80}")
+
+    for state in result.yearly_states:
+        year_income = state.income
+        year_expenses = state.living_expenses
+        year_exercise = state.exercise_costs
+        year_tax = state.tax_paid
+        year_donations = state.donation_value
+        end_cash = state.ending_cash
+
+        print(f"{state.year:<6} {year_income:<12.0f} {year_expenses:<12.0f} {year_exercise:<12.0f} {year_tax:<12.0f} {year_donations:<12.0f} {end_cash:<12.0f}")
+
+    # 2. TAX BREAKDOWN TABLE
+    print(f"\n{'-'*80}")
+    print("TAX BREAKDOWN (→ tax_timeline.csv)")
+    print(f"{'-'*80}")
+    print(f"{'Year':<6} {'Regular_Tax':<12} {'AMT_Tax':<12} {'Total_Tax':<12} {'AMT_Credits':<12}")
+    print(f"{'-'*80}")
+
+    for state in result.yearly_states:
+        tax_state = state.tax_state if hasattr(state, 'tax_state') else None
+        regular_tax = tax_state.regular_tax if tax_state else 0
+        amt_tax = tax_state.amt_tax if tax_state else 0
+        total_tax = tax_state.total_tax if tax_state else state.tax_paid
+        amt_credits = tax_state.amt_credits_remaining if tax_state else 0
+
+        print(f"{state.year:<6} {regular_tax:<12.0f} {amt_tax:<12.0f} {total_tax:<12.0f} {amt_credits:<12.0f}")
+
+    # 3. ASSETS BREAKDOWN TABLE
+    print(f"\n{'-'*80}")
+    print("ASSETS BREAKDOWN (→ annual_summary.csv)")
+    print(f"{'-'*80}")
+    print(f"{'Year':<6} {'Cash':<12} {'Investments':<12} {'Equity':<12} {'Total_NW':<12} {'YoY_Growth':<12}")
+    print(f"{'-'*80}")
+
+    prev_net_worth = 0
+    for state in result.yearly_states:
+        cash = state.ending_cash
+        investments = state.investment_balance
+        equity = state.total_equity_value
+        total_nw = state.total_net_worth
+        yoy_growth = ((total_nw - prev_net_worth) / prev_net_worth * 100) if prev_net_worth > 0 else 0
+
+        print(f"{state.year:<6} {cash:<12.0f} {investments:<12.0f} {equity:<12.0f} {total_nw:<12.0f} {yoy_growth:<12.1f}")
+        prev_net_worth = total_nw
+
+    # 4. ACTION SUMMARY TABLE
+    print(f"\n{'-'*80}")
+    print("ACTION SUMMARY (→ action_summary.csv)")
+    print(f"{'-'*80}")
+    print(f"{'Date':<12} {'Action_Type':<12} {'Lot_ID':<20} {'Quantity':<12}")
+    print(f"{'-'*80}")
+
+    for action in result.plan.planned_actions:
+        action_date = action.action_date.strftime('%Y-%m-%d')
+        action_type = str(action.action_type).replace('ActionType.', '')
+        lot_id = action.lot_id
+        quantity = action.quantity
+
+        print(f"{action_date:<12} {action_type:<12} {lot_id:<20} {quantity:<12.0f}")
 
 def resolve_scenario_path(scenario_input, use_demo=False):
     """Resolve scenario path from either full name or 3-digit identifier.
@@ -268,6 +341,7 @@ def execute_scenario(scenario_input, price_scenario="moderate", projection_years
     )
 
     print_scenario_results(result, detailed=True)
+    print_raw_data_tables(result)
     return result
 
 

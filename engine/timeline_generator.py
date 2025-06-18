@@ -98,7 +98,7 @@ class TimelineGenerator:
             strike_price = self._get_strike_price(equity_pos)
             rows.append({
                 'date': current_date.isoformat(),
-                'lot_id': 'VESTED_ISO',
+                'lot_id': 'ISO',
                 'share_type': 'ISO',
                 'quantity': vested['iso_shares'],
                 'strike_price': strike_price,
@@ -110,7 +110,7 @@ class TimelineGenerator:
             strike_price = self._get_strike_price(equity_pos)
             rows.append({
                 'date': current_date.isoformat(),
-                'lot_id': 'VESTED_NSO',
+                'lot_id': 'NSO',
                 'share_type': 'NSO',
                 'quantity': vested['nso_shares'],
                 'strike_price': strike_price,

@@ -48,6 +48,20 @@
 ## Data Contract v2.0
 - Created comprehensive DATA_CONTRACT.md defining canonical profile format
 - Built migrate_profile.py utility to convert v1.x profiles to v2.0
+
+## Realistic Scenario Development & System Improvements
+- Fixed lot naming consistency by changing VESTED_ISO/NSO to ISO/NSO upstream in equity_loader.py, timeline_generator.py, and natural_evolution_generator.py
+- Removed downstream string replacement logic in projection_output.py
+- Added share quantity validation to projection calculator methods (_process_exercise, _process_sale, _process_donation)
+- Created four fundamental equity compensation strategies as realistic baseline scenarios:
+  - 003_exercise_aggressive: Exercise ISOs as they vest to start LTCG clock ASAP
+  - 004_amt_basic: Manage AMT by exercising ~$100K bargain element per year
+  - 005_charitable_frontload: Exercise and donate early to maximize company match window
+  - 006_diversify: Exercise and sell shares to diversify portfolio ASAP
+- Built portfolio comparison system for side-by-side strategy evaluation
+- Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping
+- Updated test suite to work with new lot naming conventions
+- Portfolio analysis reveals Exercise Aggressive strategy achieves 53.7% higher net worth than Natural Evolution baseline
 - Eliminated all conditional field checking throughout codebase
 - Standardized field names across all components
 - Implemented v2.0 data contract with canonical field names

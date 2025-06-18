@@ -287,6 +287,10 @@ class ProjectionCalculator:
         if not lot:
             raise ValueError(f"Lot {action.lot_id} not found for exercise")
 
+        # Validate share quantity
+        if action.quantity > lot.quantity:
+            raise ValueError(f"Cannot exercise {action.quantity} shares from lot {action.lot_id} - only {lot.quantity} shares available")
+
         # Calculate exercise cost
         exercise_cost = action.quantity * lot.strike_price
 
@@ -360,6 +364,10 @@ class ProjectionCalculator:
         if not lot:
             raise ValueError(f"Lot {action.lot_id} not found for sale")
 
+        # Validate share quantity
+        if action.quantity > lot.quantity:
+            raise ValueError(f"Cannot sell {action.quantity} shares from lot {action.lot_id} - only {lot.quantity} shares available")
+
         # Get sale price
         if not action.price:
             raise ValueError(f"Price must be specified for sale action on {action.lot_id}")
@@ -419,6 +427,10 @@ class ProjectionCalculator:
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
         if not lot:
             raise ValueError(f"Lot {action.lot_id} not found for donation")
+
+        # Validate share quantity
+        if action.quantity > lot.quantity:
+            raise ValueError(f"Cannot donate {action.quantity} shares from lot {action.lot_id} - only {lot.quantity} shares available")
 
         # Get donation price
         if not action.price:

@@ -93,7 +93,7 @@ class EquityLoader:
         # ISO shares
         if vested.get('iso_shares', 0) > 0:
             lots.append(ShareLot(
-                lot_id='VESTED_ISO',
+                lot_id='ISO',
                 share_type=ShareType.ISO,
                 quantity=vested['iso_shares'],
                 strike_price=strike_price,
@@ -107,7 +107,7 @@ class EquityLoader:
         # NSO shares
         if vested.get('nso_shares', 0) > 0:
             lots.append(ShareLot(
-                lot_id='VESTED_NSO',
+                lot_id='NSO',
                 share_type=ShareType.NSO,
                 quantity=vested['nso_shares'],
                 strike_price=strike_price,

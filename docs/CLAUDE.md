@@ -144,25 +144,24 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 ### Known Issues
 - Carryforwards not tracked separately by donation type (cash vs stock)
-- Option expiration handling needs natural state transition implementation
 - Ordering rules for charitable deductions could be more explicit
 - Action summary CSV incorrectly shows "iso_exercise_calculator" for all exercises (display issue only, calculations are correct)
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
-- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py)
-- Option expiration tracking not implemented in projection calculator
-- Lot ID parsing in pledge obligations assumes specific underscore convention
-- Tax limit percentages in CSV generation should differentiate federal vs state
-- Forward reference in ProjectionResult needs documentation
-- Price projections loading from external source not implemented (natural_evolution_generator.py)
-- Redundant profile loading check needed in natural evolution generator
+- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
+- Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
+- Profile loading redundancy - loading profile twice in natural_evolution_generator.py
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
+- Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
+- Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
 - AMT credit carryforward timing - confirm which year the credits apply to (projection_calculator.py)
 - Improve documentation for basis election logic (projection_calculator.py)
 - Confirm whether investment growth should be considered liquid cash (projection_calculator.py)
-- Rename VESTED_ISO/VESTED_NSO to ISO/NSO consistently upstream (projection_output.py)
-- migrate recent accomplishments out of CLAUDE.md into CHANGELOG.md
+- Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
+- Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
+- Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
+- Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
@@ -170,7 +169,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Raw Data Table Implementation Plan
 **Objective**: Replace formatted summary tables with raw data tables that map directly to CSV structure for better data analysis workflow.
 
-**Current Problem**: 
+**Current Problem**:
 - Summary tables mix concepts (withholding vs tax liability vs cash flow)
 - Overlap between Financial Summary and Cash Flow Waterfall reduces clarity
 - Users want clean data that corresponds exactly to CSV outputs
@@ -181,13 +180,13 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 1. **Update run_scenario_analysis.py display logic**
    - Replace current summary tables with raw data format
-   - Use actual CSV column names as table headers  
+   - Use actual CSV column names as table headers
    - Ensure data matches exactly what appears in generated CSVs
    - Remove calculated fields that don't exist in CSVs
 
 2. **Five Raw Data Tables**:
    - **ANNUAL CASH FLOW** → yearly_cashflow.csv mapping
-   - **TAX CALCULATION** → tax_timeline.csv mapping  
+   - **TAX CALCULATION** → tax_timeline.csv mapping
    - **EQUITY POSITION** → equity_holdings.csv mapping
    - **ACTION SUMMARY** → action_summary.csv mapping
    - **ASSETS BREAKDOWN** → annual_summary.csv mapping (net worth components by year)
@@ -210,5 +209,3 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Every table value corresponds to exact CSV cell
 - No duplicate information across tables
 - Clear mapping between terminal display and CSV analysis files
-
-

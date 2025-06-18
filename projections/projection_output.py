@@ -88,7 +88,7 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
     def _create_group_total_row(group_lots: List[str], yearly_states: List[YearlyState], years: List[str]) -> Dict[str, Any]:
         """Create a TOTAL row for a group of related lots."""
         base_id = group_lots[0].replace('VESTED_', '').split('_EX_')[0]
-        display_base_id = base_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO')
+        display_base_id = base_id
 
         row = {'Lot_ID': f'{display_base_id}_GROUP', 'State': 'TOTAL'}
 
@@ -150,8 +150,8 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
 
         # For each lot and state, track quantities across years
         for lot_id in sorted_lot_ids:
-            # Rename VESTED_ISO to ISO and VESTED_NSO to NSO
-            display_lot_id = lot_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO')
+            # Use lot_id directly since upstream naming is now consistent
+            display_lot_id = lot_id
 
             # Check if we're starting a new group
             base_id = lot_id.replace('VESTED_', '').split('_EX_')[0]
@@ -617,8 +617,8 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
 
         # For each lot and transition type
         for lot_id in sorted_lot_ids:
-            # Rename VESTED_ISO to ISO and VESTED_NSO to NSO for display
-            display_lot_id = lot_id.replace('VESTED_ISO', 'ISO').replace('VESTED_NSO', 'NSO') ##Claude TODO: Instead of doing a find/replace, change the original names upstream to 'ISO' and 'NSO' consistently
+            # Use lot_id directly since upstream naming is now consistent
+            display_lot_id = lot_id
 
             for transition in transitions:
                 row = {'Lot_ID': display_lot_id, 'Transition': transition}

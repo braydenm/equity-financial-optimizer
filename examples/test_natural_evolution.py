@@ -22,8 +22,7 @@ from projections.projection_output import save_all_projection_csvs
 
 
 def load_test_profile():
-    """Load user profile for testing."""
-    # TODO: Keep test using demo_profile.json for stable, predictable validation
+    """Load demo profile for testing."""
     profile_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         'input_data', 'demo_profile.json'

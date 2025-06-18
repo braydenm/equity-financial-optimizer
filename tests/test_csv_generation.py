@@ -83,9 +83,9 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
                 tax_treatment=TaxTreatment.NA,
                 expiration_date=date(2034, 1, 1)
             ),
-            # Vested ISOs (should be renamed from VESTED_ISO to ISO)
+            # Vested ISOs (now use ISO directly)
             ShareLot(
-                lot_id="VESTED_ISO",
+                lot_id="ISO",
                 share_type=ShareType.ISO,
                 quantity=10000,
                 strike_price=5.0,
@@ -128,7 +128,7 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
         PlannedAction(
             action_date=date(2025, 7, 1),
             action_type=ActionType.EXERCISE,
-            lot_id="VESTED_ISO",
+            lot_id="ISO",
             quantity=5000,
             price=50.0,
             notes="Exercise half of vested ISOs"
@@ -220,10 +220,10 @@ def validate_state_timeline_csv(filepath: str) -> None:
     if not any(int(r.get('2025', 0)) > 0 for r in granted_rows):
         raise CSVValidationError("No granted shares found in state_timeline.csv")
 
-    # Check for VESTED_ISO renamed to ISO
+    # Check for ISO lot exists (upstream now uses ISO directly)
     lot_ids = set(r['Lot_ID'] for r in rows)
-    if 'VESTED_ISO' in lot_ids and 'ISO' not in lot_ids:
-        raise CSVValidationError("VESTED_ISO not renamed to ISO in state_timeline.csv")
+    if 'ISO' not in lot_ids:
+        raise CSVValidationError("ISO lot not found in state_timeline.csv")
 
     # Check for group TOTAL rows
     total_rows = [r for r in rows if r['State'] == 'TOTAL']
@@ -385,12 +385,12 @@ def validate_holding_period_tracking_csv(filepath: str) -> None:
         raise CSVValidationError(f"Expected at least 3 lots in holding_period_tracking, got {len(rows)}")
 
     # Check that exercised ISO lot has long-term status after 2+ years
-    iso_lot = next((r for r in rows if r['lot_id'] == 'VESTED_ISO_EX_20250701'), None)
+    iso_lot = next((r for r in rows if r['lot_id'] == 'ISO_EX_20250701'), None)
     if not iso_lot:
-        raise CSVValidationError("VESTED_ISO_EX_20250701 not found in holding_period_tracking.csv")
+        raise CSVValidationError("ISO_EX_20250701 not found in holding_period_tracking.csv")
 
     if iso_lot.get('holding_status') != 'long-term':
-        raise CSVValidationError(f"Expected VESTED_ISO_EX_20250701 holding_status=long-term, got {iso_lot.get('holding_status')}")
+        raise CSVValidationError(f"Expected ISO_EX_20250701 holding_status=long-term, got {iso_lot.get('holding_status')}")
 
     print("✅ holding_period_tracking.csv validation passed")
 

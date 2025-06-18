@@ -35,7 +35,7 @@ def load_equity_timeline(timeline_path: str) -> List[Dict[str, Any]]:
     return timeline
 
 
-def load_user_profile_simplified(profile_path: str) -> UserProfile:
+def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO: Explain why we are using a simplified load here. Can we just use an existing loader? What's the data flow for this file compared to the whole project flow?
     """Load user profile and extract key parameters for projections."""
     with open(profile_path, 'r') as f:
         profile_data = json.load(f) #Claude TODO: Does this look like we are loading the profile twice in this file in a way that is redundant?
@@ -150,7 +150,7 @@ def generate_natural_evolution(timeline_path: str, profile_path: str,
     expiration_actions = []
     for lot in initial_lots:
         if lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
-            # Calculate expiration date (10 years from grant)
+            # Calculate expiration date (10 years from grant). #Claude TODO: Pull this from user profile, don't hardcode.
             expiration_date = date(lot.grant_date.year + 10, lot.grant_date.month, lot.grant_date.day)
             if expiration_date <= end_date:
                 expiration_action = PlannedAction(
@@ -164,7 +164,7 @@ def generate_natural_evolution(timeline_path: str, profile_path: str,
 
     # Price projections should be provided externally (e.g., market_projections.json)
     # Default to current price with no change if not provided
-    # TODO: Load price projections from external source (market_projections.json, financial advisor inputs, etc.)
+    # Claude TODO: Load price projections from external source (market_projections.json, financial advisor inputs, etc.)
 
     # Extract current price from profile data
     with open(profile_path, 'r') as f:
@@ -174,7 +174,7 @@ def generate_natural_evolution(timeline_path: str, profile_path: str,
     if not base_price:
         raise ValueError("Current 409A price must be provided in user profile current_prices")
 
-    price_projections = {}
+    price_projections = {} #Claude TODO: Remove this basic assumption and load from external source.
     for year in range(start_date.year, end_date.year + 1):
         price_projections[year] = base_price  # No change assumption
 
@@ -306,7 +306,7 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     # Add vested unexercised positions
     if vested_unexercised.get('iso_shares', 0) > 0:
         iso_lot = ShareLot(
-            lot_id="VESTED_ISO",
+            lot_id="ISO",
             share_type=ShareType.ISO,
             quantity=vested_unexercised['iso_shares'],
             strike_price=strike_price,
@@ -319,7 +319,7 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
 
     if vested_unexercised.get('nso_shares', 0) > 0:
         nso_lot = ShareLot(
-            lot_id="VESTED_NSO",
+            lot_id="NSO",
             share_type=ShareType.NSO,
             quantity=vested_unexercised['nso_shares'],
             strike_price=strike_price,

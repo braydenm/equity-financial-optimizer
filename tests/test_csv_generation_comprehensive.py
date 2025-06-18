@@ -96,9 +96,20 @@ class TestCSVGeneration(unittest.TestCase):
                     tax_treatment=TaxTreatment.NA,
                     expiration_date=date(2034, 6, 15)
                 ),
+                # Vested NSOs ready to exercise
+                ShareLot(
+                    lot_id="NSO",
+                    share_type=ShareType.NSO,
+                    quantity=4000,
+                    strike_price=5.0,
+                    grant_date=date(2022, 1, 1),
+                    lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=date(2032, 1, 1)
+                ),
                 # Vested ISOs ready to exercise
                 ShareLot(
-                    lot_id="VESTED_ISO",
+                    lot_id="ISO",
                     share_type=ShareType.ISO,
                     quantity=10000,
                     strike_price=5.0,
@@ -141,7 +152,7 @@ class TestCSVGeneration(unittest.TestCase):
             PlannedAction(
                 action_date=date(2025, 7, 1),
                 action_type=ActionType.EXERCISE,
-                lot_id="VESTED_ISO",
+                lot_id="ISO",
                 quantity=5000,
                 price=50.0,
                 notes="Exercise half of vested ISOs"
