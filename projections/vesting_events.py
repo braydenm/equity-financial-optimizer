@@ -52,16 +52,34 @@ class ExpirationEvent:
     expiration_date: date
     quantity: int
     share_type: ShareType
+    strike_price: float = 0.0
+    market_price: float = 0.0
     notes: str = ""
 
+    @property
+    def opportunity_cost(self) -> float:
+        """Calculate the opportunity cost of expiration."""
+        if self.market_price > self.strike_price:
+            return (self.market_price - self.strike_price) * self.quantity
+        return 0.0
+
+    @property
+    def per_share_loss(self) -> float:
+        """Calculate the per-share opportunity cost."""
+        if self.market_price > self.strike_price:
+            return self.market_price - self.strike_price
+        return 0.0
+
     @classmethod
-    def from_lot(cls, lot: ShareLot, expiration_date: date) -> 'ExpirationEvent':
+    def from_lot(cls, lot: ShareLot, expiration_date: date, market_price: float = 0.0) -> 'ExpirationEvent':
         """Create ExpirationEvent from an expiring lot."""
         return cls(
             lot_id=lot.lot_id,
             expiration_date=expiration_date,
             quantity=lot.quantity,
             share_type=lot.share_type,
+            strike_price=lot.strike_price,
+            market_price=market_price,
             notes=f"Options expired on {expiration_date}"
         )
 
@@ -72,6 +90,9 @@ class ExpirationEvent:
             'expiration_date': self.expiration_date.isoformat(),
             'quantity': self.quantity,
             'share_type': self.share_type.name,
+            'strike_price': self.strike_price,
+            'market_price': self.market_price,
+            'opportunity_cost': self.opportunity_cost,
             'notes': self.notes
         }
 
@@ -121,7 +142,7 @@ def process_natural_vesting(lots: List[ShareLot], year: int) -> List[VestingEven
     return vesting_events
 
 
-def process_natural_expiration(lots: List[ShareLot], year: int) -> List['ExpirationEvent']:
+def process_natural_expiration(lots: List[ShareLot], year: int, market_price: float = 0.0) -> List['ExpirationEvent']:
     """
     Process natural expiration transitions for lots in a given year.
 
@@ -130,6 +151,7 @@ def process_natural_expiration(lots: List[ShareLot], year: int) -> List['Expirat
     Args:
         lots: List of share lots to check for expiration
         year: Current projection year
+        market_price: Current market price for opportunity cost calculation
 
     Returns:
         List of ExpirationEvent objects
@@ -148,10 +170,13 @@ def process_natural_expiration(lots: List[ShareLot], year: int) -> List['Expirat
             was_exercisable = lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED
             lot.lifecycle_state = LifecycleState.EXPIRED
 
-            # Create expiration event
-            event = ExpirationEvent.from_lot(lot, lot.expiration_date)
-            if was_exercisable:
-                event.notes = f"Vested options expired on {lot.expiration_date} (potential opportunity cost)"
+            # Create expiration event with market price for opportunity cost calculation
+            event = ExpirationEvent.from_lot(lot, lot.expiration_date, market_price)
+
+            if was_exercisable and event.opportunity_cost > 0:
+                event.notes = f"Vested options expired on {lot.expiration_date} - OPPORTUNITY COST: ${event.opportunity_cost:,.2f} (${event.per_share_loss:.2f}/share)"
+            elif was_exercisable:
+                event.notes = f"Vested options expired on {lot.expiration_date} (underwater - no opportunity cost)"
             else:
                 event.notes = f"Unvested options expired on {lot.expiration_date}"
 

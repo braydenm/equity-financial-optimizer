@@ -82,7 +82,7 @@ class TestOptionExpiration(unittest.TestCase):
         )
 
         lots = [lot]
-        expiration_events = process_natural_expiration(lots, 2024)
+        expiration_events = process_natural_expiration(lots, 2024, 25.0)
 
         # Should have one expiration event
         self.assertEqual(len(expiration_events), 1)
@@ -111,7 +111,7 @@ class TestOptionExpiration(unittest.TestCase):
         )
 
         lots = [lot]
-        expiration_events = process_natural_expiration(lots, 2024)
+        expiration_events = process_natural_expiration(lots, 2024, 25.0)
 
         # Should have one expiration event
         self.assertEqual(len(expiration_events), 1)
@@ -121,7 +121,7 @@ class TestOptionExpiration(unittest.TestCase):
         self.assertEqual(event.quantity, 500)
         self.assertEqual(event.expiration_date, date(2024, 6, 15))
         self.assertIn("Vested options expired", event.notes)
-        self.assertIn("potential opportunity cost", event.notes)
+        self.assertIn("OPPORTUNITY COST:", event.notes)
 
         # Lot should be marked as expired
         self.assertEqual(lot.lifecycle_state, LifecycleState.EXPIRED)
@@ -162,17 +162,17 @@ class TestOptionExpiration(unittest.TestCase):
         ]
 
         # Test 2024 expiration
-        expiration_events_2024 = process_natural_expiration(lots, 2024)
+        expiration_events_2024 = process_natural_expiration(lots, 2024, 0.0)
         self.assertEqual(len(expiration_events_2024), 1)
         self.assertEqual(expiration_events_2024[0].lot_id, "ISO_EXPIRES_2024")
 
         # Test 2025 expiration
-        expiration_events_2025 = process_natural_expiration(lots, 2025)
+        expiration_events_2025 = process_natural_expiration(lots, 2025, 0.0)
         self.assertEqual(len(expiration_events_2025), 1)
         self.assertEqual(expiration_events_2025[0].lot_id, "NSO_EXPIRES_2025")
 
         # Test 2026 - no expirations
-        expiration_events_2026 = process_natural_expiration(lots, 2026)
+        expiration_events_2026 = process_natural_expiration(lots, 2026, 0.0)
         self.assertEqual(len(expiration_events_2026), 0)
 
         # Check final states
@@ -245,7 +245,7 @@ class TestOptionExpiration(unittest.TestCase):
         )
 
         lots = [rsu_lot]
-        expiration_events = process_natural_expiration(lots, 2024)
+        expiration_events = process_natural_expiration(lots, 2024, 0.0)
 
         # Should have no expiration events
         self.assertEqual(len(expiration_events), 0)
@@ -308,6 +308,8 @@ class TestOptionExpiration(unittest.TestCase):
             expiration_date=date(2024, 6, 15),
             quantity=1500,
             share_type=ShareType.ISO,
+            strike_price=10.0,
+            market_price=25.0,
             notes="Test expiration event"
         )
 
@@ -318,6 +320,9 @@ class TestOptionExpiration(unittest.TestCase):
             'expiration_date': '2024-06-15',
             'quantity': 1500,
             'share_type': 'ISO',
+            'strike_price': 10.0,
+            'market_price': 25.0,
+            'opportunity_cost': 22500.0,
             'notes': 'Test expiration event'
         }
 

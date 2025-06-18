@@ -139,7 +139,8 @@ class ProjectionCalculator:
 
             # Track vesting events for CSV output
             yearly_state.vesting_events = vesting_events
-            expiration_events = process_natural_expiration(current_lots, year)
+            market_price = plan.price_projections.get(year, 0.0)
+            expiration_events = process_natural_expiration(current_lots, year, market_price)
             yearly_state.expiration_events = expiration_events
 
             # Process each action chronologically
