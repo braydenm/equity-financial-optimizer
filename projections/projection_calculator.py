@@ -29,6 +29,12 @@ from calculators.iso_exercise_calculator import (
 from calculators.share_sale_calculator import ShareSaleCalculator
 from calculators.share_donation_calculator import ShareDonationCalculator
 from calculators.annual_tax_calculator import AnnualTaxCalculator
+from calculators.tax_constants import (
+    FEDERAL_SUPPLEMENTAL_WITHHOLDING_RATE,
+    CALIFORNIA_SUPPLEMENTAL_WITHHOLDING_RATE,
+    MEDICARE_RATE,
+    CALIFORNIA_SDI_RATE
+)
 from calculators.components import (
     ISOExerciseComponents,
     NSOExerciseComponents,
@@ -68,9 +74,10 @@ class ProjectionCalculator:
         yearly_states = []
         current_lots = deepcopy(plan.initial_lots)
         current_cash = plan.initial_cash
+        current_investments = self.profile.taxable_investments
 
         # Initialize carryforward states
-        amt_credits_remaining = 0.0
+        amt_credits_remaining = self.profile.amt_credit_carryforward #Claude TODO: Confirm which year the credits in profile are to be applied to and whether that applies to the current year
         charitable_carryforward = {}  # year -> amount
         pledge_state = PledgeState()
         cumulative_shares_sold = {}  # Track cumulative sales across years
@@ -79,8 +86,17 @@ class ProjectionCalculator:
         # Process each year in the projection
         for year in range(plan.start_date.year, plan.end_date.year + 1):
             year_start_cash = current_cash
+            year_start_investments = current_investments
+
+            # Calculate all income sources
             year_w2_income = self.profile.annual_w2_income
-            year_total_income = self.profile.annual_w2_income + self.profile.spouse_w2_income + self.profile.other_income
+            year_total_income = self.profile.get_total_income()
+            year_investment_income = self.profile.interest_income + self.profile.dividend_income
+
+            # Model investment growth
+            investment_growth = current_investments * self.profile.investment_return_rate
+            current_investments = current_investments * (1 + self.profile.investment_return_rate)
+
             year_exercise_costs = 0.0
             year_tax_paid = 0.0
             year_donation_value = 0.0
@@ -128,7 +144,10 @@ class ProjectionCalculator:
             # Process each action chronologically
             for action in sorted(year_actions, key=lambda a: a.action_date):
                 if action.action_type == ActionType.EXERCISE:
-                    exercise_result = self._process_exercise(action, current_lots, annual_components)
+                    # Get the FMV for this year from price projections
+                    year_fmv = plan.price_projections.get(year,
+                        self.profile.current_cash)  # Fallback to a default if missing
+                    exercise_result = self._process_exercise(action, current_lots, annual_components, year_fmv)
                     year_exercise_costs += exercise_result['exercise_cost']
                     current_cash -= exercise_result['exercise_cost']
 
@@ -177,7 +196,11 @@ class ProjectionCalculator:
                 elect_basis_deduction=elect_basis
             )
 
-            year_tax_paid = tax_result.total_tax
+            # Calculate net tax payment (gross tax minus withholdings)
+            year_gross_tax = tax_result.total_tax
+            year_withholdings = self.calculate_year_withholding(year, annual_components)
+            year_tax_paid = max(0, year_gross_tax - year_withholdings)  # Net payment due
+
             year_tax_state.amt_tax = tax_result.federal_amt + tax_result.ca_amt
             year_tax_state.regular_tax = tax_result.federal_regular_tax + tax_result.ca_tax_owed
             year_tax_state.total_tax = tax_result.total_tax
@@ -187,8 +210,10 @@ class ProjectionCalculator:
             # Update AMT credits for next year
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward
 
-            # Calculate end of year cash
-            year_end_cash = year_start_cash + year_total_income - year_exercise_costs - year_tax_paid
+            # Calculate end of year cash including all income/expenses
+            year_expenses = self.profile.get_annual_expenses()
+            year_end_cash = (year_start_cash + year_total_income + investment_growth
+                           - year_exercise_costs - year_tax_paid - year_expenses) ##Claude TODO: Confirm whether investment growth should be considered liquid cash
             current_cash = year_end_cash
 
             # Update AMT credits for next year
@@ -212,13 +237,18 @@ class ProjectionCalculator:
             yearly_state.exercise_costs = year_exercise_costs
             yearly_state.annual_tax_components = annual_components
             yearly_state.tax_paid = year_tax_paid
+            yearly_state.gross_tax = year_gross_tax
+            yearly_state.tax_withholdings = year_withholdings
+            yearly_state.living_expenses = year_expenses
+            yearly_state.investment_income = year_investment_income
+            yearly_state.investment_balance = current_investments
             yearly_state.donation_value = year_donation_value
             yearly_state.ending_cash = year_end_cash
             yearly_state.charitable_state = charitable_state
             yearly_state.equity_holdings = deepcopy(current_lots)
             yearly_state.total_equity_value = total_equity_value
             yearly_state.pledge_state = pledge_state
-            yearly_state.total_net_worth = year_end_cash + total_equity_value
+            yearly_state.total_net_worth = year_end_cash + total_equity_value + current_investments
 
             # Update cumulative tracking for next year
             cumulative_shares_sold = deepcopy(yearly_state.shares_sold)
@@ -241,8 +271,15 @@ class ProjectionCalculator:
 
 
     def _process_exercise(self, action: PlannedAction, current_lots: List[ShareLot],
-                         annual_components: AnnualTaxComponents) -> Dict[str, float]:
-        """Process an exercise action and extract tax components."""
+                         annual_components: AnnualTaxComponents, current_year_fmv: float) -> Dict[str, float]:
+        """Process an exercise action and extract tax components.
+
+        Args:
+            action: The exercise action to process
+            current_lots: Current share lots
+            annual_components: Annual tax components to update
+            current_year_fmv: Fair market value for the current year from price projections
+        """
         # Find the lot being exercised
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
         if not lot:
@@ -252,9 +289,9 @@ class ProjectionCalculator:
         exercise_cost = action.quantity * lot.strike_price
 
         # Get current FMV
-        if not action.price:
-            raise ValueError(f"Price must be specified for exercise action on {action.lot_id}")
-        current_price = action.price
+        # Use the year's projected FMV for exercises (not action.price which may be strike price)
+        # This fixes NSO bargain element calculations
+        current_price = current_year_fmv
 
         # Extract exercise components based on share type
         if lot.share_type == ShareType.ISO:
@@ -453,3 +490,49 @@ class ProjectionCalculator:
         # The pledge state is maintained throughout the year via add_obligation and discharge_donation
         # This method exists for compatibility but doesn't need to do additional calculations
         return pledge_state
+
+    def calculate_year_withholding(self, year: int, annual_components: AnnualTaxComponents) -> float:
+        """
+        Calculate tax withholding for a given year based on income types.
+
+        For years after 2024, uses base withholding amounts if available to avoid
+        inflated withholding from stock exercise years.
+
+        Args:
+            year: Tax year
+            annual_components: Annual tax components with income breakdown
+
+        Returns:
+            Total withholding amount for the year
+        """
+        # Determine base withholding amounts
+        if year > 2024 and self.profile.base_federal_withholding > 0:
+            # Use base withholding for normal years
+            base_federal = self.profile.base_federal_withholding
+            base_state = self.profile.base_state_withholding
+        else:
+            # Fall back to regular withholding (backward compatibility)
+            base_federal = self.profile.federal_withholding
+            base_state = self.profile.state_withholding
+
+        # Calculate supplemental withholding for stock compensation
+        stock_withholding = 0.0
+
+        # NSO exercises
+        nso_income = sum(comp.bargain_element for comp in annual_components.nso_exercise_components)
+
+        # RSU vesting (if any RSU components exist)
+        rsu_income = 0.0  # RSUs would be added here if implemented
+
+        total_stock_income = nso_income + rsu_income
+
+        if total_stock_income > 0:
+            # Apply supplemental withholding rates
+            stock_withholding = total_stock_income * (
+                FEDERAL_SUPPLEMENTAL_WITHHOLDING_RATE +      # 22%
+                CALIFORNIA_SUPPLEMENTAL_WITHHOLDING_RATE +   # 10.23%
+                MEDICARE_RATE +                               # 1.45%
+                CALIFORNIA_SDI_RATE                           # 1.2%
+            )  # Total: ~34.88%
+
+        return base_federal + base_state + stock_withholding

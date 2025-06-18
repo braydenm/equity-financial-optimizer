@@ -144,3 +144,13 @@
 - Scenario discovery pattern: optimal strategies emerge from comparison, not predetermined
 - Strong data contracts with well-defined classes replacing dictionary/object dual handling
 - No external dependencies on CSV outputs enabling flexible reporting evolution
+
+## Base Withholding Implementation
+- Added base_federal_withholding and base_state_withholding fields to UserProfile dataclass
+- Implemented intelligent withholding calculation that uses base rates for future years
+- Added supplemental withholding for stock compensation (NSO exercises, RSU vesting)
+- Supplemental rate combines federal (22%), CA (10.23%), Medicare (1.45%), and CA SDI (1.2%)
+- Updated all profile loaders (portfolio manager, scenario loader, natural evolution generator)
+- Added base withholding example to demo_profile.json
+- Solves problem of inflated withholding from stock exercise years affecting all projections
+- Backward compatible - works without base withholding fields using existing withholding amounts

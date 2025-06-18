@@ -46,6 +46,10 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile:
     charitable = profile_data.get('charitable_giving', {})
     liquid_assets = financial_pos.get('liquid_assets', {})
     liquidity_needs = profile_data.get('goals_and_constraints', {}).get('liquidity_needs', {})
+    tax_situation = profile_data.get('tax_situation', {})
+    estimated_taxes = tax_situation.get('estimated_taxes', {})
+    carryforwards = tax_situation.get('carryforwards', {})
+    monthly_cash_flow = financial_pos.get('monthly_cash_flow', {})
 
     return UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
@@ -58,12 +62,23 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile:
         annual_w2_income=income.get('annual_w2_income', 0),
         spouse_w2_income=income.get('spouse_w2_income', 0),
         other_income=income.get('other_income', 0),
+        interest_income=income.get('interest_income', 0),
+        dividend_income=income.get('dividend_income', 0),
+        bonus_expected=income.get('bonus_expected', 0),
         current_cash=liquid_assets.get('cash', 0),
         exercise_reserves=liquidity_needs.get('exercise_reserves', 0),
         pledge_percentage=charitable.get('pledge_percentage', 0.5),
         company_match_ratio=charitable.get('company_match_ratio', 3.0),
         filing_status=personal_info.get('tax_filing_status', 'single'),
-        state_of_residence=personal_info.get('state_of_residence', 'California')
+        state_of_residence=personal_info.get('state_of_residence', 'California'),
+        monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
+        federal_withholding=estimated_taxes.get('federal_withholding', 0),
+        state_withholding=estimated_taxes.get('state_withholding', 0),
+        quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
+        base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
+        base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
+        taxable_investments=liquid_assets.get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
     )
 
 
@@ -101,7 +116,7 @@ def generate_natural_evolution(timeline_path: str, profile_path: str,
     """
     # Load data
     timeline_data = load_equity_timeline(timeline_path)
-    profile = load_user_profile_simplified(profile_path)
+    profile = load_user_profile_simplified(profile_path) ##Claude TODO: Just use regular profile loader and delete simplified.
 
     # Determine projection period
     start_date = date(2025, 1, 1)  # Start of current projection year
@@ -197,8 +212,12 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     # Create user profile
     personal_info = profile_data.get('personal_information', {})
     income = profile_data.get('income', {})
-    financial_pos = profile_data.get('financial_position', {})
+    financial = profile_data.get('financial_position', {})
     charitable = profile_data.get('charitable_giving', {})
+    tax_situation = profile_data.get('tax_situation', {})
+    estimated_taxes = tax_situation.get('estimated_taxes', {})
+    carryforwards = tax_situation.get('carryforwards', {})
+    monthly_cash_flow = financial.get('monthly_cash_flow', {})
 
     profile = UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
@@ -208,13 +227,26 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         fica_tax_rate=personal_info['fica_tax_rate'],
         additional_medicare_rate=personal_info['additional_medicare_rate'],
         niit_rate=personal_info['niit_rate'],
-        annual_w2_income=income.get('annual_w2_income', 0),
+        annual_w2_income=income['annual_w2_income'],
         spouse_w2_income=income.get('spouse_w2_income', 0),
-        current_cash=financial_pos.get('liquid_assets', {}).get('cash', 0),
+        other_income=income.get('other_income', 0),
+        interest_income=income.get('interest_income', 0),
+        dividend_income=income.get('dividend_income', 0),
+        bonus_expected=income.get('bonus_expected', 0),
+        current_cash=financial['liquid_assets']['cash'],
         exercise_reserves=profile_data.get('goals_and_constraints', {}).get('liquidity_needs', {}).get('exercise_reserves', 0),
         pledge_percentage=charitable.get('pledge_percentage', 0.5),
         company_match_ratio=charitable.get('company_match_ratio', 3.0),
-        filing_status=personal_info.get('tax_filing_status', 'single')
+        filing_status=personal_info.get('tax_filing_status', 'single'),
+        state_of_residence=personal_info.get('state_of_residence', 'California'),
+        monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
+        federal_withholding=estimated_taxes.get('federal_withholding', 0),
+        state_withholding=estimated_taxes.get('state_withholding', 0),
+        quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
+        base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
+        base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
+        taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
     )
 
     # Set up projection period

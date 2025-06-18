@@ -114,7 +114,9 @@
     "estimated_taxes": {
       "federal_withholding": 150000,
       "state_withholding": 50000,
-      "quarterly_payments": 0
+      "quarterly_payments": 0,
+      "base_federal_withholding": 102000,
+      "base_state_withholding": 29400
     }
   },
 

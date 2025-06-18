@@ -128,9 +128,11 @@
   },
   "tax_situation": {
     "estimated_taxes": {
-      "federal_withholding": 150000,
-      "state_withholding": 50000,
-      "quarterly_payments": 0
+      "federal_withholding": 28500,
+      "state_withholding": 16275,
+      "quarterly_payments": 0,
+      "base_federal_withholding": 15000,
+      "base_state_withholding": 8000
     }
   },
   "financial_position": {
@@ -152,9 +154,9 @@
       "total": 0
     },
     "monthly_cash_flow": {
-      "income": 41667,
-      "expenses": 16500,
-      "savings": 10000
+      "income": 20000,
+      "expenses": 11000,
+      "savings": 9000
     }
   },
   "goals_and_constraints": {

@@ -52,7 +52,7 @@ docs/reference/tender-offer-may-2025.md
 scenario_config.json
 *.csv
 *.xlsx
-**/metadata.json
+**/**/metadata.json
 !data/examples/*.csv
 !data/examples/*.xlsx
 !data/user_profile_template.json

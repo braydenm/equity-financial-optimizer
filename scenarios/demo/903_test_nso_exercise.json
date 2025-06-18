@@ -1,11 +1,11 @@
 {
-  "scenario_name": "003_test_nso_exercise",
+  "scenario_name": "903_test_nso_exercise",
   "description": "Test NSO exercise tax calculation with component approach",
   "actions": [
     {
       "action_date": "2026-01-15",
       "action_type": "exercise",
-      "lot_id": "NSO_2026_001",
+      "lot_id": "VEST_20260101_NSO",
       "quantity": 2000,
       "price": null,
       "notes": "Exercise first batch of vested NSOs"
@@ -13,7 +13,7 @@
     {
       "action_date": "2026-04-15",
       "action_type": "exercise",
-      "lot_id": "NSO_2026_002",
+      "lot_id": "VEST_20260401_NSO",
       "quantity": 2000,
       "price": null,
       "notes": "Exercise second batch of vested NSOs"

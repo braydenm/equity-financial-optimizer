@@ -127,6 +127,13 @@ CALIFORNIA_MENTAL_HEALTH_TAX_RATE = 0.01
 # California does not have preferential LTCG rates
 # LTCG is taxed as ordinary income in California
 
+# California State Disability Insurance (SDI) - 2025 values
+CALIFORNIA_SDI_RATE = 0.012  # 1.2% for 2025 (no wage base limit)
+
+# California supplemental withholding rate (2025)
+# Applies to bonuses, stock compensation, and other supplemental wages
+CALIFORNIA_SUPPLEMENTAL_WITHHOLDING_RATE = 0.1023  # 10.23% for 2025
+
 # California AMT Parameters (2025 values)
 CALIFORNIA_AMT_EXEMPTION = {
     'single': 85084,
@@ -187,6 +194,10 @@ SOCIAL_SECURITY_RATE = 0.062  # Employee portion
 
 # Medicare rate (no wage limit)
 MEDICARE_RATE = 0.0145  # Employee portion
+
+# Federal supplemental withholding rate (2025)
+# Applies to bonuses, stock compensation (RSUs, NSOs), and other supplemental wages
+FEDERAL_SUPPLEMENTAL_WITHHOLDING_RATE = 0.22  # 22% flat rate
 
 # ===== HOLDING PERIOD CONSTANTS =====
 

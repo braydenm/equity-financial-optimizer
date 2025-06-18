@@ -216,6 +216,15 @@ class YearlyState:
     # Charitable deductions
     charitable_state: CharitableDeductionState
 
+    # Tax details
+    gross_tax: float = 0.0
+    tax_withholdings: float = 0.0
+
+    # Additional financial tracking
+    living_expenses: float = 0.0
+    investment_income: float = 0.0
+    investment_balance: float = 0.0
+
     # Equity holdings
     equity_holdings: List[ShareLot] = field(default_factory=list)
     total_equity_value: float = 0.0
@@ -373,9 +382,34 @@ class UserProfile:
     filing_status: str = "single"
     state_of_residence: str = "California"
 
+    # Additional income sources (with defaults)
+    interest_income: float = 0.0
+    dividend_income: float = 0.0
+    bonus_expected: float = 0.0
+
+    # Expenses and cash flow
+    monthly_living_expenses: float = 0.0
+
+    # Tax withholdings and payments
+    federal_withholding: float = 0.0
+    state_withholding: float = 0.0
+    quarterly_payments: float = 0.0
+
+    # Base withholding for normal years (optional)
+    base_federal_withholding: float = 0.0
+    base_state_withholding: float = 0.0
+
+    # Investment tracking
+    taxable_investments: float = 0.0
+    investment_return_rate: float = 0.07  # Default 7% annual return #Claude TODO: Plan to move this out to be user specified.
+
+    # Tax carryforwards
+    amt_credit_carryforward: float = 0.0
+
     def get_total_agi(self) -> float:
         """Calculate total AGI for charitable deduction limits."""
-        return self.annual_w2_income + self.spouse_w2_income + self.other_income
+        return (self.annual_w2_income + self.spouse_w2_income + self.other_income +
+                self.interest_income + self.dividend_income + self.bonus_expected)
 
     def get_available_exercise_cash(self) -> float:
         """Get total cash available for exercising options."""
@@ -397,3 +431,16 @@ class UserProfile:
         """
         remaining_eligible_shares = max(0, int(self.pledge_percentage * eligible_vested_shares) - shares_already_donated)
         return remaining_eligible_shares * current_share_price * self.company_match_ratio
+
+    def get_total_income(self) -> float:
+        """Calculate total annual income from all sources."""
+        return (self.annual_w2_income + self.spouse_w2_income + self.other_income +
+                self.interest_income + self.dividend_income + self.bonus_expected)
+
+    def get_annual_expenses(self) -> float:
+        """Calculate total annual living expenses."""
+        return self.monthly_living_expenses * 12
+
+    def get_total_withholdings(self) -> float:
+        """Calculate total tax withholdings and estimated payments."""
+        return self.federal_withholding + self.state_withholding + self.quarterly_payments

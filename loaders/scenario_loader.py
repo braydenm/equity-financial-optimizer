@@ -96,6 +96,10 @@ class ScenarioLoader:
         financial = data['financial_position']
         goals = data['goals_and_constraints']
         charitable = data['charitable_giving']
+        tax_situation = data.get('tax_situation', {})
+        estimated_taxes = tax_situation.get('estimated_taxes', {})
+        carryforwards = tax_situation.get('carryforwards', {})
+        monthly_cash_flow = financial.get('monthly_cash_flow', {})
 
         return UserProfile(
             federal_tax_rate=personal['federal_tax_rate'],
@@ -106,14 +110,25 @@ class ScenarioLoader:
             additional_medicare_rate=personal['additional_medicare_rate'],
             niit_rate=personal['niit_rate'],
             annual_w2_income=income['annual_w2_income'],
-            spouse_w2_income=income['spouse_w2_income'],
-            other_income=income['interest_income'] + income['other_income'] + income['dividend_income'],
+            spouse_w2_income=income.get('spouse_w2_income', 0),
+            other_income=income.get('other_income', 0),
+            interest_income=income.get('interest_income', 0),
+            dividend_income=income.get('dividend_income', 0),
+            bonus_expected=income.get('bonus_expected', 0),
             current_cash=financial['liquid_assets']['cash'],
             exercise_reserves=goals['liquidity_needs']['exercise_reserves'],
             pledge_percentage=charitable['pledge_percentage'],
             company_match_ratio=charitable['company_match_ratio'],
             filing_status=personal['tax_filing_status'],
-            state_of_residence=personal['state_of_residence']
+            state_of_residence=personal['state_of_residence'],
+            monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
+            federal_withholding=estimated_taxes.get('federal_withholding', 0),
+            state_withholding=estimated_taxes.get('state_withholding', 0),
+            quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
+            base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
+            base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
+            taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
+            amt_credit_carryforward=carryforwards.get('amt_credit', 0)
         )
 
     def _load_initial_lots(self, equity_path: Path) -> List[ShareLot]:
