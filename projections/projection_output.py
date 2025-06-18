@@ -252,6 +252,10 @@ def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str)
         calc_date = date(final_state.year, 12, 31)
 
         for lot in final_state.equity_holdings:
+            # Skip expired lots - they're no longer held
+            if lot.lifecycle_state == LifecycleState.EXPIRED:
+                continue
+
             # Determine acquisition date and type
             acquisition_date = None
             acquisition_type = ''
