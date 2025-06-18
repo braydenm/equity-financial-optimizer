@@ -119,3 +119,42 @@ def process_natural_vesting(lots: List[ShareLot], year: int) -> List[VestingEven
                 continue
 
     return vesting_events
+
+
+def process_natural_expiration(lots: List[ShareLot], year: int) -> List['ExpirationEvent']:
+    """
+    Process natural expiration transitions for lots in a given year.
+
+    This handles options that expire naturally based on their expiration date.
+
+    Args:
+        lots: List of share lots to check for expiration
+        year: Current projection year
+
+    Returns:
+        List of ExpirationEvent objects
+    """
+    from projections.projection_state import LifecycleState
+
+    expiration_events = []
+
+    for lot in lots:
+        # Check if this lot has an expiration date and should expire this year
+        if (lot.expiration_date and
+            lot.expiration_date.year == year and
+            lot.lifecycle_state in [LifecycleState.GRANTED_NOT_VESTED, LifecycleState.VESTED_NOT_EXERCISED]):
+
+            # Mark the lot as expired
+            was_exercisable = lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED
+            lot.lifecycle_state = LifecycleState.EXPIRED
+
+            # Create expiration event
+            event = ExpirationEvent.from_lot(lot, lot.expiration_date)
+            if was_exercisable:
+                event.notes = f"Vested options expired on {lot.expiration_date} (potential opportunity cost)"
+            else:
+                event.notes = f"Unvested options expired on {lot.expiration_date}"
+
+            expiration_events.append(event)
+
+    return expiration_events

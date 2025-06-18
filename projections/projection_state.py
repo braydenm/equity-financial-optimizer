@@ -28,6 +28,7 @@ class LifecycleState(Enum):
     VESTED_NOT_EXERCISED = "vested_not_exercised"
     EXERCISED_NOT_DISPOSED = "exercised_not_disposed"
     DISPOSED = "disposed"
+    EXPIRED = "expired"
 
 
 class TaxTreatment(Enum):
@@ -62,6 +63,7 @@ class ShareLot:
     taxes_paid: float = 0.0
     amt_adjustment: float = 0.0
     fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
+    expiration_date: Optional[date] = None  # Expiration date for options
 
 
 @dataclass

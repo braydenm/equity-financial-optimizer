@@ -42,7 +42,7 @@ from calculators.components import (
     DonationComponents,
     AnnualTaxComponents
 )
-from projections.vesting_events import process_natural_vesting, VestingEvent
+from projections.vesting_events import process_natural_vesting, VestingEvent, process_natural_expiration, ExpirationEvent
 from projections.pledge_calculator import PledgeCalculator
 
 
@@ -139,7 +139,8 @@ class ProjectionCalculator:
 
             # Track vesting events for CSV output
             yearly_state.vesting_events = vesting_events
-            yearly_state.expiration_events = []  # Claude TODO: Add expiration handling based on specified expiration date on the parent grant object.
+            expiration_events = process_natural_expiration(current_lots, year)
+            yearly_state.expiration_events = expiration_events
 
             # Process each action chronologically
             for action in sorted(year_actions, key=lambda a: a.action_date):

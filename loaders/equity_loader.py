@@ -1,9 +1,7 @@
 """
 Direct equity lot loader from user profile JSON.
 
-This module loads share lots directly from the user profile, eliminating
-the need for CSV as an intermediate format. CSVs become output-only for
-visualization and analysis.
+This module loads share lots from the json user profile or demo profile.
 """
 
 from datetime import date, datetime
@@ -90,6 +88,7 @@ class EquityLoader:
 
         # Get strike price from original grants
         strike_price = self._get_strike_price_from_grants(equity_position)
+        expiration_date = self._get_expiration_date_from_grants(equity_position)
 
         # ISO shares
         if vested.get('iso_shares', 0) > 0:
@@ -101,7 +100,8 @@ class EquityLoader:
                 grant_date=None,  # Could be derived from grants if needed
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=expiration_date
             ))
 
         # NSO shares
@@ -114,7 +114,8 @@ class EquityLoader:
                 grant_date=None,
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=expiration_date
             ))
 
         # RSU shares (if any vested but not released)
@@ -127,7 +128,8 @@ class EquityLoader:
                 grant_date=None,
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                expiration_date=None  # RSUs don't expire
             ))
 
         return lots
@@ -184,12 +186,21 @@ class EquityLoader:
         else:
             raise ValueError(f"Unknown share type: {type_str}")
 
-    def _get_strike_price_from_grants(self, equity_position: Dict[str, Any]) -> float:
+    def _get_strike_price_from_grants(self, equity_position: dict) -> float:
         """Extract strike price from original grants."""
         grants = equity_position.get('original_grants', [])
         if grants:
             return grants[0].get('strike_price', 0.0)
         return 0.0
+
+    def _get_expiration_date_from_grants(self, equity_position: dict) -> Optional[date]:
+        """Extract expiration date from original grants."""
+        grants = equity_position.get('original_grants', [])
+        if grants and 'expiration_date' in grants[0]:
+            expiration_str = grants[0]['expiration_date']
+            if expiration_str:
+                return datetime.fromisoformat(expiration_str).date()
+        return None
 
     def summarize_lots(self, lots: List[ShareLot]) -> Dict[str, Any]:
         """

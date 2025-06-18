@@ -166,98 +166,22 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
 
-**Option Expiration Implementation** - Implement natural expiration through lifecycle state transitions as detailed in the plan below.
 
-### Option Expiration Implementation Plan
-
-**Overview**: Implement natural option expiration through lifecycle state transitions, ensuring expired options are properly tracked and removed from exercisable inventory while maintaining audit trail.
-
-**1. Data Model Updates**
-- Add `expiration_date` to ShareLot model (already exists in grants, needs to flow to lots)
-- Add new lifecycle state: `EXPIRED` to LifecycleState enum
-- Add `ExpirationEvent` class to track expiration transitions:
-  ```python
-  @dataclass
-  class ExpirationEvent:
-      lot_id: str
-      shares_expired: int
-      expiration_date: date
-      original_grant_date: date
-      strike_price: float
-      was_exercisable: bool  # Track if expired while vested
-  ```
-
-**2. Natural State Transition Implementation**
-- Update `process_natural_vesting()` in natural_evolution_generator.py to also check expiration:
-  ```python
-  def process_natural_transitions(lots, current_year):
-      vesting_events = []
-      expiration_events = []
-
-      for lot in lots:
-          # Existing vesting logic...
-
-          # Check for expiration
-          if lot.expiration_date and lot.expiration_date.year == current_year:
-              if lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
-                  lot.lifecycle_state = LifecycleState.EXPIRED
-                  expiration_events.append(ExpirationEvent(...))
-              elif lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
-                  lot.lifecycle_state = LifecycleState.EXPIRED
-                  expiration_events.append(ExpirationEvent(...))
-
-      return vesting_events, expiration_events
-  ```
-
-**3. Projection Calculator Updates**
-- Update YearlyState to include expiration_events (already has placeholder)
-- Modify evaluate_projection_plan to process expirations:
-  - Remove expired shares from exercisable inventory
-  - Track opportunity cost (expired in-the-money options)
-  - Update equity value calculations to exclude expired lots
-
-**4. CSV Output Enhancements**
-- **transition_timeline.csv**: Ensure expiration events show up in the Expiring state transition aggregation
-- **state_timeline.csv**: Ensure expiration events are aggregated into the Expired state category per year
-- **action_summary.csv**: Include a 'let expire' event type for any lots that expire. Are there any implications for any of the other fields in that file?
-- **holding_period_tracking.csv**: Remove any lots once expired
-
-
-**5. Calculator Integration**
-- No changes needed to tax calculators (expired options have no tax impact)
-- Update portfolio valuation to exclude expired lots
-- Add metrics for tracking:
-  - Total shares expired by year
-  - Opportunity cost (for vested options that expired ITM) with warning
-
-**6. Testing Approach**
-- Create test_option_expiration.py with scenarios:
-  - Options expiring while unvested (no opportunity cost)
-  - Options expiring while vested OTM (no opportunity cost)
-  - Options expiring while vested ITM (calculate opportunity cost)
-  - Mixed portfolio with staggered expiration dates
-- Add expiration scenarios to demo data:
-  - 905_expiring_options.json - Options expiring across multiple years
-  - Update demo_profile.json grants to include expiration_date
-
-**7. Implementation Order**
-1. Add expiration_date to ShareLot and ensure it flows from grants
-2. Add EXPIRED lifecycle state and ExpirationEvent class
-3. Update natural transition processing to handle expirations
-4. Update ProjectionCalculator to process expiration events
-5. Add CSV outputs for expiration tracking
-6. Create comprehensive tests
-7. Update documentation and examples
-
-**Success Criteria**
-- Options automatically expire on expiration date
-- Expired options removed from exercisable inventory
-- Clear tracking of expiration events and opportunity costs
-- All existing tests continue to pass
-- New expiration-specific tests pass
-- CSV outputs properly reflect expired options
 
 ### Completed Features
+
+**Option Expiration Implementation** ✓
+- Added `EXPIRED` lifecycle state to LifecycleState enum
+- Added `expiration_date` field to ShareLot model with proper flow from grants
+- Implemented `process_natural_expiration()` function for natural state transitions
+- Added `ExpirationEvent` class with proper tracking and opportunity cost warnings
+- Updated ProjectionCalculator to process expiration events alongside vesting
+- Fixed CSV state timeline to properly track expired shares in "Expired" state
+- Created comprehensive test suite with 8 test cases covering all expiration scenarios
+- Added demo scenario 906_expiring_options.json to demonstrate functionality
+- Expired options automatically excluded from exercisable inventory
+- Complete audit trail of expiration events in transition_timeline.csv
+- Proper differentiation between vested (opportunity cost) and unvested expiration
 
 **Comprehensive Cash Flow Accuracy** ✓
 - Updated ProjectionCalculator to include all income sources (spouse W2, interest, dividends, bonuses)

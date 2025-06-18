@@ -211,9 +211,9 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
                         # Track cumulative donations from disposal tracking
                         quantity = yearly_state.shares_donated.get(lot_id, 0)
                     elif state_name == 'Expired':
-                        # Check if past expiration date
-                        # For now, mark as 0 - this would need expiration date tracking
-                        quantity = 0
+                        # Track shares that have expired
+                        if lot and lot.lifecycle_state == LifecycleState.EXPIRED:
+                            quantity = lot.quantity
                     elif state_name == 'SUBTOTAL':
                         # Subtotal is the sum of all states for this lot
                         # Current holdings + disposed shares
