@@ -62,7 +62,7 @@
 - Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping:
   - Created `print_raw_data_tables()` function for terminal output
   - ANNUAL CASH FLOW table mapping to yearly_cashflow.csv
-  - TAX BREAKDOWN table mapping to tax_timeline.csv  
+  - TAX BREAKDOWN table mapping to tax_timeline.csv
   - ASSETS BREAKDOWN table mapping to annual_summary.csv
   - ACTION SUMMARY table mapping to action_summary.csv
   - Tables use raw numbers only (no $ or % symbols) for easy spreadsheet copy/paste
@@ -76,6 +76,7 @@
 - Investment growth now properly stays in investment balance as unrealized gains, improving cash flow accuracy
 - AMT credits from user profile now correctly apply to first projection year with proper documentation
 - Validated AMT credit generation, usage, and carryforward logic matches tax regulations
+- Created regression test (test_amt_credit_carryforward.py) that would fail under old implementation but passes with fix
 - Eliminated all conditional field checking throughout codebase
 - Standardized field names across all components
 - Implemented v2.0 data contract with canonical field names
@@ -172,8 +173,6 @@
 - Scenario discovery pattern: optimal strategies emerge from comparison, not predetermined
 - Strong data contracts with well-defined classes replacing dictionary/object dual handling
 - No external dependencies on CSV outputs enabling flexible reporting evolution
-
-
 
 ## Withholding Rate System Refactoring
 - Replaced 4 separate withholding amount fields with 2 unified rate-based fields for simplified configuration

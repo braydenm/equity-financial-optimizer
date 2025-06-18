@@ -35,7 +35,9 @@ from calculators.tax_constants import (
     CALIFORNIA_AMT_PHASEOUT_START,
     CALIFORNIA_AMT_PHASEOUT_RATE,
     FEDERAL_CHARITABLE_AGI_LIMITS,
-    CALIFORNIA_CHARITABLE_AGI_LIMITS
+    CALIFORNIA_CHARITABLE_AGI_LIMITS,
+    FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
+    CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS
 )
 
 # Import AMT calculation functions
@@ -149,10 +151,12 @@ class AnnualTaxCalculator:
     # Federal charitable deduction AGI limits - using centralized constants
     FEDERAL_AGI_LIMIT_CASH = FEDERAL_CHARITABLE_AGI_LIMITS['cash']  # 60% for cash donations (2025)
     FEDERAL_AGI_LIMIT_STOCK = FEDERAL_CHARITABLE_AGI_LIMITS['stock']  # 30% for appreciated stock
+    FEDERAL_AGI_LIMIT_STOCK_BASIS_ELECTION = FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock']  # 50% with basis election
 
     # California charitable deduction AGI limits
     CA_AGI_LIMIT_CASH = CALIFORNIA_CHARITABLE_AGI_LIMITS['cash']  # 50% for cash donations
     CA_AGI_LIMIT_STOCK = CALIFORNIA_CHARITABLE_AGI_LIMITS['stock']  # 30% for appreciated stock
+    CA_AGI_LIMIT_STOCK_BASIS_ELECTION = CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock']  # 50% with basis election
 
     def calculate_annual_tax(
         self,
@@ -231,7 +235,7 @@ class AnnualTaxCalculator:
             agi, donation_components, cash_donation_components,
             carryforward_cash_deduction, carryforward_stock_deduction,
             cash_limit_pct=self.FEDERAL_AGI_LIMIT_CASH,
-            stock_limit_pct=0.50 if elect_basis_deduction else self.FEDERAL_AGI_LIMIT_STOCK, #Claude TODO: Pull from tax constants.
+            stock_limit_pct=self.FEDERAL_AGI_LIMIT_STOCK_BASIS_ELECTION if elect_basis_deduction else self.FEDERAL_AGI_LIMIT_STOCK,
             elect_basis_deduction=elect_basis_deduction
         )
 
@@ -240,7 +244,7 @@ class AnnualTaxCalculator:
             agi, donation_components, cash_donation_components,
             carryforward_cash_deduction, carryforward_stock_deduction,
             cash_limit_pct=self.CA_AGI_LIMIT_CASH,
-            stock_limit_pct=0.50 if elect_basis_deduction else self.CA_AGI_LIMIT_STOCK, #Claude TODO: Pull from tax constants.
+            stock_limit_pct=self.CA_AGI_LIMIT_STOCK_BASIS_ELECTION if elect_basis_deduction else self.CA_AGI_LIMIT_STOCK,
             elect_basis_deduction=elect_basis_deduction
         )
 
@@ -369,16 +373,10 @@ class AnnualTaxCalculator:
             cash_donation_components: Cash donations
             carryforward_cash: Cash donation carryforward
             carryforward_stock: Stock donation carryforward
-            cash_limit_pct: Cash donation AGI limit percentage (defaults to federal)
-            stock_limit_pct: Stock donation AGI limit percentage (defaults to federal)
+            cash_limit_pct: Cash donation AGI limit percentage (required if cash donations > 0)
+            stock_limit_pct: Stock donation AGI limit percentage (required if stock donations > 0)
             elect_basis_deduction: If True, use cost basis instead of FMV for stock donations
         """
-        # Use federal limits as default if not specified
-        if cash_limit_pct is None:
-            cash_limit_pct = self.FEDERAL_AGI_LIMIT_CASH
-        if stock_limit_pct is None:
-            stock_limit_pct = self.FEDERAL_AGI_LIMIT_STOCK
-
         # Calculate total donations by type
         if elect_basis_deduction:
             # When electing basis, use cost basis instead of FMV
@@ -392,11 +390,23 @@ class AnnualTaxCalculator:
         total_stock_available = stock_donations + carryforward_stock
         total_cash_available = cash_donations + carryforward_cash
 
+        # Require limits to be set if donations exist
+        if total_cash_available > 0 and cash_limit_pct is None:
+            raise ValueError("cash_limit_pct must be provided when cash donations > 0")
+        if total_stock_available > 0 and stock_limit_pct is None:
+            raise ValueError("stock_limit_pct must be provided when stock donations > 0")
+
+        # Set default limits to 0 if no donations (to avoid multiplication by None)
+        if cash_limit_pct is None:
+            cash_limit_pct = 0.0
+        if stock_limit_pct is None:
+            stock_limit_pct = 0.0
+
         # Apply AGI limits
         stock_limit = agi * stock_limit_pct
         cash_limit = agi * cash_limit_pct
 
-        # Stock deductions use 30% limit
+        # Stock deductions use specified limit
         stock_used = min(total_stock_available, stock_limit)
         stock_carryforward = total_stock_available - stock_used
 

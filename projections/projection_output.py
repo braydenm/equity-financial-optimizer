@@ -12,6 +12,14 @@ from typing import List, Dict, Any
 from projections.projection_state import ProjectionResult, YearlyState, LifecycleState
 from projections.detailed_materialization import materialize_detailed_projection
 
+# Import tax constants for charitable deduction limits
+from calculators.tax_constants import (
+    FEDERAL_CHARITABLE_AGI_LIMITS,
+    CALIFORNIA_CHARITABLE_AGI_LIMITS,
+    FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
+    CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS
+)
+
 
 
 
@@ -428,9 +436,19 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 # Fallback AGI calculation
                 agi = state.income + state.spouse_income + state.other_income
 
-            # AGI limits for charitable deductions
-            cash_limit = agi * 0.60  # 60% AGI limit for cash
-            stock_limit = agi * (0.50 if basis_election else 0.30)  # 50% if basis election, 30% for FMV. #Claude TODO: Pull from tax constants and differentiate federal from state
+            # AGI limits for charitable deductions - differentiate federal vs state
+            # Use federal limits as primary (most scenarios), but could be enhanced for state-specific analysis
+            federal_cash_limit = agi * FEDERAL_CHARITABLE_AGI_LIMITS['cash']
+            federal_stock_limit = agi * (FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock'] if basis_election else FEDERAL_CHARITABLE_AGI_LIMITS['stock'])
+
+            ca_cash_limit = agi * CALIFORNIA_CHARITABLE_AGI_LIMITS['cash']
+            ca_stock_limit = agi * (CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock'] if basis_election else CALIFORNIA_CHARITABLE_AGI_LIMITS['stock'])
+
+            # LIMITATION: Currently using only federal limits for CSV reporting
+            # Note: Federal cash limit (60%) is actually LESS restrictive than CA (50%)
+            # TODO: Consider separate federal vs state charitable deduction tracking
+            cash_limit = federal_cash_limit
+            stock_limit = federal_stock_limit
 
             # Get deductions actually used from charitable state
             if state.charitable_state and state.charitable_state.current_year_deduction > 0:

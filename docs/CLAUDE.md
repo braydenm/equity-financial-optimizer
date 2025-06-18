@@ -149,7 +149,6 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
-- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
 - Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
 - Profile loading redundancy - loading profile twice in natural_evolution_generator.py
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
@@ -157,9 +156,13 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
 - Improve documentation for basis election logic (projection_calculator.py)
 - Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
-- Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
+- Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
+- Federal vs state charitable deduction persistence: only federal charitable_deduction_result saved in AnnualTaxResult, CA result discarded (annual_tax_calculator.py)
+- Projection calculator only uses federal charitable carryforwards, ignoring CA-specific carryforward rules (projection_calculator.py)
+- CSV generation comment claims federal limits are "most restrictive" but CA cash limit (50%) < federal (60%) (projection_output.py)
+- Consider separate federal vs state charitable deduction tracking in projection state for accurate multi-year planning (projection_state.py)
 
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
@@ -259,17 +262,22 @@ def test_[pathway]_e2e():
 
 ### TODO Burndown Plan - Structured Groups
 
-**Current State: 11 TODOs Remaining** (Group A1 completed: AMT credit & investment growth)
+**Current State: 12 TODOs Remaining** (Groups A1 & A2 completed, 4 new federal/state issues discovered)
 
-#### Group A2: Tax Constants Consolidation (3 TODOs)
+#### Group A2: Tax Constants Consolidation (COMPLETED ✅)
 *Priority: HIGH - Accuracy & maintainability*
 
-**TODOs to Address:**
-- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
-- Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
+**TODOs Completed:**
+- ✅ Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
+- ✅ Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
 
-**Rationale**: Centralize tax rules for easier updates when tax laws change
-**Impact**: High - Compliance and maintainability
+**Resolution**: 
+- Added FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS and CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS to tax_constants.py
+- Replaced hardcoded 0.50 values in annual_tax_calculator.py with constants from tax_constants.py
+- Updated projection_output.py to use constants and differentiate federal vs state tax limits
+- Added comprehensive regression tests to prevent future hardcoded values
+
+**Impact**: High - System maintainability improved for tax law changes, easier compliance updates
 
 #### Group B: User Experience & Configuration (4 TODOs)
 *Priority: MEDIUM - Scenario realism and flexibility*
@@ -299,10 +307,9 @@ def test_[pathway]_e2e():
 
 **Rationale**: Improve maintainability and prevent edge case failures
 **Impact**: Low-Medium - Developer experience
-**Effort**: 2 hours total
 
 #### Implementation Schedule
-- **Sprint 1**: Fix charitable deduction bug (CRITICAL - discovered via E2E testing)
-- **Sprint 2**: Group A2 - Tax constants consolidation
+- **Sprint 1**: ✅ Fix charitable deduction bug (COMPLETED - discovered via E2E testing)
+- **Sprint 2**: ✅ Group A2 - Tax constants consolidation (COMPLETED)
 - **Sprint 3**: Group B - User experience & configuration
 - **Sprint 4**: Group C - Code quality & robustness

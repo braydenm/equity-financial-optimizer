@@ -172,6 +172,20 @@ CALIFORNIA_CHARITABLE_AGI_LIMITS = {
 # Carryforward period for excess charitable deductions
 CHARITABLE_CARRYFORWARD_YEARS = 5
 
+# Basis Election AGI Limits for Charitable Deductions (2025 values)
+# When taxpayers elect to use cost basis instead of FMV for stock donations,
+# they receive a higher AGI limit but lower deduction amount
+# Source: IRS Publication 526 - Charitable Contributions
+FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS = {
+    'stock': 0.50,   # 50% of AGI for stock donations when using cost basis election
+}
+
+# California Basis Election AGI Limits for Charitable Deductions (2025 values)
+# California generally follows federal rules for basis election
+CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS = {
+    'stock': 0.50,   # 50% of AGI for stock donations when using cost basis election
+}
+
 # ===== OTHER TAX CONSTANTS =====
 
 # Net Investment Income Tax (NIIT)
