@@ -59,7 +59,14 @@
   - 005_charitable_frontload: Exercise and donate early to maximize company match window
   - 006_diversify: Exercise and sell shares to diversify portfolio ASAP
 - Built portfolio comparison system for side-by-side strategy evaluation
-- Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping
+- Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping:
+  - Created `print_raw_data_tables()` function for terminal output
+  - ANNUAL CASH FLOW table mapping to yearly_cashflow.csv
+  - TAX BREAKDOWN table mapping to tax_timeline.csv  
+  - ASSETS BREAKDOWN table mapping to annual_summary.csv
+  - ACTION SUMMARY table mapping to action_summary.csv
+  - Tables use raw numbers only (no $ or % symbols) for easy spreadsheet copy/paste
+  - Column headers match CSV field names with underscores
 - Updated test suite to work with new lot naming conventions
 - Portfolio analysis reveals Exercise Aggressive strategy achieves 53.7% higher net worth than Natural Evolution baseline
 

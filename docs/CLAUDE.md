@@ -164,46 +164,145 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
 
-### Raw Data Table Implementation Plan
-**Objective**: Replace formatted summary tables with raw data tables that map directly to CSV structure for better data analysis workflow.
+### E2E Testing Plan for Critical Financial Pathways
+**Context**: The AMT credit carryforward bug revealed a critical gap - multi-year state management wasn't properly tested. This could affect other financial calculations with similar patterns. We've already discovered a CRITICAL bug in charitable deduction carryforward where AGI limits are ignored!
 
-**Current Problem**:
-- Summary tables mix concepts (withholding vs tax liability vs cash flow)
-- Overlap between Financial Summary and Cash Flow Waterfall reduces clarity
-- Users want clean data that corresponds exactly to CSV outputs
+**Discovered Bugs Requiring Immediate Fix:**
+1. **Charitable Deduction AGI Limits Not Applied** - CRITICAL BUG affecting tax liability calculations
+   - **Symptom**: Donations are deducted at 100% of value regardless of AGI limits
+   - **Expected**: Stock donations limited to 30% of AGI, cash to 60% of AGI per IRS rules
+   - **Root Cause**: In `projection_calculator.py`, the `_calculate_charitable_state` method sets `current_year_deduction=year_donation` without any AGI limit checks
+   - **The Disconnect**: `annual_tax_calculator.py` correctly calculates `charitable_deduction_result` with proper AGI limits, but this result is never propagated back to `yearly_state.charitable_state`
+   - **Impact**: Tax liability could be understated by $100K+ in high-donation scenarios
+   - **Test Case**: $500K AGI with $400K donation shows $400K deduction (should be $150K)
+   - **Fix Required**: Update `projection_calculator.py` to use `tax_result.charitable_deduction_result` instead of the naive calculation
+   - **Pattern**: Similar to AMT credit bug - correct calculation exists but state management fails
 
-**Proposed Solution**: Five raw data tables with 1:1 CSV mapping
+**High-Risk Areas Requiring E2E Tests:**
 
-**Implementation Plan**:
+1. **Charitable Deduction Carryforward** (CRITICAL - BUG CONFIRMED)
+   - Risk: 5-year expiration, federal/state limit mixing, wrong year attribution
+   - Impact: Phantom deductions, incorrect tax liability
+   - Current Bug: AGI limits completely ignored - $400K donation shows as $400K deduction instead of $150K (30% limit)
+   - Test Scenarios:
+     * Large single-year donation exceeding 30% AGI limit
+     * Multi-year donations with varying AGI
+     * Mixed cash (60% limit) and stock (30% limit) donations
+     * Carryforward expiration after 5 years
+     * Basis election changing limits from 30% to 50%
+   - Implementation: Fix `_calculate_charitable_state` to use tax_result.charitable_deduction_result
 
-1. **Update run_scenario_analysis.py display logic**
-   - Replace current summary tables with raw data format
-   - Use actual CSV column names as table headers
-   - Ensure data matches exactly what appears in generated CSVs
-   - Remove calculated fields that don't exist in CSVs
+2. **Pledge Obligation Tracking** (CRITICAL)
+   - Risk: 3-year fulfillment window, obligations not carrying forward
+   - Impact: Missed obligations, incorrect company match calculations
+   - Test Scenarios:
+     * Sale creating 50% pledge, track for 3 years
+     * Multiple sales with overlapping pledge windows
+     * Partial fulfillment across years
+     * Pledge expiration warnings and enforcement
+     * Company match limit calculations
+   - Validation: Ensure pledge_state properly carries forward like AMT credits
 
-2. **Five Raw Data Tables**:
-   - **ANNUAL CASH FLOW** → yearly_cashflow.csv mapping
-   - **TAX CALCULATION** → tax_timeline.csv mapping
-   - **EQUITY POSITION** → equity_holdings.csv mapping
-   - **ACTION SUMMARY** → action_summary.csv mapping
-   - **ASSETS BREAKDOWN** → annual_summary.csv mapping (net worth components by year)
+3. **ISO Disqualifying Disposition** (HIGH)
+   - Risk: Complex date calculations (exercise + 2yr AND grant + 1yr)
+   - Impact: Wrong tax treatment (ordinary income vs LTCG)
+   - Test Scenarios:
+     * Exercise and sell < 1 year (STCG + ordinary income)
+     * Exercise and sell > 1 year but < 2 years from exercise (disqualifying)
+     * Exercise and sell > 2 years from exercise AND > 1 year from grant (qualifying)
+     * Edge case: Exactly 365 vs 366 days
+   - Validation: Compare tax treatment against IRS Publication 525
 
-3. **Table Format Requirements**:
-   - Clean, copy-pasteable format with consistent spacing
-   - Column headers match CSV field names exactly
-   - No formatting like "$" or "%" in data (raw numbers only)
-   - Direct 1:1 correspondence between terminal and CSV data
+4. **Cash Flow Viability** (CRITICAL)
+   - Risk: Strategies requiring negative cash
+   - Impact: Impossible-to-execute strategies
+   - Test Scenarios:
+     * Exercise costs exceeding available cash
+     * Tax payments causing negative cash
+     * Living expenses not covered
+     * Sequence of actions depleting cash mid-year
+   - Implementation: Add cash_flow_valid flag and warnings
 
-4. **Implementation Steps**:
-   - Modify `print_scenario_results()` function in run_scenario_analysis.py
-   - Create helper functions for each raw data table
-   - Ensure consistent number formatting across tables
-   - Add brief table descriptions explaining corresponding CSV files
-   - Test with existing scenarios to verify data accuracy
+5. **NSO Withholding Reconciliation** (MEDIUM)
+   - Risk: Withholding ≠ actual tax owed
+   - Impact: Surprise tax bills or phantom refunds
+   - Test Scenarios:
+     * High NSO exercise with supplemental withholding
+     * Year-end true-up calculation
+     * Estimated tax payment requirements
+     * Refund vs additional payment due
 
-**Success Criteria**:
-- Terminal output data can be copied directly into spreadsheets
-- Every table value corresponds to exact CSV cell
-- No duplicate information across tables
-- Clear mapping between terminal display and CSV analysis files
+**Implementation Priority:**
+1. **IMMEDIATE**: Fix charitable deduction bug - propagate tax_result.charitable_deduction_result to yearly_state
+2. **WEEK 1**: Create regression tests for charitable deduction carryforward
+3. **WEEK 2**: Add pledge obligation E2E tests
+4. **WEEK 3**: ISO disposition and cash flow validation tests
+5. **WEEK 4**: NSO withholding reconciliation tests
+
+**Test Structure Template:**
+```python
+def test_[pathway]_e2e():
+    # 1. Setup multi-year scenario
+    # 2. Execute projection
+    # 3. Validate year 1 state
+    # 4. Validate carryforward to year 2
+    # 5. Check edge cases
+    # 6. Assert against hand calculations
+```
+
+### Raw Data Table - Residual Work
+
+**Residual Work** (from original 5-table plan):
+1. **EQUITY POSITION table** (→ equity_holdings.csv) was not implemented
+2. **Charitable donations table** would be valuable given the AGI limit bug discovered
+3. **Column name validation** - Ensure terminal headers exactly match CSV headers
+
+### TODO Burndown Plan - Structured Groups
+
+**Current State: 11 TODOs Remaining** (Group A1 completed: AMT credit & investment growth)
+
+#### Group A2: Tax Constants Consolidation (3 TODOs)
+*Priority: HIGH - Accuracy & maintainability*
+
+**TODOs to Address:**
+- Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
+- Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
+
+**Rationale**: Centralize tax rules for easier updates when tax laws change
+**Impact**: High - Compliance and maintainability
+
+#### Group B: User Experience & Configuration (4 TODOs)
+*Priority: MEDIUM - Scenario realism and flexibility*
+
+**B1. User-Configurable Parameters:**
+- Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
+- Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
+
+**B2. Market Intelligence:**
+- Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
+
+**Rationale**: Enable realistic scenario modeling with user control
+**Impact**: Medium-High - Strategy accuracy
+
+#### Group C: Code Quality & Robustness (4 TODOs)
+*Priority: LOWER - Technical debt cleanup*
+
+**C1. Profile Loading Cleanup:**
+- Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
+- Profile loading redundancy - loading profile twice in natural_evolution_generator.py
+- Use regular profile loader and delete simplified version (natural_evolution_generator.py)
+
+**C2. Documentation & Edge Cases:**
+- Improve documentation for basis election logic (projection_calculator.py)
+- Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
+- Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
+
+**Rationale**: Improve maintainability and prevent edge case failures
+**Impact**: Low-Medium - Developer experience
+**Effort**: 2 hours total
+
+#### Implementation Schedule
+- **Sprint 1**: Fix charitable deduction bug (CRITICAL - discovered via E2E testing)
+- **Sprint 2**: Group A2 - Tax constants consolidation
+- **Sprint 3**: Group B - User experience & configuration
+- **Sprint 4**: Group C - Code quality & robustness
