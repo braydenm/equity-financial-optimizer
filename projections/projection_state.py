@@ -67,11 +67,14 @@ class ShareLot:
 
     def __post_init__(self):
         """Validate ShareLot constraints after initialization."""
-        # Options (ISO and NSO) must have expiration dates
-        if self.share_type in [ShareType.ISO, ShareType.NSO] and self.expiration_date is None:
+        # Unexercised options (ISO and NSO) must have expiration dates
+        # Exercised options don't need expiration dates since they can't expire anymore
+        if (self.share_type in [ShareType.ISO, ShareType.NSO] and
+            self.expiration_date is None and
+            self.lifecycle_state in [LifecycleState.GRANTED_NOT_VESTED, LifecycleState.VESTED_NOT_EXERCISED]):
             raise ValueError(
-                f"ShareLot {self.lot_id}: Options (ISO/NSO) must have an expiration_date. "
-                f"Share type {self.share_type.value} requires expiration_date to be set."
+                f"ShareLot {self.lot_id}: Unexercised options (ISO/NSO) must have an expiration_date. "
+                f"Share type {self.share_type.value} with lifecycle state {self.lifecycle_state.value} requires expiration_date to be set."
             )
 
         # Validate that options cannot expire before vesting
