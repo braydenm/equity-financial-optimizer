@@ -37,6 +37,58 @@ The system does NOT simply multiply your income by these rates. Instead:
 3. **AMT Calculation**: Determined annually by comparing regular tax vs Alternative Minimum Tax
 4. **Annual Aggregation**: All tax components from the year's actions are aggregated before calculating tax
 
+## Withholding Rate Fields
+
+### Overview
+The system uses simplified withholding rates to automatically calculate tax withholdings based on income type. This replaces the previous system of absolute withholding amounts.
+
+### Required Withholding Rate Fields
+- **regular_income_withholding_rate**: Combined withholding rate for W2 wages, interest, dividends, and bonuses
+- **supplemental_income_withholding_rate**: Combined withholding rate for stock compensation (NSO exercises, RSU vesting)
+
+### Calculating Your Withholding Rates
+
+**Regular Income Withholding Rate** typically includes:
+- Federal Income Tax (varies by bracket: 10%, 12%, 22%, 24%, 32%, 35%, 37%)
+- Medicare Tax (1.45%)
+- Additional Medicare Tax (0.9% above $200k single / $250k married)
+- Social Security Tax (6.2% up to wage cap ~$176k)
+- State Income Tax (varies by state)
+- State Disability Insurance (varies by state)
+
+**Supplemental Income Withholding Rate** typically includes:
+- Federal Supplemental Tax (22% or 37% above $1M)
+- Medicare Tax (1.45%)
+- Additional Medicare Tax (0.9% above thresholds)
+- Social Security Tax (6.2% up to wage cap)
+- State Supplemental Tax (varies by state)
+- State Disability Insurance (varies by state)
+
+### Example Calculations
+
+**California High-Income Example:**
+```
+Regular Income Rate: 37.9%
+= Federal (24.6%) + Medicare (1.45%) + Additional Medicare (0.9%) + 
+  Social Security (6.2%) + CA State (8.1%) + CA SDI (1.2%)
+
+Supplemental Income Rate: 36.4%
+= Federal Supplemental (22%) + Medicare (1.45%) + Additional Medicare (0.9%) + 
+  Social Security (6.2%) + CA Supplemental (10.23%) + CA SDI (1.2%)
+```
+
+**Generic Example (Template Values):**
+```
+Regular Income Rate: 35%
+Supplemental Income Rate: 33%
+```
+
+### How Withholding Rates Are Applied
+
+1. **Regular Income**: Applied to W2 wages, spouse income, interest, dividends, and bonuses
+2. **Supplemental Income**: Applied to NSO bargain elements and RSU vesting income
+3. **Total Withholding**: Sum of both calculations plus any quarterly estimated payments
+
 ## Determining Your Rates
 
 To fill in your profile:
@@ -47,6 +99,7 @@ To fill in your profile:
 4. **FICA**: Use 0.0765 if income under ~$160k, otherwise 0.0145
 5. **Additional Medicare**: Use 0.009 if single with income >$200k or married >$250k
 6. **NIIT**: Use 0.038 if you meet the income thresholds above
+7. **Withholding Rates**: Calculate combined rates for regular and supplemental income as shown above
 
 ## Example for High-Income California Resident
 

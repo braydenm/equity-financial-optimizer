@@ -109,14 +109,17 @@
       "amt_credit": 15000,
       "capital_loss": 0,
       "charitable_deduction": 0
-    },
-
+    }
+  },
+  "_comments": {
+    "regular_income_withholding_rate": "35% (Example Rate) = Federal Income Tax (varies by bracket) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Tax (varies by state) + State SDI (varies by state)",
+    "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)"
+  },
+  "tax_situation": {
     "estimated_taxes": {
-      "federal_withholding": 150000,
-      "state_withholding": 50000,
       "quarterly_payments": 0,
-      "base_federal_withholding": 102000,
-      "base_state_withholding": 29400
+      "regular_income_withholding_rate": 0.35,
+      "supplemental_income_withholding_rate": 0.33
     }
   },
 

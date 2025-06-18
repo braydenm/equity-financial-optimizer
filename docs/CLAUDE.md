@@ -162,51 +162,53 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Improve documentation for basis election logic (projection_calculator.py)
 - Confirm whether investment growth should be considered liquid cash (projection_calculator.py)
 - Rename VESTED_ISO/VESTED_NSO to ISO/NSO consistently upstream (projection_output.py)
+- migrate recent accomplishments out of CLAUDE.md into CHANGELOG.md
 
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
 
+### Raw Data Table Implementation Plan
+**Objective**: Replace formatted summary tables with raw data tables that map directly to CSV structure for better data analysis workflow.
+
+**Current Problem**: 
+- Summary tables mix concepts (withholding vs tax liability vs cash flow)
+- Overlap between Financial Summary and Cash Flow Waterfall reduces clarity
+- Users want clean data that corresponds exactly to CSV outputs
+
+**Proposed Solution**: Five raw data tables with 1:1 CSV mapping
+
+**Implementation Plan**:
+
+1. **Update run_scenario_analysis.py display logic**
+   - Replace current summary tables with raw data format
+   - Use actual CSV column names as table headers  
+   - Ensure data matches exactly what appears in generated CSVs
+   - Remove calculated fields that don't exist in CSVs
+
+2. **Five Raw Data Tables**:
+   - **ANNUAL CASH FLOW** → yearly_cashflow.csv mapping
+   - **TAX CALCULATION** → tax_timeline.csv mapping  
+   - **EQUITY POSITION** → equity_holdings.csv mapping
+   - **ACTION SUMMARY** → action_summary.csv mapping
+   - **ASSETS BREAKDOWN** → annual_summary.csv mapping (net worth components by year)
+
+3. **Table Format Requirements**:
+   - Clean, copy-pasteable format with consistent spacing
+   - Column headers match CSV field names exactly
+   - No formatting like "$" or "%" in data (raw numbers only)
+   - Direct 1:1 correspondence between terminal and CSV data
+
+4. **Implementation Steps**:
+   - Modify `print_scenario_results()` function in run_scenario_analysis.py
+   - Create helper functions for each raw data table
+   - Ensure consistent number formatting across tables
+   - Add brief table descriptions explaining corresponding CSV files
+   - Test with existing scenarios to verify data accuracy
+
+**Success Criteria**:
+- Terminal output data can be copied directly into spreadsheets
+- Every table value corresponds to exact CSV cell
+- No duplicate information across tables
+- Clear mapping between terminal display and CSV analysis files
 
 
-### Completed Features
-
-**Option Expiration Implementation** ✓
-- Added `EXPIRED` lifecycle state to LifecycleState enum
-- Added `expiration_date` field to ShareLot model with proper flow from grants
-- Implemented `process_natural_expiration()` function for natural state transitions
-- Added `ExpirationEvent` class with proper tracking and opportunity cost warnings
-- Updated ProjectionCalculator to process expiration events alongside vesting
-- Fixed CSV state timeline to properly track expired shares in "Expired" state
-- Created comprehensive test suite with 8 test cases covering all expiration scenarios
-- Added demo scenario 906_expiring_options.json to demonstrate functionality
-- Expired options automatically excluded from exercisable inventory
-- Complete audit trail of expiration events in transition_timeline.csv
-- Proper differentiation between vested (opportunity cost) and unvested expiration
-
-**Comprehensive Cash Flow Accuracy** ✓
-- Updated ProjectionCalculator to include all income sources (spouse W2, interest, dividends, bonuses)
-- Added living expenses from monthly_cash_flow section
-- Implemented tax withholdings vs gross tax liability calculation
-- AMT credit carryforward usage from tax_situation now flows through projections
-- Investment growth modeling for taxable_investments implemented
-- Accurate initial cash position from liquid_assets
-- Enhanced CSV outputs and text summaries with realistic cash projections
-
-**Base Withholding Implementation** ✓
-- Added base_federal_withholding and base_state_withholding to UserProfile dataclass
-- Implemented intelligent withholding calculation that uses base rates for future years
-- Added supplemental withholding for stock compensation (NSO exercises, RSU vesting)
-- Supplemental rate combines federal (22%), CA (10.23%), Medicare (1.45%), and CA SDI (1.2%)
-- Updated all profile loaders (portfolio manager, scenario loader, natural evolution generator)
-- Added base withholding example to demo_profile.json
-- Solves problem of inflated withholding from stock exercise years affecting all projections
-- Backward compatible - works without base withholding fields using existing withholding amounts
-
-**NSO Bargain Element Fix** ✓
-- Fixed portfolio_manager._determine_action_price() to return FMV for exercises instead of strike price
-- NSO exercises now correctly calculate bargain element (FMV - strike price)
-- Supplemental withholding automatically applied to NSO ordinary income (~34.88%)
-- ISO exercises continue to work correctly with AMT adjustments
-- All sales and donations continue using projected prices correctly
-- Added test_nso_exercise_withholding.py to verify NSO withholding calculations
-- All existing tests continue to pass

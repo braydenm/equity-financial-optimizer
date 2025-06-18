@@ -117,10 +117,15 @@ This document defines the canonical format for user profile data in the Equity F
     },
 
     "estimated_taxes": {
-      "federal_withholding": 150000,
-      "state_withholding": 50000,
-      "quarterly_payments": 0
+      "quarterly_payments": 0,
+      "regular_income_withholding_rate": 0.35,
+      "supplemental_income_withholding_rate": 0.33
     }
+  },
+
+  "_comments": {
+    "regular_income_withholding_rate": "35% (Example Rate) = Federal Income Tax (varies by bracket) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Tax (varies by state) + State SDI (varies by state)",
+    "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)"
   },
 
   "financial_position": {
@@ -241,6 +246,12 @@ This document defines the canonical format for user profile data in the Equity F
 - `state_tax_rate`: State marginal tax rate
 - `state_ltcg_rate`: State LTCG rate (usually same as state rate)
 - Tax calculations now use proper brackets, not combined flat rates
+
+### equity_position
+### tax_situation
+- `regular_income_withholding_rate`: Combined withholding rate for W2 wages, interest, dividends, and bonuses (as decimal)
+- `supplemental_income_withholding_rate`: Combined withholding rate for stock compensation income (as decimal)
+- `quarterly_payments`: Estimated tax payments made quarterly
 
 ### equity_position
 - `exercised_lots`: Array of all exercised share lots

@@ -448,14 +448,10 @@ class UserProfile:
     # Expenses and cash flow
     monthly_living_expenses: float = 0.0
 
-    # Tax withholdings and payments
-    federal_withholding: float = 0.0
-    state_withholding: float = 0.0
+    # Tax withholding rates and payments
+    regular_income_withholding_rate: float = 0.0
+    supplemental_income_withholding_rate: float = 0.0
     quarterly_payments: float = 0.0
-
-    # Base withholding for normal years (optional)
-    base_federal_withholding: float = 0.0
-    base_state_withholding: float = 0.0
 
     # Investment tracking
     taxable_investments: float = 0.0
@@ -499,6 +495,8 @@ class UserProfile:
         """Calculate total annual living expenses."""
         return self.monthly_living_expenses * 12
 
-    def get_total_withholdings(self) -> float:
-        """Calculate total tax withholdings and estimated payments."""
-        return self.federal_withholding + self.state_withholding + self.quarterly_payments
+    def get_total_withholdings(self, regular_income: float = 0.0, supplemental_income: float = 0.0) -> float:
+        """Calculate total tax withholdings and estimated payments based on income."""
+        regular_withholding = regular_income * self.regular_income_withholding_rate
+        supplemental_withholding = supplemental_income * self.supplemental_income_withholding_rate
+        return regular_withholding + supplemental_withholding + self.quarterly_payments

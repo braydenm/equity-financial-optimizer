@@ -122,11 +122,9 @@ class ScenarioLoader:
             filing_status=personal['tax_filing_status'],
             state_of_residence=personal['state_of_residence'],
             monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
-            federal_withholding=estimated_taxes.get('federal_withholding', 0),
-            state_withholding=estimated_taxes.get('state_withholding', 0),
+            regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
+            supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
             quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-            base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
-            base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
             taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
             amt_credit_carryforward=carryforwards.get('amt_credit', 0)
         )

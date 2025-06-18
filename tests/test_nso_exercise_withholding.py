@@ -54,11 +54,9 @@ def create_test_profile():
         exercise_reserves=50000,
         company_match_ratio=3.0,
         pledge_percentage=0.0,
-        # Base withholding for normal years
-        federal_withholding=15000,
-        state_withholding=8000,
-        base_federal_withholding=15000,
-        base_state_withholding=8000
+        # Withholding rates for income types
+        regular_income_withholding_rate=0.35,  # 35% for regular income
+        supplemental_income_withholding_rate=0.33  # 33% for supplemental income
     )
 
 
@@ -149,13 +147,15 @@ def test_nso_withholding_calculation():
     # Calculate withholding
     withholding = calculator.calculate_year_withholding(2026, annual_components)
 
-    # Expected: base withholding + supplemental on bargain element
-    expected_base = profile.base_federal_withholding + profile.base_state_withholding
-    expected_supplemental = bargain_element * supplemental_rate
-    expected_total = expected_base + expected_supplemental
+    # Expected: regular income withholding + supplemental on bargain element
+    regular_income = (profile.annual_w2_income + profile.spouse_w2_income +
+                     profile.interest_income + profile.dividend_income + profile.bonus_expected)
+    expected_regular = regular_income * profile.regular_income_withholding_rate
+    expected_supplemental = bargain_element * profile.supplemental_income_withholding_rate
+    expected_total = expected_regular + expected_supplemental
 
     print(f"\nWithholding Calculation:")
-    print(f"Base Withholding: ${expected_base:,.2f}")
+    print(f"Regular Income Withholding: ${expected_regular:,.2f}")
     print(f"Supplemental on Bargain Element: ${expected_supplemental:,.2f}")
     print(f"Expected Total: ${expected_total:,.2f}")
     print(f"Calculated Total: ${withholding:,.2f}")

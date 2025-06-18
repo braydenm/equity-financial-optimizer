@@ -126,13 +126,15 @@
       "tender_offer_price": 25.0
     }
   },
+  "_comments": {
+    "regular_income_withholding_rate": "35% (Example Rate) = Federal Income Tax (varies by bracket) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Tax (varies by state) + State SDI (varies by state)",
+    "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)"
+  },
   "tax_situation": {
     "estimated_taxes": {
-      "federal_withholding": 28500,
-      "state_withholding": 16275,
       "quarterly_payments": 0,
-      "base_federal_withholding": 15000,
-      "base_state_withholding": 8000
+      "regular_income_withholding_rate": 0.35,
+      "supplemental_income_withholding_rate": 0.33
     }
   },
   "financial_position": {

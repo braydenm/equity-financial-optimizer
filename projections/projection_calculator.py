@@ -508,19 +508,17 @@ class ProjectionCalculator:
         Returns:
             Total withholding amount for the year
         """
-        # Determine base withholding amounts
-        if year > 2024 and self.profile.base_federal_withholding > 0:
-            # Use base withholding for normal years
-            base_federal = self.profile.base_federal_withholding
-            base_state = self.profile.base_state_withholding
-        else:
-            # Fall back to regular withholding (backward compatibility)
-            base_federal = self.profile.federal_withholding
-            base_state = self.profile.state_withholding
+        # Calculate regular income withholding (W2, interest, dividends, bonuses)
+        regular_income = (
+            self.profile.annual_w2_income +
+            self.profile.spouse_w2_income +
+            self.profile.interest_income +
+            self.profile.dividend_income +
+            self.profile.bonus_expected
+        )
+        regular_withholding = regular_income * self.profile.regular_income_withholding_rate
 
         # Calculate supplemental withholding for stock compensation
-        stock_withholding = 0.0
-
         # NSO exercises
         nso_income = sum(comp.bargain_element for comp in annual_components.nso_exercise_components)
 
@@ -528,14 +526,6 @@ class ProjectionCalculator:
         rsu_income = 0.0  # RSUs would be added here if implemented
 
         total_stock_income = nso_income + rsu_income
+        supplemental_withholding = total_stock_income * self.profile.supplemental_income_withholding_rate
 
-        if total_stock_income > 0:
-            # Apply supplemental withholding rates
-            stock_withholding = total_stock_income * (
-                FEDERAL_SUPPLEMENTAL_WITHHOLDING_RATE +      # 22%
-                CALIFORNIA_SUPPLEMENTAL_WITHHOLDING_RATE +   # 10.23%
-                MEDICARE_RATE +                               # 1.45%
-                CALIFORNIA_SDI_RATE                           # 1.2%
-            )  # Total: ~34.88%
-
-        return base_federal + base_state + stock_withholding
+        return regular_withholding + supplemental_withholding

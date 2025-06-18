@@ -72,11 +72,9 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile:
         filing_status=personal_info.get('tax_filing_status', 'single'),
         state_of_residence=personal_info.get('state_of_residence', 'California'),
         monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
-        federal_withholding=estimated_taxes.get('federal_withholding', 0),
-        state_withholding=estimated_taxes.get('state_withholding', 0),
+        regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
+        supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
-        base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
         taxable_investments=liquid_assets.get('taxable_investments', 0),
         amt_credit_carryforward=carryforwards.get('amt_credit', 0)
     )
@@ -240,11 +238,9 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         filing_status=personal_info.get('tax_filing_status', 'single'),
         state_of_residence=personal_info.get('state_of_residence', 'California'),
         monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
-        federal_withholding=estimated_taxes.get('federal_withholding', 0),
-        state_withholding=estimated_taxes.get('state_withholding', 0),
+        regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
+        supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        base_federal_withholding=estimated_taxes.get('base_federal_withholding', 0),
-        base_state_withholding=estimated_taxes.get('base_state_withholding', 0),
         taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
         amt_credit_carryforward=carryforwards.get('amt_credit', 0)
     )
