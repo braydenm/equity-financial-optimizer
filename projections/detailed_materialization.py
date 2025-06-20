@@ -282,7 +282,21 @@ class DetailedMaterializer:
 
         # Calculator identification and calculations based on action type
         if action.action_type == ActionType.EXERCISE:
-            detailed.calculator_used = "iso_exercise_calculator"
+            if lot and hasattr(lot, 'share_type'):
+                share_type_value = lot.share_type
+                if hasattr(share_type_value, 'value'):  # Handle enum
+                    share_type_str = share_type_value.value
+                else:
+                    share_type_str = str(share_type_value)
+
+                if share_type_str == 'ISO':
+                    detailed.calculator_used = "iso_exercise_calculator"
+                elif share_type_str == 'NSO':
+                    detailed.calculator_used = "nso_exercise_calculator"
+                else:
+                    detailed.calculator_used = "iso_exercise_calculator"  # fallback
+            else:
+                detailed.calculator_used = "iso_exercise_calculator"  # fallback
             detailed.exercise_cost = action.quantity * (lot.strike_price if lot else 0)
             detailed.amt_adjustment = action.quantity * ((action.price if action.price else 0) - (lot.strike_price if lot else 0))
             detailed.tax_impact = 0  # AMT impact tracked at year level
@@ -313,7 +327,18 @@ class DetailedMaterializer:
             detailed.calculator_used = "share_donation_calculator"
             detailed.donation_value = action.quantity * (action.price if action.price else 0)
             detailed.total_charitable_impact = detailed.donation_value
-            detailed.tax_impact = 0  # Deduction benefit tracked at year level
+            detailed.tax_impact = 0  # Deduction benefit tracked at year level #Claude TODO: Clean this up.
+
+            # Get company match from donation components
+            detailed.company_match = 0.0
+            if hasattr(yearly_state, 'annual_tax_components') and yearly_state.annual_tax_components:
+                # Find the matching donation component for this action
+                for donation_comp in yearly_state.annual_tax_components.donation_components:
+                    if (donation_comp.lot_id == action.lot_id and
+                        donation_comp.donation_date == action.action_date and
+                        donation_comp.shares_donated == action.quantity):
+                        detailed.company_match = donation_comp.company_match_amount
+                        break
 
         # Simplified cash change
         detailed.net_cash_change = -detailed.exercise_cost + detailed.gross_proceeds - detailed.tax_impact

@@ -1,4 +1,4 @@
-# CHANGELOG - Equity Financial Optimizer (Claude instructions: Append only)
+# CHANGELOG - Equity Financial Optimizer (Claude instructions: Append to end only)
 
 ## Initial Release
 - Initial equity financial optimizer concept and architecture
@@ -232,3 +232,6 @@
 ### Minor Fixes
 - Fixed AMT credit carryforward bug where credits weren't being properly carried forward year-over-year
 - Fixed investment growth incorrectly being added to liquid cash - now stays in investment balance as unrealized gains
+- Removed tax_component_breakdown.csv generation - redundant with action_summary.csv components and used misleading hardcoded tax rates instead of progressive brackets
+- Fixed calculator field in action_summary.csv to correctly distinguish ISO vs NSO exercises (now shows "nso_exercise_calculator" for NSO exercises instead of always showing "iso_exercise_calculator")
+- Fixed company_match calculation in action_summary.csv and annual_summary.csv - now properly shows 3:1 company match for donations by accessing donation_components data

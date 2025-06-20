@@ -179,8 +179,8 @@ def print_scenario_results(result, detailed=True):
                 deduction_used = 0
                 carryforward = 0
                 if hasattr(state, 'charitable_state'):
-                    deduction_used = state.charitable_state.current_year_deduction
-                    carryforward = sum(state.charitable_state.carryforward_remaining.values())
+                    deduction_used = state.charitable_state.federal_current_year_deduction + state.charitable_state.ca_current_year_deduction
+                    carryforward = sum(state.charitable_state.federal_carryforward_remaining.values()) + sum(state.charitable_state.ca_carryforward_remaining.values())
 
                 # Get pledge obligation
                 pledge_obligation = state.pledge_state.total_outstanding_obligation if state.pledge_state else 0

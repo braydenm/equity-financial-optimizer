@@ -419,37 +419,6 @@ class TestCSVGeneration(unittest.TestCase):
         if iso_lot['acquisition_date']:
             self.assertEqual(iso_lot['holding_status'], 'long-term')
 
-    def test_tax_component_breakdown(self):
-        """Test that tax_component_breakdown.csv shows all components."""
-        profile, plan = self.create_comprehensive_test_data()
-
-        # Run projection
-        calculator = ProjectionCalculator(profile)
-        result = calculator.evaluate_projection_plan(plan)
-
-        # Generate CSVs
-        save_all_projection_csvs(result, "test", self.test_output_dir)
-
-        # Read tax_component_breakdown.csv
-        csv_path = os.path.join(self.test_output_dir, "test_tax_component_breakdown.csv")
-        self.assertTrue(os.path.exists(csv_path))
-
-        with open(csv_path, 'r') as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        # Check for W2 income component in 2025
-        w2_row = next((r for r in rows if r['year'] == '2025' and r['component_type'] == 'W2_income'), None)
-        self.assertIsNotNone(w2_row, f"No W2_income row found for 2025. Available rows: {[r for r in rows if r['year'] == '2025']}")
-        # The amount should be the W2 income only (not including spouse/other)
-        self.assertEqual(float(w2_row['amount']), 300000.0, f"W2 amount mismatch. Row: {w2_row}")
-
-        # Check for ISO exercise component in 2025
-        iso_row = next((r for r in rows if r['year'] == '2025' and r['component_type'] == 'ISO_exercise'), None)
-        self.assertIsNotNone(iso_row)
-        # 5000 shares * ($50 - $5) = $225,000 bargain element
-        self.assertEqual(float(iso_row['amount']), 225000.0)
-
     def test_vested_iso_renamed_in_csvs(self):
         """Test that VESTED_ISO is renamed to ISO in CSVs."""
         profile, plan = self.create_comprehensive_test_data()

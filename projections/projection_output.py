@@ -518,103 +518,6 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             })
 
 
-def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save detailed tax component breakdown by type."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = [
-            'year', 'component_type', 'lot_id', 'amount',
-            'federal_tax', 'ca_tax', 'total_tax'
-        ]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        # Process each year
-        for state in result.yearly_states:
-            # Extract tax rates (simplified - would be better from profile)
-            federal_ordinary_rate = 0.37
-            federal_ltcg_rate = 0.20
-            state_rate = 0.093
-
-            # ISO Exercise components
-            if state.annual_tax_components and hasattr(state.annual_tax_components, 'iso_exercise_components'):
-                for component in state.annual_tax_components.iso_exercise_components:
-                    bargain_element = getattr(component, 'bargain_element', 0)
-                    if bargain_element > 0:
-                        writer.writerow({
-                            'year': state.year,
-                            'component_type': 'ISO_exercise',
-                            'lot_id': getattr(component, 'lot_id', ''),
-                            'amount': round(bargain_element, 2),
-                            'federal_tax': 0,  # AMT adjustment, not regular tax
-                            'ca_tax': 0,
-                            'total_tax': 0
-                        })
-
-            # NSO Exercise components (ordinary income)
-            if state.annual_tax_components and hasattr(state.annual_tax_components, 'nso_exercise_components'):
-                for component in state.annual_tax_components.nso_exercise_components:
-                    bargain_element = getattr(component, 'bargain_element', 0)
-                    if bargain_element > 0:
-                        federal_tax = bargain_element * federal_ordinary_rate
-                        state_tax = bargain_element * state_rate
-                        writer.writerow({
-                            'year': state.year,
-                            'component_type': 'NSO_exercise',
-                            'lot_id': getattr(component, 'lot_id', ''),
-                            'amount': round(bargain_element, 2),
-                            'federal_tax': round(federal_tax, 2),
-                            'ca_tax': round(state_tax, 2),
-                            'total_tax': round(federal_tax + state_tax, 2)
-                        })
-
-            # Sale components (capital gains)
-            if state.annual_tax_components and hasattr(state.annual_tax_components, 'sale_components'):
-                for component in state.annual_tax_components.sale_components:
-                    stcg = getattr(component, 'short_term_gain', 0)
-                    ltcg = getattr(component, 'long_term_gain', 0)
-
-                    if stcg > 0:
-                        federal_tax = stcg * federal_ordinary_rate
-                        state_tax = stcg * state_rate
-                        writer.writerow({
-                            'year': state.year,
-                            'component_type': 'STCG',
-                            'lot_id': getattr(component, 'lot_id', ''),
-                            'amount': round(stcg, 2),
-                            'federal_tax': round(federal_tax, 2),
-                            'ca_tax': round(state_tax, 2),
-                            'total_tax': round(federal_tax + state_tax, 2)
-                        })
-
-                    if ltcg > 0:
-                        federal_tax = ltcg * federal_ltcg_rate
-                        state_tax = ltcg * state_rate
-                        writer.writerow({
-                            'year': state.year,
-                            'component_type': 'LTCG',
-                            'lot_id': getattr(component, 'lot_id', ''),
-                            'amount': round(ltcg, 2),
-                            'federal_tax': round(federal_tax, 2),
-                            'ca_tax': round(state_tax, 2),
-                            'total_tax': round(federal_tax + state_tax, 2)
-                        })
-
-            # Ordinary income from W2
-            w2_income = getattr(state, 'income', 0)
-            if w2_income > 0:
-                federal_tax = w2_income * federal_ordinary_rate
-                state_tax = w2_income * state_rate
-                writer.writerow({
-                    'year': state.year,
-                    'component_type': 'W2_income',
-                    'lot_id': 'N/A',
-                    'amount': round(w2_income, 2),
-                    'federal_tax': round(federal_tax, 2),
-                    'ca_tax': round(state_tax, 2),
-                    'total_tax': round(federal_tax + state_tax, 2)
-                })
 
 
 def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> None:
@@ -905,7 +808,6 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     save_holding_period_tracking_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
     save_pledge_obligations_csv(result, f"{output_dir}/{base_name}_pledge_obligations.csv")
     save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
-    save_tax_component_breakdown_csv(result, f"{output_dir}/{base_name}_tax_component_breakdown.csv")
 
     # Comprehensive cash flow tracking
     save_comprehensive_cashflow_csv(result, f"{output_dir}/{base_name}_comprehensive_cashflow.csv")

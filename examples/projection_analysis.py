@@ -163,7 +163,6 @@ def main():
     print(f"  - natural_evolution_holding_period_tracking.csv")
     print(f"  - natural_evolution_pledge_obligations.csv")
     print(f"  - natural_evolution_charitable_carryforward.csv")
-    print(f"  - natural_evolution_tax_component_breakdown.csv")
 
     print(f"\nKEY INSIGHTS:")
     final_state = result.get_final_state()

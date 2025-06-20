@@ -174,19 +174,6 @@ def main():
     else:
         print(f"\n  ERROR: {pledge_csv} not found!")
 
-    # Check tax_component_breakdown.csv
-    tax_csv = os.path.join(output_dir, "debug_tax_component_breakdown.csv")
-    if os.path.exists(tax_csv):
-        print(f"\n  {tax_csv}:")
-        with open(tax_csv, 'r') as f:
-            content = f.read()
-            # Find W2_income line
-            for line in content.strip().split('\n'):
-                if 'W2_income' in line:
-                    print(f"    W2_income line: {line}")
-    else:
-        print(f"\n  ERROR: {tax_csv} not found!")
-
     print("\n" + "=" * 60)
     print("Debug complete. Check output/debug_csv/ for full CSV files.")
 
