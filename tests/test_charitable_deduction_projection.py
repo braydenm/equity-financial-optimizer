@@ -136,21 +136,21 @@ def test_charitable_deduction_agi_limit_bug():
 
     print(f"\nProjection Results:")
     print(f"  Donation Value in State: ${year_2025_state.donation_value:,.0f}")
-    print(f"  Charitable Current Year Deduction: ${year_2025_state.charitable_state.current_year_deduction:,.0f}")
-    print(f"  Charitable Total Available: ${year_2025_state.charitable_state.total_available:,.0f}")
+    print(f"  Federal Current Year Deduction: ${year_2025_state.charitable_state.federal_current_year_deduction:,.0f}")
+    print(f"  Federal Total Available: ${year_2025_state.charitable_state.federal_total_available:,.0f}")
 
     print(f"\nAnnual Tax Calculator Results (from tax_result):")
     print(f"  Total Tax: ${year_2025_state.tax_state.total_tax:,.0f}")
 
     # The BUG: charitable_state shows full donation amount instead of AGI-limited amount
-    print(f"\n📊 VERIFICATION:")
-    print(f"  Actual Deduction: ${year_2025_state.charitable_state.current_year_deduction:,.0f}")
+    print(f"📊 VERIFICATION:")
+    print(f"  Actual Deduction: ${year_2025_state.charitable_state.federal_current_year_deduction:,.0f}")
     print(f"  Expected Deduction: ${expected_limit:,.0f}")
-    print(f"  Difference: ${year_2025_state.charitable_state.current_year_deduction - expected_limit:,.0f}")
+    print(f"  Difference: ${year_2025_state.charitable_state.federal_current_year_deduction - expected_limit:,.0f}")
 
     # Verify AGI limits are properly applied
-    assert year_2025_state.charitable_state.current_year_deduction == expected_limit, \
-        f"Charitable deduction should be limited to {expected_limit:,.0f} (30% of AGI), but got {year_2025_state.charitable_state.current_year_deduction:,.0f}"
+    assert year_2025_state.charitable_state.federal_current_year_deduction == expected_limit, \
+        f"Charitable deduction should be limited to {expected_limit:,.0f} (30% of AGI), but got {year_2025_state.charitable_state.federal_current_year_deduction:,.0f}"
 
     print("\n✅ Test PASSED - AGI limits correctly applied!")
     return True
@@ -237,29 +237,29 @@ def test_charitable_deduction_carryforward():
     print(f"  Year 1 AGI Limit (30%): ${year_1_limit:,.0f}")
     print(f"  Expected Carryforward: ${expected_carryforward:,.0f}")
 
-    print(f"\nYear 2025 Results:")
-    print(f"  Current Year Deduction: ${year_2025_state.charitable_state.current_year_deduction:,.0f}")
-    print(f"  Total Available: ${year_2025_state.charitable_state.total_available:,.0f}")
-    print(f"  Carryforward Remaining: {year_2025_state.charitable_state.carryforward_remaining}")
+    print(f"Year 2025 Results:")
+    print(f"  Federal Current Year Deduction: ${year_2025_state.charitable_state.federal_current_year_deduction:,.0f}")
+    print(f"  Federal Total Available: ${year_2025_state.charitable_state.federal_total_available:,.0f}")
+    print(f"  Federal Carryforward Remaining: {year_2025_state.charitable_state.federal_carryforward_remaining}")
 
     print(f"\nYear 2026 Results:")
-    print(f"  Current Year Deduction: ${year_2026_state.charitable_state.current_year_deduction:,.0f}")
-    print(f"  Total Available: ${year_2026_state.charitable_state.total_available:,.0f}")
-    print(f"  Carryforward Remaining: {year_2026_state.charitable_state.carryforward_remaining}")
+    print(f"  Federal Current Year Deduction: ${year_2026_state.charitable_state.federal_current_year_deduction:,.0f}")
+    print(f"  Federal Total Available: ${year_2026_state.charitable_state.federal_total_available:,.0f}")
+    print(f"  Federal Carryforward Remaining: {year_2026_state.charitable_state.federal_carryforward_remaining}")
 
     # Verify year 1 deduction is limited to AGI
-    assert year_2025_state.charitable_state.current_year_deduction == year_1_limit, \
-        f"Year 1 deduction should be {year_1_limit:,.0f}, but got {year_2025_state.charitable_state.current_year_deduction:,.0f}"
+    assert year_2025_state.charitable_state.federal_current_year_deduction == year_1_limit, \
+        f"Year 1 deduction should be {year_1_limit:,.0f}, but got {year_2025_state.charitable_state.federal_current_year_deduction:,.0f}"
 
     # Verify year 2 uses carryforward (up to AGI limit)
     year_2_limit = agi * 0.30  # $150K again
-    assert year_2026_state.charitable_state.current_year_deduction == year_2_limit, \
-        f"Year 2 deduction should be {year_2_limit:,.0f}, but got {year_2026_state.charitable_state.current_year_deduction:,.0f}"
+    assert year_2026_state.charitable_state.federal_current_year_deduction == year_2_limit, \
+        f"Year 2 deduction should be {year_2_limit:,.0f}, but got {year_2026_state.charitable_state.federal_current_year_deduction:,.0f}"
 
     # Verify remaining carryforward
     total_used = year_1_limit + year_2_limit  # $300K
     expected_remaining = donation_value - total_used  # $300K
-    remaining_carryforward = sum(year_2026_state.charitable_state.carryforward_remaining.values())
+    remaining_carryforward = sum(year_2026_state.charitable_state.federal_carryforward_remaining.values())
     assert remaining_carryforward == expected_remaining, \
         f"Remaining carryforward should be {expected_remaining:,.0f}, but got {remaining_carryforward:,.0f}"
 

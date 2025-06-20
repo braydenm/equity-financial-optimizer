@@ -79,7 +79,8 @@ class ProjectionCalculator:
         # Initialize carryforward states
         # AMT credits from profile apply to the first projection year
         amt_credits_remaining = self.profile.amt_credit_carryforward
-        charitable_carryforward = {}  # year -> amount
+        federal_charitable_carryforward = {}  # year -> amount (federal)
+        ca_charitable_carryforward = {}  # year -> amount (California)
         pledge_state = PledgeState()
         cumulative_shares_sold = {}  # Track cumulative sales across years
         cumulative_shares_donated = {}  # Track cumulative donations across years
@@ -185,8 +186,9 @@ class ProjectionCalculator:
             if 'charitable_basis_election_years' in plan.tax_elections:
                 elect_basis = year in plan.tax_elections['charitable_basis_election_years']
 
-            # Extract charitable carryforward for current year
-            current_year_carryforward = charitable_carryforward.get(year, 0.0)
+            # Extract charitable carryforwards for current year (federal and state)
+            federal_current_year_carryforward = federal_charitable_carryforward.get(year, 0.0)
+            ca_current_year_carryforward = ca_charitable_carryforward.get(year, 0.0)
 
             tax_result = self.annual_tax_calculator.calculate_annual_tax(
                 year=year,
@@ -199,7 +201,8 @@ class ProjectionCalculator:
                 sale_components=annual_components.sale_components,
                 donation_components=annual_components.donation_components,
                 existing_amt_credit=amt_credits_remaining,
-                carryforward_stock_deduction=current_year_carryforward,
+                carryforward_stock_deduction=federal_current_year_carryforward,
+                ca_carryforward_stock_deduction=ca_current_year_carryforward,
                 elect_basis_deduction=elect_basis
             )
 
@@ -225,19 +228,30 @@ class ProjectionCalculator:
                            - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
 
-            # Update charitable carryforward tracking with new carryforward amounts
-            new_carryforward = tax_result.charitable_deduction_result.total_carryforward
-            if new_carryforward > 0:
-                # Add carryforward for next year
+            # Update charitable carryforward tracking with new carryforward amounts (federal and state)
+            federal_new_carryforward = tax_result.charitable_deduction_result.total_carryforward
+            ca_new_carryforward = tax_result.ca_charitable_deduction_result.total_carryforward
+
+            if federal_new_carryforward > 0:
+                # Add federal carryforward for next year
                 next_year = year + 1
-                charitable_carryforward[next_year] = charitable_carryforward.get(next_year, 0) + new_carryforward
+                federal_charitable_carryforward[next_year] = federal_charitable_carryforward.get(next_year, 0) + federal_new_carryforward
 
-            # Remove current year carryforward since it's been used
-            if year in charitable_carryforward:
-                del charitable_carryforward[year]
+            if ca_new_carryforward > 0:
+                # Add California carryforward for next year
+                next_year = year + 1
+                ca_charitable_carryforward[next_year] = ca_charitable_carryforward.get(next_year, 0) + ca_new_carryforward
 
-            # Calculate charitable deduction state using AGI-limited amounts from tax calculation
-            charitable_state = self._calculate_charitable_state(year_donation_value, charitable_carryforward, year, tax_result)
+            # Remove current year carryforwards since they've been used
+            if year in federal_charitable_carryforward:
+                del federal_charitable_carryforward[year]
+            if year in ca_charitable_carryforward:
+                del ca_charitable_carryforward[year]
+
+            # Calculate charitable deduction state using AGI-limited amounts from tax calculation (federal and state)
+            charitable_state = self._calculate_charitable_state(
+                year_donation_value, federal_charitable_carryforward, ca_charitable_carryforward, year, tax_result
+            )
 
             # Pledge state is already maintained and updated throughout the year
             # No additional calculation needed
@@ -505,20 +519,25 @@ class ProjectionCalculator:
         }
 
     def _calculate_charitable_state(self, year_donation: float,
-                                  carryforward: Dict[int, float],
+                                  federal_carryforward: Dict[int, float],
+                                  ca_carryforward: Dict[int, float],
                                   year: int,
                                   tax_result) -> CharitableDeductionState:
-        """Calculate charitable deduction state with carryforward using AGI-limited amounts."""
-        # Use the AGI-limited deduction amount from the tax calculation result
-        # instead of the raw donation amount to properly respect AGI limits
-        agi_limited_deduction = tax_result.charitable_deduction_result.total_deduction_used
+        """Calculate charitable deduction state with carryforward using AGI-limited amounts for both federal and state."""
+        # Use the AGI-limited deduction amounts from the tax calculation results
+        # for both federal and California to properly respect their different AGI limits
+        federal_agi_limited_deduction = tax_result.charitable_deduction_result.total_deduction_used
+        ca_agi_limited_deduction = tax_result.ca_charitable_deduction_result.total_deduction_used
 
         # The carryforward tracking is already handled in the main projection loop
-        # We just need to return the current state
+        # We just need to return the current state with both federal and state data
         return CharitableDeductionState(
-            current_year_deduction=agi_limited_deduction,
-            carryforward_remaining=carryforward.copy(),
-            total_available=agi_limited_deduction + sum(carryforward.values())
+            federal_current_year_deduction=federal_agi_limited_deduction,
+            federal_carryforward_remaining=federal_carryforward.copy(),
+            federal_total_available=federal_agi_limited_deduction + sum(federal_carryforward.values()),
+            ca_current_year_deduction=ca_agi_limited_deduction,
+            ca_carryforward_remaining=ca_carryforward.copy(),
+            ca_total_available=ca_agi_limited_deduction + sum(ca_carryforward.values())
         )
 
     def _calculate_pledge_state(self, pledge_state: PledgeState, year: int) -> PledgeState:

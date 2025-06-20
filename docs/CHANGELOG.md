@@ -1,4 +1,4 @@
-# CHANGELOG - Equity Financial Optimizer
+# CHANGELOG - Equity Financial Optimizer (Claude instructions: Append only)
 
 ## Initial Release
 - Initial equity financial optimizer concept and architecture
@@ -151,12 +151,23 @@
 - Fixed all failing tests establishing clean baseline
 - Fixed test data inconsistencies and improved validation
 
-## Tax Constants Consolidation
+## Tax Constants Consolidation & Federal/State Separation
 - Fixed critical AGI cash donation limit bug (50% → 60% per IRS 2025 rules)
 - Created centralized tax_constants.py eliminating ~200 lines of duplication
 - Built amt_calculator.py for single source of AMT calculations
 - Resolved AGI inconsistency between calculators
-- Removed ~200 lines of duplicated code
+- Added FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS and CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS for basis election 50% limits
+- Replaced hardcoded 0.50 values in annual_tax_calculator.py with constants from tax_constants.py (2 instances)
+- Enhanced CharitableDeductionState with complete federal/state separation: federal_current_year_deduction, ca_current_year_deduction, and separate carryforward dictionaries
+- Removed all backward compatibility properties (current_year_deduction, carryforward_remaining, total_available) that masked federal/state differences
+- Updated projection calculator to handle separate federal and CA carryforward tracking with dedicated federal_charitable_carryforward and ca_charitable_carryforward dictionaries
+- Enhanced CSV outputs with explicit federal vs state columns: federal_cash_limit vs ca_cash_limit, federal_cash_used vs ca_cash_used, etc.
+- Updated CSV column names for clarity: regular_tax → federal_regular_tax/ca_regular_tax, state_tax → ca_tax for consistency
+- Updated DetailedYear structure to track both federal_charitable_deductions_used and ca_charitable_deductions_used
+- Fixed all code references to use explicit federal/state field names throughout projection_output.py, detailed_materialization.py, and test files
+- Added comprehensive regression tests to prevent future hardcoded tax values and verify federal vs state persistence functionality
+- Documented CA AMT credit tracking limitation as TODO for future implementation when use cases arise
+- Impact: Improved maintainability for tax law changes and enabled accurate state-specific charitable tax planning with proper multi-year carryforward optimization
 
 ## Charitable Basis Election
 - Added per-year basis election configuration via tax_elections in scenario JSON

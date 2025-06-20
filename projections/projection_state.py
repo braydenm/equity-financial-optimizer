@@ -121,10 +121,18 @@ class TaxState:
 
 @dataclass
 class CharitableDeductionState:
-    """Charitable deduction state and carryforward tracking."""
-    current_year_deduction: float = 0.0
-    carryforward_remaining: Dict[int, float] = field(default_factory=dict)  # year -> amount
-    total_available: float = 0.0
+    """Charitable deduction state and carryforward tracking for both federal and state."""
+    # Federal charitable deductions
+    federal_current_year_deduction: float = 0.0
+    federal_carryforward_remaining: Dict[int, float] = field(default_factory=dict)  # year -> amount
+    federal_total_available: float = 0.0
+
+    # California charitable deductions
+    ca_current_year_deduction: float = 0.0
+    ca_carryforward_remaining: Dict[int, float] = field(default_factory=dict)  # year -> amount
+    ca_total_available: float = 0.0
+
+
 
 
 @dataclass

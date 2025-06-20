@@ -119,6 +119,14 @@ class AnnualTaxResult:
     ca_amt: float
     ca_is_amt: bool
     ca_tax_owed: float
+    # TODO: Add CA AMT credit tracking (ca_amt_credit_generated, ca_amt_credit_used, ca_amt_credit_carryforward)
+    # California does have AMT credits similar to federal - if you pay CA AMT in one year,
+    # you can use it as a credit against regular tax in future years when not in AMT.
+    # Implementation would require:
+    # 1. Tracking CA AMT credits separately from federal
+    # 2. CA-specific credit usage rules (different from federal)
+    # 3. Multi-year carryforward tracking for CA
+    # Note: Only implement when a real use case requires CA AMT credit tracking
 
     # Combined results
     total_tax: float
@@ -126,7 +134,8 @@ class AnnualTaxResult:
     marginal_tax_rate: float
 
     # Deductions
-    charitable_deduction_result: CharitableDeductionResult
+    charitable_deduction_result: CharitableDeductionResult  # Federal charitable deductions
+    ca_charitable_deduction_result: CharitableDeductionResult  # California charitable deductions
     standard_deduction_used: float
 
     # Component tracking
@@ -177,6 +186,8 @@ class AnnualTaxCalculator:
         existing_amt_credit: float = 0,
         carryforward_cash_deduction: float = 0,
         carryforward_stock_deduction: float = 0,
+        ca_carryforward_cash_deduction: float = 0,
+        ca_carryforward_stock_deduction: float = 0,
         elect_basis_deduction: bool = False
     ) -> AnnualTaxResult:
         """
@@ -242,7 +253,7 @@ class AnnualTaxCalculator:
         # Calculate California charitable deductions with California AGI limits
         ca_deduction_result = self._apply_charitable_deduction_limits(
             agi, donation_components, cash_donation_components,
-            carryforward_cash_deduction, carryforward_stock_deduction,
+            ca_carryforward_cash_deduction, ca_carryforward_stock_deduction,
             cash_limit_pct=self.CA_AGI_LIMIT_CASH,
             stock_limit_pct=self.CA_AGI_LIMIT_STOCK_BASIS_ELECTION if elect_basis_deduction else self.CA_AGI_LIMIT_STOCK,
             elect_basis_deduction=elect_basis_deduction
@@ -313,8 +324,9 @@ class AnnualTaxCalculator:
             total_tax=total_tax,
             effective_tax_rate=effective_rate,
             marginal_tax_rate=marginal_rate,
-            # Deductions (using federal for the main result)
+            # Deductions (both federal and state)
             charitable_deduction_result=federal_deduction_result,
+            ca_charitable_deduction_result=ca_deduction_result,
             standard_deduction_used=FEDERAL_STANDARD_DEDUCTION[filing_status],
             # Components
             exercise_components=exercise_components,

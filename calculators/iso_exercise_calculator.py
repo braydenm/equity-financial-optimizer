@@ -164,7 +164,7 @@ def calculate_california_amt(
         regular_tax=ca_regular_tax,
         amt=ca_amt,
         is_amt=is_ca_amt,
-        amt_credit_generated=0,  # CA doesn't have AMT credits like federal
+        amt_credit_generated=0,  # CA AMT credit tracking not implemented. See other TODO note in annual_tax_calculator.py
         effective_tax_on_exercise=effective_tax
     )
 

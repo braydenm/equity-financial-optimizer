@@ -31,8 +31,8 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
         fieldnames = [
             'year', 'w2_income', 'spouse_income', 'nso_ordinary_income',
             'short_term_gains', 'long_term_gains', 'iso_bargain_element',
-            'regular_tax', 'amt_tax', 'total_tax',
-            'amt_credits_generated', 'amt_credits_used',
+            'federal_regular_tax', 'federal_amt_tax', 'ca_regular_tax', 'ca_amt_tax', 'total_tax_combined',
+            'federal_amt_credits_generated', 'federal_amt_credits_used',
             'charitable_deduction_cash', 'charitable_deduction_stock'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -67,16 +67,18 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
             writer.writerow({
                 'year': state.year,
                 'w2_income': round(result.user_profile.annual_w2_income if result.user_profile else state.income, 2),
-                'spouse_income': round(state.spouse_income, 2),
+                'spouse_income': round(result.user_profile.spouse_w2_income if result.user_profile else state.spouse_income, 2),
                 'nso_ordinary_income': round(nso_ordinary, 2),
                 'short_term_gains': round(stcg, 2),
                 'long_term_gains': round(ltcg, 2),
                 'iso_bargain_element': round(iso_bargain, 2),
-                'regular_tax': round(state.tax_state.regular_tax, 2),
-                'amt_tax': round(state.tax_state.amt_tax, 2),
-                'total_tax': round(state.tax_state.total_tax, 2),
-                'amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
-                'amt_credits_used': round(state.tax_state.amt_credits_used, 2),
+                'federal_regular_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
+                'federal_amt_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
+                'ca_regular_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
+                'ca_amt_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
+                'total_tax_combined': round(state.tax_state.total_tax, 2),
+                'federal_amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
+                'federal_amt_credits_used': round(state.tax_state.amt_credits_used, 2),
                 'charitable_deduction_cash': round(charitable_cash, 2),
                 'charitable_deduction_stock': round(charitable_stock, 2)
             })
@@ -364,24 +366,26 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
     with open(output_path, 'w', newline='') as f:
         fieldnames = [
             'year', 'cash_donations', 'stock_donations', 'agi',
-            'cash_limit', 'stock_limit', 'cash_used', 'stock_used',
-            'cash_carryforward', 'stock_carryforward', 'carryforward_expiration_year',
-            'basis_election', 'stock_deduction_type'
+            'federal_cash_limit', 'federal_stock_limit', 'federal_cash_used', 'federal_stock_used',
+            'federal_cash_carryforward', 'federal_stock_carryforward',
+            'ca_cash_limit', 'ca_stock_limit', 'ca_cash_used', 'ca_stock_used',
+            'ca_cash_carryforward', 'ca_stock_carryforward',
+            'carryforward_expiration_year', 'basis_election', 'stock_deduction_type'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Track carryforward across years
-        cumulative_cash_carryforward = {}  # year -> amount
-        cumulative_stock_carryforward = {}  # year -> amount
+        # Track carryforward across years for both federal and CA
+        cumulative_federal_cash_carryforward = {}  # year -> amount
+        cumulative_federal_stock_carryforward = {}  # year -> amount
+        cumulative_ca_cash_carryforward = {}  # year -> amount
+        cumulative_ca_stock_carryforward = {}  # year -> amount
 
         for state in result.yearly_states:
             # Get AGI for this year
             agi = 0
             cash_donations = 0
             stock_donations = 0
-            cash_used = 0
-            stock_used = 0
 
             # Check if basis election applies this year
             basis_election = False
@@ -433,7 +437,7 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 for cash_donation in getattr(state.annual_tax_components, 'cash_donation_components', []):
                     cash_donations += getattr(cash_donation, 'amount', 0)
             else:
-                # Fallback AGI calculation
+                # Fallback AGI calculation #Claude TODO: Just throw an error here.
                 agi = state.income + state.spouse_income + state.other_income
 
             # AGI limits for charitable deductions - differentiate federal vs state
@@ -444,55 +448,73 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             ca_cash_limit = agi * CALIFORNIA_CHARITABLE_AGI_LIMITS['cash']
             ca_stock_limit = agi * (CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock'] if basis_election else CALIFORNIA_CHARITABLE_AGI_LIMITS['stock'])
 
-            # LIMITATION: Currently using only federal limits for CSV reporting
-            # Note: Federal cash limit (60%) is actually LESS restrictive than CA (50%)
-            # TODO: Consider separate federal vs state charitable deduction tracking
-            cash_limit = federal_cash_limit
-            stock_limit = federal_stock_limit
+            # Get deductions actually used from charitable state (both federal and state)
+            has_federal_deductions = state.charitable_state and state.charitable_state.federal_current_year_deduction > 0
+            has_ca_deductions = state.charitable_state and state.charitable_state.ca_current_year_deduction > 0
 
-            # Get deductions actually used from charitable state
-            if state.charitable_state and state.charitable_state.current_year_deduction > 0:
-                total_deduction = state.charitable_state.current_year_deduction
-                # Split between cash and stock based on donation ratio
+            if has_federal_deductions or has_ca_deductions:
+                federal_total_deduction = state.charitable_state.federal_current_year_deduction if has_federal_deductions else 0
+                ca_total_deduction = state.charitable_state.ca_current_year_deduction if has_ca_deductions else 0
+
+                # Split between cash and stock based on donation ratio for both federal and state
                 if (cash_donations + stock_donations) > 0:
                     stock_ratio = stock_donations / (cash_donations + stock_donations)
-                    stock_used = min(stock_donations, total_deduction * stock_ratio, stock_limit)
-                    cash_used = min(cash_donations, total_deduction * (1 - stock_ratio), cash_limit)
+
+                    # Federal splits
+                    federal_stock_used = min(stock_donations, federal_total_deduction * stock_ratio, federal_stock_limit)
+                    federal_cash_used = min(cash_donations, federal_total_deduction * (1 - stock_ratio), federal_cash_limit)
+
+                    # California splits
+                    ca_stock_used = min(stock_donations, ca_total_deduction * stock_ratio, ca_stock_limit)
+                    ca_cash_used = min(cash_donations, ca_total_deduction * (1 - stock_ratio), ca_cash_limit)
                 else:
-                    cash_used = 0
-                    stock_used = 0
+                    federal_cash_used = federal_stock_used = 0
+                    ca_cash_used = ca_stock_used = 0
             else:
-                # Apply limits directly
-                stock_used = min(stock_donations, stock_limit)
-                cash_used = min(cash_donations, cash_limit)
+                federal_cash_used = federal_stock_used = 0
+                ca_cash_used = ca_stock_used = 0
 
-            # Calculate carryforward
-            cash_carryforward = max(0, cash_donations - cash_used)
-            stock_carryforward = max(0, stock_donations - stock_used)
+            # Calculate carryforwards for both federal and state
+            federal_cash_carryforward = max(0, cash_donations - federal_cash_used)
+            federal_stock_carryforward = max(0, stock_donations - federal_stock_used)
+            ca_cash_carryforward = max(0, cash_donations - ca_cash_used)
+            ca_stock_carryforward = max(0, stock_donations - ca_stock_used)
 
-            # Track cumulative carryforward
-            if cash_carryforward > 0:
-                cumulative_cash_carryforward[state.year] = cash_carryforward
-            if stock_carryforward > 0:
-                cumulative_stock_carryforward[state.year] = stock_carryforward
+            # Track cumulative carryforward separately for federal and state
+            if federal_cash_carryforward > 0:
+                cumulative_federal_cash_carryforward[state.year] = federal_cash_carryforward
+            if federal_stock_carryforward > 0:
+                cumulative_federal_stock_carryforward[state.year] = federal_stock_carryforward
+            if ca_cash_carryforward > 0:
+                cumulative_ca_cash_carryforward[state.year] = ca_cash_carryforward
+            if ca_stock_carryforward > 0:
+                cumulative_ca_stock_carryforward[state.year] = ca_stock_carryforward
 
-            # Carryforward expires after 5 years
-            carryforward_expiration = state.year + 5 if (cash_carryforward > 0 or stock_carryforward > 0) else ''
+            # Carryforward expires after 5 years (same for both federal and CA)
+            has_any_carryforward = (federal_cash_carryforward > 0 or federal_stock_carryforward > 0 or
+                                  ca_cash_carryforward > 0 or ca_stock_carryforward > 0)
+            carryforward_expiration = state.year + 5 if has_any_carryforward else ''
 
             writer.writerow({
                 'year': state.year,
                 'cash_donations': round(cash_donations, 2),
                 'stock_donations': round(stock_donations, 2),
                 'agi': round(agi, 2),
-                'cash_limit': round(cash_limit, 2),
-                'stock_limit': round(stock_limit, 2),
-                'cash_used': round(cash_used, 2),
-                'stock_used': round(stock_used, 2),
-                'cash_carryforward': round(cash_carryforward, 2),
-                'stock_carryforward': round(stock_carryforward, 2),
-                'basis_election': 'Yes' if basis_election else 'No',
-                'stock_deduction_type': 'Basis' if basis_election else 'FMV',
-                'carryforward_expiration_year': carryforward_expiration
+                'federal_cash_limit': round(federal_cash_limit, 2),
+                'federal_stock_limit': round(federal_stock_limit, 2),
+                'federal_cash_used': round(federal_cash_used, 2),
+                'federal_stock_used': round(federal_stock_used, 2),
+                'federal_cash_carryforward': round(federal_cash_carryforward, 2),
+                'federal_stock_carryforward': round(federal_stock_carryforward, 2),
+                'ca_cash_limit': round(ca_cash_limit, 2),
+                'ca_stock_limit': round(ca_stock_limit, 2),
+                'ca_cash_used': round(ca_cash_used, 2),
+                'ca_stock_used': round(ca_stock_used, 2),
+                'ca_cash_carryforward': round(ca_cash_carryforward, 2),
+                'ca_stock_carryforward': round(ca_stock_carryforward, 2),
+                'carryforward_expiration_year': carryforward_expiration,
+                'basis_election': basis_election,
+                'stock_deduction_type': 'basis' if basis_election else 'fmv'
             })
 
 
@@ -503,7 +525,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
     with open(output_path, 'w', newline='') as f:
         fieldnames = [
             'year', 'component_type', 'lot_id', 'amount',
-            'federal_tax', 'state_tax', 'total_tax'
+            'federal_tax', 'ca_tax', 'total_tax'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -526,7 +548,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
                             'lot_id': getattr(component, 'lot_id', ''),
                             'amount': round(bargain_element, 2),
                             'federal_tax': 0,  # AMT adjustment, not regular tax
-                            'state_tax': 0,
+                            'ca_tax': 0,
                             'total_tax': 0
                         })
 
@@ -543,7 +565,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
                             'lot_id': getattr(component, 'lot_id', ''),
                             'amount': round(bargain_element, 2),
                             'federal_tax': round(federal_tax, 2),
-                            'state_tax': round(state_tax, 2),
+                            'ca_tax': round(state_tax, 2),
                             'total_tax': round(federal_tax + state_tax, 2)
                         })
 
@@ -562,7 +584,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
                             'lot_id': getattr(component, 'lot_id', ''),
                             'amount': round(stcg, 2),
                             'federal_tax': round(federal_tax, 2),
-                            'state_tax': round(state_tax, 2),
+                            'ca_tax': round(state_tax, 2),
                             'total_tax': round(federal_tax + state_tax, 2)
                         })
 
@@ -575,7 +597,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
                             'lot_id': getattr(component, 'lot_id', ''),
                             'amount': round(ltcg, 2),
                             'federal_tax': round(federal_tax, 2),
-                            'state_tax': round(state_tax, 2),
+                            'ca_tax': round(state_tax, 2),
                             'total_tax': round(federal_tax + state_tax, 2)
                         })
 
@@ -590,7 +612,7 @@ def save_tax_component_breakdown_csv(result: ProjectionResult, output_path: str)
                     'lot_id': 'N/A',
                     'amount': round(w2_income, 2),
                     'federal_tax': round(federal_tax, 2),
-                    'state_tax': round(state_tax, 2),
+                    'ca_tax': round(state_tax, 2),
                     'total_tax': round(federal_tax + state_tax, 2)
                 })
 

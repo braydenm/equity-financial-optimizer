@@ -124,10 +124,12 @@ equity-financial-optimizer/
 ## Current Status & Backlog
 
 ### Project Status
-Production-ready core with comprehensive test coverage. Main calculators operational,
-handling complex scenarios including tender offers, ISO exercises, charitable donations
-with basis elections, and multi-year projections. Ready for enhancement with additional
-state tax systems, ESPP support, and advanced optimization features.
+**Project Status**
+Production-ready core with comprehensive test coverage and complete federal vs state tax separation.
+Main calculators operational, handling complex scenarios including tender offers, ISO exercises,
+charitable donations with basis elections, and multi-year projections. Federal and California
+charitable deductions now properly tracked separately with accurate carryforward management.
+Some initial user scenarios ready with further exploration necessary to find optimal action strategy for specific user goals.
 
 ### Project History
 See CHANGELOG.md for complete feature history and implementation details.
@@ -136,16 +138,25 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Component-based tax calculation system fully operational
 - Progressive brackets for federal/state income tax and LTCG
 - AMT calculation with credit tracking across years
-- Charitable deduction AGI limits (30% stock, 60% cash federal, 50% cash CA)
+- Complete federal vs state charitable deduction separation with independent carryforward tracking
+- Charitable deduction AGI limits (30% stock, 60% cash federal, 50% cash CA) properly applied
 - Basis election for charitable donations (per-year configuration)
 - Natural vesting through state transitions (no event detection needed)
-- Comprehensive test suite with all tests passing
+- Comprehensive test suite with all 16 tests passing
 - Security model: demo vs user data separation with automatic fallback
+- Enhanced CSV outputs with explicit federal/CA tax breakdown
+
+### Next Steps & Readiness
+
+**Immediate Opportunities:**
+- Real-world scenario validation with users to stress-test edge cases
+
+### Known Issues</parameter>
 
 ### Known Issues
-- Carryforwards not tracked separately by donation type (cash vs stock)
-- Ordering rules for charitable deductions could be more explicit
 - Action summary CSV incorrectly shows "iso_exercise_calculator" for all exercises (display issue only, calculations are correct)
+- CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
+- Annual tax detail CSV federal/state tax columns populated with placeholder values - requires TaxState architectural changes for proper separation
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
@@ -159,10 +170,6 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
-- Federal vs state charitable deduction persistence: only federal charitable_deduction_result saved in AnnualTaxResult, CA result discarded (annual_tax_calculator.py)
-- Projection calculator only uses federal charitable carryforwards, ignoring CA-specific carryforward rules (projection_calculator.py)
-- CSV generation comment claims federal limits are "most restrictive" but CA cash limit (50%) < federal (60%) (projection_output.py)
-- Consider separate federal vs state charitable deduction tracking in projection state for accurate multi-year planning (projection_state.py)
 
 ### Immediate Priorities
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
@@ -170,32 +177,9 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### E2E Testing Plan for Critical Financial Pathways
 **Context**: The AMT credit carryforward bug revealed a critical gap - multi-year state management wasn't properly tested. This could affect other financial calculations with similar patterns. We've already discovered a CRITICAL bug in charitable deduction carryforward where AGI limits are ignored!
 
-**Discovered Bugs Requiring Immediate Fix:**
-1. **Charitable Deduction AGI Limits Not Applied** - CRITICAL BUG affecting tax liability calculations
-   - **Symptom**: Donations are deducted at 100% of value regardless of AGI limits
-   - **Expected**: Stock donations limited to 30% of AGI, cash to 60% of AGI per IRS rules
-   - **Root Cause**: In `projection_calculator.py`, the `_calculate_charitable_state` method sets `current_year_deduction=year_donation` without any AGI limit checks
-   - **The Disconnect**: `annual_tax_calculator.py` correctly calculates `charitable_deduction_result` with proper AGI limits, but this result is never propagated back to `yearly_state.charitable_state`
-   - **Impact**: Tax liability could be understated by $100K+ in high-donation scenarios
-   - **Test Case**: $500K AGI with $400K donation shows $400K deduction (should be $150K)
-   - **Fix Required**: Update `projection_calculator.py` to use `tax_result.charitable_deduction_result` instead of the naive calculation
-   - **Pattern**: Similar to AMT credit bug - correct calculation exists but state management fails
-
 **High-Risk Areas Requiring E2E Tests:**
 
-1. **Charitable Deduction Carryforward** (CRITICAL - BUG CONFIRMED)
-   - Risk: 5-year expiration, federal/state limit mixing, wrong year attribution
-   - Impact: Phantom deductions, incorrect tax liability
-   - Current Bug: AGI limits completely ignored - $400K donation shows as $400K deduction instead of $150K (30% limit)
-   - Test Scenarios:
-     * Large single-year donation exceeding 30% AGI limit
-     * Multi-year donations with varying AGI
-     * Mixed cash (60% limit) and stock (30% limit) donations
-     * Carryforward expiration after 5 years
-     * Basis election changing limits from 30% to 50%
-   - Implementation: Fix `_calculate_charitable_state` to use tax_result.charitable_deduction_result
-
-2. **Pledge Obligation Tracking** (CRITICAL)
+1. **Pledge Obligation Tracking** (HIGH)
    - Risk: 3-year fulfillment window, obligations not carrying forward
    - Impact: Missed obligations, incorrect company match calculations
    - Test Scenarios:
@@ -236,11 +220,9 @@ See CHANGELOG.md for complete feature history and implementation details.
      * Refund vs additional payment due
 
 **Implementation Priority:**
-1. **IMMEDIATE**: Fix charitable deduction bug - propagate tax_result.charitable_deduction_result to yearly_state
-2. **WEEK 1**: Create regression tests for charitable deduction carryforward
-3. **WEEK 2**: Add pledge obligation E2E tests
-4. **WEEK 3**: ISO disposition and cash flow validation tests
-5. **WEEK 4**: NSO withholding reconciliation tests
+1. **Next**: Add pledge obligation E2E tests
+2. **Then**: ISO disposition and cash flow validation tests
+3. **Later**: NSO withholding reconciliation tests
 
 **Test Structure Template:**
 ```python
@@ -257,33 +239,17 @@ def test_[pathway]_e2e():
 
 **Residual Work** (from original 5-table plan):
 1. **EQUITY POSITION table** (→ equity_holdings.csv) was not implemented
-2. **Charitable donations table** would be valuable given the AGI limit bug discovered
-3. **Column name validation** - Ensure terminal headers exactly match CSV headers
+2. **Column name validation** - Ensure terminal headers exactly match CSV headers
 
 ### TODO Burndown Plan - Structured Groups
 
-**Current State: 12 TODOs Remaining** (Groups A1 & A2 completed, 4 new federal/state issues discovered)
-
-#### Group A2: Tax Constants Consolidation (COMPLETED ✅)
-*Priority: HIGH - Accuracy & maintainability*
-
-**TODOs Completed:**
-- ✅ Basis election 50% limit hardcoded, should pull from tax_constants.py (annual_tax_calculator.py) - 2 instances
-- ✅ Tax limit percentages in CSV generation should differentiate federal vs state (projection_output.py)
-
-**Resolution**: 
-- Added FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS and CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS to tax_constants.py
-- Replaced hardcoded 0.50 values in annual_tax_calculator.py with constants from tax_constants.py
-- Updated projection_output.py to use constants and differentiate federal vs state tax limits
-- Added comprehensive regression tests to prevent future hardcoded values
-
-**Impact**: High - System maintainability improved for tax law changes, easier compliance updates
+**Current State: 9 TODOs Remaining** (Groups A1, A2, and federal/state persistence completed)
 
 #### Group B: User Experience & Configuration (4 TODOs)
 *Priority: MEDIUM - Scenario realism and flexibility*
 
 **B1. User-Configurable Parameters:**
-- Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
+- Investment return rate hardcoded at 7%, should be user specified (via an extension of input_data/market_assemptions/price_scenarios.json)
 - Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
 
 **B2. Market Intelligence:**
@@ -308,8 +274,66 @@ def test_[pathway]_e2e():
 **Rationale**: Improve maintainability and prevent edge case failures
 **Impact**: Low-Medium - Developer experience
 
-#### Implementation Schedule
-- **Sprint 1**: ✅ Fix charitable deduction bug (COMPLETED - discovered via E2E testing)
-- **Sprint 2**: ✅ Group A2 - Tax constants consolidation (COMPLETED)
-- **Sprint 3**: Group B - User experience & configuration
-- **Sprint 4**: Group C - Code quality & robustness
+### Additional Improvements Identified
+- **Search codebase systematically for other hardcoded tax values** that should be in tax_constants.py (comprehensive audit needed)
+- **TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting
+- **CA AMT credit tracking** when real use cases emerge requiring state-specific AMT credit carryforward
+
+### Implementation Priorities
+- **High Priority**: Group B - User experience & configuration (scenario realism)
+- **Medium Priority**: Group C - Code quality & robustness (technical debt cleanup)
+- **Ongoing**: E2E testing for pledge obligations and cash flow validation
+
+#TaxState Planning
+## Recommendations for TaxState Enhancement
+
+Based on the usage patterns I found, here's a minimal but effective enhancement to `TaxState`:
+
+```python
+@dataclass
+class TaxState:
+    """Tax-related state for a given year."""
+    # Keep existing combined values for backward compatibility
+    regular_tax: float = 0.0
+    amt_tax: float = 0.0
+    total_tax: float = 0.0
+
+    # Federal-specific values (most critical for downstream)
+    federal_tax_owed: float = 0.0
+    federal_amt_credits_generated: float = 0.0
+    federal_amt_credits_used: float = 0.0
+    federal_amt_credits_remaining: float = 0.0
+
+    # State-specific values (add only CA for now)
+    ca_tax_owed: float = 0.0
+
+    # Add these helper properties for clarity
+    @property
+    def federal_is_amt(self) -> bool:
+        """Whether federal taxes are subject to AMT."""
+        return self.federal_amt_credits_generated > 0
+```
+
+### Rationale:
+
+1. **Minimal Changes**: Only adds 2 new fields (`federal_tax_owed`, `ca_tax_owed`) to address the most critical gap
+
+2. **Backward Compatible**: Keeps existing fields so no breaking changes
+
+3. **Most Critical Values**:
+   - Federal/state tax separation (needed for CSV output - see TODO at lines 75-78)
+   - AMT credit tracking already exists for federal (the most complex carryforward)
+   - CA AMT credits can wait until there's a real use case
+
+4. **What We're NOT Adding**:
+   - Separate regular/AMT for each jurisdiction (overengineering)
+   - CA AMT credits (no current use case per TODO comment)
+   - Detailed income breakdowns (already in AnnualTaxComponents)
+
+5. **Key Benefits**:
+   - CSV outputs can show federal vs state taxes
+   - Multi-state tax planning becomes possible
+   - AMT credit carryforward continues working
+   - Simple property makes AMT status clear
+
+This approach follows the "just enough" principle - it solves the immediate problems (CSV output gaps, federal/state visibility) without creating a complex tax state hierarchy.

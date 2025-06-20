@@ -115,8 +115,10 @@ class DetailedYear:
     amt_credits_generated: float = 0.0
     amt_credits_used: float = 0.0
     amt_credits_available: float = 0.0
-    charitable_deductions_used: float = 0.0
-    charitable_deductions_carried: float = 0.0
+    federal_charitable_deductions_used: float = 0.0
+    federal_charitable_deductions_carried: float = 0.0
+    ca_charitable_deductions_used: float = 0.0
+    ca_charitable_deductions_carried: float = 0.0
 
     # Cash flow
     starting_cash: float = 0.0
@@ -203,8 +205,10 @@ class DetailedMaterializer:
         detailed_year.amt_credits_generated = yearly_state.tax_state.amt_credits_generated
         detailed_year.amt_credits_used = yearly_state.tax_state.amt_credits_used
         detailed_year.amt_credits_available = yearly_state.tax_state.amt_credits_remaining
-        detailed_year.charitable_deductions_used = yearly_state.charitable_state.current_year_deduction
-        detailed_year.charitable_deductions_carried = yearly_state.charitable_state.total_available
+        detailed_year.federal_charitable_deductions_used = yearly_state.charitable_state.federal_current_year_deduction
+        detailed_year.federal_charitable_deductions_carried = yearly_state.charitable_state.federal_total_available
+        detailed_year.ca_charitable_deductions_used = yearly_state.charitable_state.ca_current_year_deduction
+        detailed_year.ca_charitable_deductions_carried = yearly_state.charitable_state.ca_total_available
 
         # Cash flow
         detailed_year.starting_cash = yearly_state.starting_cash

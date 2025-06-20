@@ -162,9 +162,9 @@ def generate_natural_evolution(timeline_path: str, profile_path: str,
                 )
                 expiration_actions.append(expiration_action)
 
-    # Price projections should be provided externally (e.g., market_projections.json)
+    # Price projections should be provided externally
     # Default to current price with no change if not provided
-    # Claude TODO: Load price projections from external source (market_projections.json, financial advisor inputs, etc.)
+    # Claude TODO: Load price projections from external source (market_assumptions/price_scenarios.json)
 
     # Extract current price from profile data
     with open(profile_path, 'r') as f:
