@@ -235,3 +235,31 @@
 - Removed tax_component_breakdown.csv generation - redundant with action_summary.csv components and used misleading hardcoded tax rates instead of progressive brackets
 - Fixed calculator field in action_summary.csv to correctly distinguish ISO vs NSO exercises (now shows "nso_exercise_calculator" for NSO exercises instead of always showing "iso_exercise_calculator")
 - Fixed company_match calculation in action_summary.csv and annual_summary.csv - now properly shows 3:1 company match for donations by accessing donation_components data
+
+## Charitable Deduction Carryforward Full IRS Compliance Implementation
+- Fixed critical bug where charitable deduction carryforwards never expired per IRS 5-year rule
+- Implemented complete IRS-compliant FIFO consumption: "use carryover from earliest year first"
+- Enhanced projection_calculator.py to track carryforward by creation year for both expiration and FIFO ordering
+- Added federal_expired_this_year and ca_expired_this_year tracking to CharitableDeductionState
+- Enhanced annual_tax_calculator.py to accept and consume carryforwards by creation year
+- Added carryforward_consumed_by_creation_year and carryforward_remaining_by_creation_year to CharitableDeductionResult
+- Fixed charitable deduction ordering: cash before stock, current year before carryovers
+- Added support for 50% limit organizations
+- Updated charitable_carryforward.csv to include expired amounts for lost tax benefit visibility
+- Created comprehensive 7-year test scenario verifying FIFO, expiration, and varying AGI handling
+- Corrected carryforward calculation bug where expiration logic ran after total calculation, causing incorrect carryforward amounts
+- Added missing expired_carryforward field to CharitableDeductionResult, enabling proper expiration tracking in projections
+- Added fifty_pct_limit_org parameter to calculate_annual_tax() method for public charity vs private foundation handling
+- Fixed test expectations to correctly reflect 50% limit organization rules (public charities)
+- Enhanced test documentation to clarify IRS organization types and deduction limit interactions
+- Fixed sequential AGI limit application ensuring overall charitable limit is respected
+
+**Recent Fix (Charitable Deduction Carryforward Expiration)**
+- Fixed critical bug in charitable deduction carryforward expiration logic
+- Previous implementation expired carryforwards in year 6 (when `years_since > 5`)
+- Corrected to expire at end of year 5 (when `years_since >= 5`) per IRS rules
+- Key changes:
+  - Moved expiration check AFTER carryforward consumption (allows use in year 5)
+  - Changed condition from `> 5` to `>= 5` for proper 5-year expiration
+  - Updated all related tests to match corrected behavior
+- Verified with comprehensive test suite covering simple, complex, and edge cases

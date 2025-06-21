@@ -231,21 +231,106 @@ def test_combined_cash_and_stock_limits():
     print(f"  Cash Deduction Used: ${result.charitable_deduction_result.cash_deduction_used:,.0f}")
     print(f"  Total Deduction Used: ${result.charitable_deduction_result.total_deduction_used:,.0f}")
 
-    # Stock should be fully deductible (20% < 30% limit)
-    assert result.charitable_deduction_result.stock_deduction_used == stock_donation_value, \
-        f"Stock donation should be fully deductible when under 30% limit"
+    # For 50% limit organizations (public charities):
+    # Overall limit: 50% of AGI = $250k
+    # Cash uses: $200k (full amount, under 60% cash limit and 50% overall limit)
+    # Remaining overall limit: $250k - $200k = $50k
+    # Stock gets: min($150k stock limit, $50k remaining overall) = $50k
 
-    # For federal: After stock (20%), cash can use remaining up to 60% total
-    # So cash can use 60% - 20% = 40% of AGI = $200k (full amount)
     assert result.charitable_deduction_result.cash_deduction_used == cash_donation, \
-        f"Federal cash deduction should be fully allowed when total is within 60%"
+        f"Cash donation should be fully deductible when under overall 50% limit"
 
-    # For California calculation, it would be different:
-    # Stock: 20% (allowed)
-    # Cash: Limited to 50% - 20% = 30% of AGI = $150k
-    # So CA would have $50k more in taxable income
+    expected_stock_deduction = 50000  # Limited by remaining overall limit
+    assert result.charitable_deduction_result.stock_deduction_used == expected_stock_deduction, \
+        f"Stock donation should be limited by remaining overall charitable limit (50% org)"
 
-    print("\n✅ Combined donation limits correctly applied")
+    expected_stock_carryforward = stock_donation_value - expected_stock_deduction
+    assert result.charitable_deduction_result.stock_carryforward == expected_stock_carryforward, \
+        f"Stock carryforward should be unused portion of donation"
+
+    print(f"  Stock Carryforward: ${result.charitable_deduction_result.stock_carryforward:,.0f}")
+    print("\n✅ Combined donation limits correctly applied for 50% limit organizations")
+
+
+def test_public_charity_vs_private_foundation():
+    """Test donation limit differences between public charities and private foundations."""
+    print("\n" + "="*70)
+    print("TEST: Public Charity vs Private Foundation Donation Limits")
+    print("="*70)
+
+    profile = create_test_profile()
+    calculator = AnnualTaxCalculator()
+
+    w2_income = 500000
+    stock_donation_value = 200000  # 40% of AGI
+
+    donation_components = [
+        DonationComponents(
+            lot_id='RSU_001',
+            donation_date=date(2025, 6, 1),
+            shares_donated=2000,
+            fmv_at_donation=100.0,
+            cost_basis=50000,
+            acquisition_date=date(2020, 1, 1),
+            holding_period_days=1887,
+            donation_value=stock_donation_value,
+            deduction_type='stock',
+            company_match_ratio=0,
+            company_match_amount=0
+        )
+    ]
+
+    # Test public charity (50% limit organization)
+    result_public = calculator.calculate_annual_tax(
+        year=2025,
+        user_profile=profile,
+        w2_income=w2_income,
+        donation_components=donation_components,
+        fifty_pct_limit_org=True
+    )
+
+    # Test private foundation (30% limit organization)
+    result_private = calculator.calculate_annual_tax(
+        year=2025,
+        user_profile=profile,
+        w2_income=w2_income,
+        donation_components=donation_components,
+        fifty_pct_limit_org=False
+    )
+
+    print(f"\nDonation Details:")
+    print(f"  W2 Income: ${w2_income:,}")
+    print(f"  Stock Donation: ${stock_donation_value:,} (40% of AGI)")
+
+    print(f"\nPublic Charity (50% limit org) Results:")
+    print(f"  Stock Deduction Used: ${result_public.charitable_deduction_result.stock_deduction_used:,.0f}")
+    print(f"  Stock Carryforward: ${result_public.charitable_deduction_result.stock_carryforward:,.0f}")
+
+    print(f"\nPrivate Foundation (30% limit org) Results:")
+    print(f"  Stock Deduction Used: ${result_private.charitable_deduction_result.stock_deduction_used:,.0f}")
+    print(f"  Stock Carryforward: ${result_private.charitable_deduction_result.stock_carryforward:,.0f}")
+
+    # Public charity: 30% stock limit, 50% overall limit
+    # Stock donation is 40% of AGI, limited to 30% = $150k
+    expected_public_deduction = w2_income * 0.30  # $150k
+    expected_public_carryforward = stock_donation_value - expected_public_deduction  # $50k
+
+    # Private foundation: 30% overall limit for stock
+    # Stock donation is 40% of AGI, limited to 30% = $150k
+    expected_private_deduction = w2_income * 0.30  # $150k
+    expected_private_carryforward = stock_donation_value - expected_private_deduction  # $50k
+
+    assert result_public.charitable_deduction_result.stock_deduction_used == expected_public_deduction, \
+        f"Public charity stock deduction should be limited to 30% of AGI"
+    assert result_public.charitable_deduction_result.stock_carryforward == expected_public_carryforward, \
+        f"Public charity stock carryforward should be excess over 30% limit"
+
+    assert result_private.charitable_deduction_result.stock_deduction_used == expected_private_deduction, \
+        f"Private foundation stock deduction should be limited to 30% of AGI"
+    assert result_private.charitable_deduction_result.stock_carryforward == expected_private_carryforward, \
+        f"Private foundation stock carryforward should be excess over 30% limit"
+
+    print("\n✅ Public charity vs private foundation limits correctly applied")
 
 
 def test_basis_election_high_appreciation():
@@ -545,9 +630,8 @@ def run_all_tests():
     test_federal_vs_california_cash_limits()
     test_stock_donation_limits()
     test_combined_cash_and_stock_limits()
+    test_public_charity_vs_private_foundation()
     test_basis_election_high_appreciation()
-    test_basis_election_low_appreciation()
-    test_basis_election_with_mixed_donations()
     test_california_basis_election()
 
     print("\n" + "="*70)

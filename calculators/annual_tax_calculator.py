@@ -37,7 +37,8 @@ from calculators.tax_constants import (
     FEDERAL_CHARITABLE_AGI_LIMITS,
     CALIFORNIA_CHARITABLE_AGI_LIMITS,
     FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
-    CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS
+    CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
+    CHARITABLE_CARRYFORWARD_YEARS
 )
 
 # Import AMT calculation functions
@@ -84,6 +85,12 @@ class CharitableDeductionResult:
     cash_carryforward: float
     stock_carryforward: float
     total_carryforward: float
+    # FIFO tracking: creation_year -> amount consumed
+    carryforward_consumed_by_creation_year: Dict[int, float] = field(default_factory=dict)
+    # FIFO tracking: creation_year -> amount remaining
+    carryforward_remaining_by_creation_year: Dict[int, float] = field(default_factory=dict)
+    # Expiration tracking: total amount that expired this year
+    expired_carryforward: float = 0.0
 
 
 @dataclass
@@ -174,21 +181,22 @@ class AnnualTaxCalculator:
         w2_income: float = 0,
         spouse_income: float = 0,
         other_ordinary_income: float = 0,
-        short_term_gains: float = 0,
-        long_term_gains: float = 0,
-        exercise_components: Optional[List[ISOExerciseComponents]] = None,
-        nso_exercise_components: Optional[List[NSOExerciseComponents]] = None,
-        sale_components: Optional[List[ShareSaleComponents]] = None,
-        donation_components: Optional[List[DonationComponents]] = None,
-        cash_donation_components: Optional[List[CashDonationComponents]] = None,
+        exercise_components: List[ISOExerciseComponents] = None,
+        nso_exercise_components: List[NSOExerciseComponents] = None,
+        sale_components: List[ShareSaleComponents] = None,
+        donation_components: List[DonationComponents] = None,
+        cash_donation_components: List[CashDonationComponents] = None,
         filing_status: Optional[str] = None,
         include_california: Optional[bool] = None,
         existing_amt_credit: float = 0,
         carryforward_cash_deduction: float = 0,
         carryforward_stock_deduction: float = 0,
+        carryforward_stock_by_creation_year: Optional[Dict[int, float]] = None,
         ca_carryforward_cash_deduction: float = 0,
         ca_carryforward_stock_deduction: float = 0,
-        elect_basis_deduction: bool = False
+        ca_carryforward_stock_by_creation_year: Optional[Dict[int, float]] = None,
+        elect_basis_deduction: bool = False,
+        fifty_pct_limit_org: bool = True
     ) -> AnnualTaxResult:
         """
         Calculate comprehensive annual tax from components.
@@ -208,8 +216,11 @@ class AnnualTaxCalculator:
             include_california: Override CA tax inclusion (uses profile if None)
             existing_amt_credit: AMT credit from prior years
             carryforward_cash_deduction: Charitable cash deduction carryforward
-            carryforward_stock_deduction: Charitable stock deduction carryforward
+            carryforward_stock_deduction: Charitable stock deduction carryforward (legacy - use carryforward_stock_by_creation_year for FIFO)
+            carryforward_stock_by_creation_year: Federal stock carryforward by creation year for FIFO compliance
+            ca_carryforward_stock_by_creation_year: CA stock carryforward by creation year for FIFO compliance
             elect_basis_deduction: If True, use cost basis instead of FMV for stock donations (To raise donation AGI limit)
+            fifty_pct_limit_org: If True, donations are to 50% limit organizations (public charities). If False, donations are to 30% limit organizations (private foundations).
 
         Returns:
             AnnualTaxResult with comprehensive tax calculation
@@ -241,22 +252,39 @@ class AnnualTaxCalculator:
         # Calculate AGI
         agi = total_ordinary + total_gains
 
-        # Calculate federal charitable deductions with federal AGI limits
+        # Handle backward compatibility for legacy carryforward parameters
+        if carryforward_stock_by_creation_year is None and carryforward_stock_deduction > 0:
+            # Convert legacy format to new format - assume current year creation for backward compatibility
+            carryforward_stock_by_creation_year = {year: carryforward_stock_deduction}
+        elif carryforward_stock_by_creation_year is None:
+            carryforward_stock_by_creation_year = {}
+
+        if ca_carryforward_stock_by_creation_year is None and ca_carryforward_stock_deduction > 0:
+            # Convert legacy format to new format - assume current year creation for backward compatibility
+            ca_carryforward_stock_by_creation_year = {year: ca_carryforward_stock_deduction}
+        elif ca_carryforward_stock_by_creation_year is None:
+            ca_carryforward_stock_by_creation_year = {}
+
+        # Calculate federal charitable deductions with federal AGI limits using FIFO
         federal_deduction_result = self._apply_charitable_deduction_limits(
             agi, donation_components, cash_donation_components,
-            carryforward_cash_deduction, carryforward_stock_deduction,
+            carryforward_cash_deduction, carryforward_stock_by_creation_year,
             cash_limit_pct=self.FEDERAL_AGI_LIMIT_CASH,
             stock_limit_pct=self.FEDERAL_AGI_LIMIT_STOCK_BASIS_ELECTION if elect_basis_deduction else self.FEDERAL_AGI_LIMIT_STOCK,
-            elect_basis_deduction=elect_basis_deduction
+            elect_basis_deduction=elect_basis_deduction,
+            fifty_pct_limit_org=fifty_pct_limit_org,
+            current_year=year
         )
 
-        # Calculate California charitable deductions with California AGI limits
+        # Calculate California charitable deductions with California AGI limits using FIFO
         ca_deduction_result = self._apply_charitable_deduction_limits(
             agi, donation_components, cash_donation_components,
-            ca_carryforward_cash_deduction, ca_carryforward_stock_deduction,
+            ca_carryforward_cash_deduction, ca_carryforward_stock_by_creation_year,
             cash_limit_pct=self.CA_AGI_LIMIT_CASH,
             stock_limit_pct=self.CA_AGI_LIMIT_STOCK_BASIS_ELECTION if elect_basis_deduction else self.CA_AGI_LIMIT_STOCK,
-            elect_basis_deduction=elect_basis_deduction
+            elect_basis_deduction=elect_basis_deduction,
+            fifty_pct_limit_org=fifty_pct_limit_org,
+            current_year=year
         )
 
         # Calculate federal tax
@@ -372,22 +400,27 @@ class AnnualTaxCalculator:
         donation_components: List[DonationComponents],
         cash_donation_components: List[CashDonationComponents],
         carryforward_cash: float,
-        carryforward_stock: float,
+        carryforward_stock_by_creation_year: Optional[Dict[int, float]],
         cash_limit_pct: float = None,
         stock_limit_pct: float = None,
-        elect_basis_deduction: bool = False
+        elect_basis_deduction: bool = False,
+        fifty_pct_limit_org: bool = True,
+        current_year: int = None
     ) -> CharitableDeductionResult:
-        """Apply AGI limits to charitable deductions.
+        """Apply AGI limits to charitable deductions with FIFO ordering.
 
         Args:
             agi: Adjusted gross income
             donation_components: Stock donations
             cash_donation_components: Cash donations
             carryforward_cash: Cash donation carryforward
-            carryforward_stock: Stock donation carryforward
+            carryforward_stock_by_creation_year: Stock donation carryforward by creation year for FIFO
             cash_limit_pct: Cash donation AGI limit percentage (required if cash donations > 0)
             stock_limit_pct: Stock donation AGI limit percentage (required if stock donations > 0)
             elect_basis_deduction: If True, use cost basis instead of FMV for stock donations
+            fifty_pct_limit_org: If True, donations are to 50% limit organizations (overall charitable
+                                limit is 50% of AGI instead of the standard 60% for federal)
+            current_year: Current tax year for expiration checking
         """
         # Calculate total donations by type
         if elect_basis_deduction:
@@ -398,8 +431,16 @@ class AnnualTaxCalculator:
             stock_donations = sum(d.donation_value for d in donation_components)
         cash_donations = sum(d.amount for d in cash_donation_components)
 
-        # Add carryforwards
-        total_stock_available = stock_donations + carryforward_stock
+        # Handle None carryforward dictionary - convert to empty dict for processing
+        if carryforward_stock_by_creation_year is None:
+            carryforward_stock_by_creation_year = {}
+
+        # Don't expire carryforwards before processing - they can be used in their 5th year
+        # Expiration happens AFTER consumption, not before
+
+        # Calculate total available
+        total_stock_carryforward = sum(carryforward_stock_by_creation_year.values())
+        total_stock_available = stock_donations + total_stock_carryforward
         total_cash_available = cash_donations + carryforward_cash
 
         # Require limits to be set if donations exist
@@ -418,14 +459,69 @@ class AnnualTaxCalculator:
         stock_limit = agi * stock_limit_pct
         cash_limit = agi * cash_limit_pct
 
-        # Stock deductions use specified limit
-        stock_used = min(total_stock_available, stock_limit)
-        stock_carryforward = total_stock_available - stock_used
-
-        # Cash deductions use specified limit (minus any stock deductions)
-        cash_limit_after_stock = max(0, cash_limit - stock_used)
-        cash_used = min(total_cash_available, cash_limit_after_stock)
+        # Cash deductions (apply first)
+        cash_used = min(total_cash_available, cash_limit)
         cash_carryforward = total_cash_available - cash_used
+
+        # Stock deductions with FIFO ordering (apply after cash)
+        # Stock is limited by BOTH the stock-specific limit AND the remaining overall charitable limit
+        # For 50% limit organizations, the overall limit is 50% of AGI instead of 60%
+        if fifty_pct_limit_org:
+            overall_charitable_limit = agi * 0.50  # 50% limit organizations
+        else:
+            overall_charitable_limit = cash_limit  # For federal, this is 60% (or 50% for some years)
+        remaining_charitable_limit = max(0, overall_charitable_limit - cash_used)
+        effective_stock_limit = min(stock_limit, remaining_charitable_limit)
+
+        stock_used = 0.0
+        carryforward_consumed_by_creation_year = {}
+        carryforward_remaining_by_creation_year = {}
+
+        # IRS rule: Current year donations are used BEFORE carryovers
+        # First, use current year donations
+        remaining_stock_limit = effective_stock_limit
+        current_year_used = 0.0
+        if stock_donations > 0 and remaining_stock_limit > 0:
+            current_year_used = min(stock_donations, remaining_stock_limit)
+            stock_used += current_year_used
+            remaining_stock_limit -= current_year_used
+
+        # Use carryforward in FIFO order (oldest first) with remaining limit
+        # Note: Carryforwards can be used in their 5th year before expiring
+        for creation_year in sorted(carryforward_stock_by_creation_year.keys()):
+            if remaining_stock_limit <= 0:
+                # No more limit available, carry forward the rest
+                carryforward_remaining_by_creation_year[creation_year] = carryforward_stock_by_creation_year[creation_year]
+                continue
+
+            available_from_year = carryforward_stock_by_creation_year[creation_year]
+            used_from_year = min(available_from_year, remaining_stock_limit)
+
+            if used_from_year > 0:
+                carryforward_consumed_by_creation_year[creation_year] = used_from_year
+                stock_used += used_from_year
+                remaining_stock_limit -= used_from_year
+
+            remaining_from_year = available_from_year - used_from_year
+            if remaining_from_year > 0:
+                carryforward_remaining_by_creation_year[creation_year] = remaining_from_year
+
+        # Apply expiration AFTER consumption - carryforwards expire at end of their 5th year
+        expired_amount = 0.0
+        expired_carryforward = {}
+        if current_year is not None:
+            for creation_year in list(carryforward_remaining_by_creation_year.keys()):
+                years_since_creation = current_year - creation_year
+                amount = carryforward_remaining_by_creation_year[creation_year]
+
+                if years_since_creation >= CHARITABLE_CARRYFORWARD_YEARS:
+                    expired_carryforward[creation_year] = amount
+                    expired_amount += amount
+                    del carryforward_remaining_by_creation_year[creation_year]
+
+        # Calculate total carryforward: existing carryforward + unused current year donations
+        unused_current_year_donations = stock_donations - current_year_used
+        stock_carryforward = sum(carryforward_remaining_by_creation_year.values()) + unused_current_year_donations
 
         return CharitableDeductionResult(
             cash_deduction_used=cash_used,
@@ -433,7 +529,10 @@ class AnnualTaxCalculator:
             total_deduction_used=cash_used + stock_used,
             cash_carryforward=cash_carryforward,
             stock_carryforward=stock_carryforward,
-            total_carryforward=cash_carryforward + stock_carryforward
+            total_carryforward=cash_carryforward + stock_carryforward,
+            carryforward_consumed_by_creation_year=carryforward_consumed_by_creation_year,
+            carryforward_remaining_by_creation_year=carryforward_remaining_by_creation_year,
+            expired_carryforward=expired_amount
         )
 
     def _calculate_federal_tax(

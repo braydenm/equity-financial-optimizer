@@ -126,11 +126,13 @@ class CharitableDeductionState:
     federal_current_year_deduction: float = 0.0
     federal_carryforward_remaining: Dict[int, float] = field(default_factory=dict)  # year -> amount
     federal_total_available: float = 0.0
+    federal_expired_this_year: float = 0.0  # Amount that expired this year (lost tax benefit)
 
     # California charitable deductions
     ca_current_year_deduction: float = 0.0
     ca_carryforward_remaining: Dict[int, float] = field(default_factory=dict)  # year -> amount
     ca_total_available: float = 0.0
+    ca_expired_this_year: float = 0.0      # Amount that expired this year (lost tax benefit)
 
 
 

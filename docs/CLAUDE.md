@@ -112,8 +112,6 @@ equity-financial-optimizer/
 1. **calculators/annual_tax_calculator.py** - Core tax engine showing component aggregation and bracket calculations
 2. **projections/projection_calculator.py** - Multi-year scenario evaluation demonstrating the event processing pipeline
 3. **engine/portfolio_manager.py** - Scenario execution orchestration showing how everything ties together
-4. **tests/test_charitable_deduction_limits.py** - Example of comprehensive testing approach with basis election tests
-5. **scenarios/demo/004_basis_election_example.json** - Example scenario showing tax election configuration
 
 ## Architecture Documentation
 - TECHNICAL_ARCHITECTURE.md - System design and data flow
@@ -127,8 +125,8 @@ equity-financial-optimizer/
 **Project Status**
 Production-ready core with comprehensive test coverage and complete federal vs state tax separation.
 Main calculators operational, handling complex scenarios including tender offers, ISO exercises,
-charitable donations with basis elections, and multi-year projections. Federal and California
-charitable deductions now properly tracked separately with accurate carryforward management.
+charitable donations with basis elections, and multi-year projections, and Federal and California
+charitable deductions and carryforward management.
 Some initial user scenarios ready with further exploration necessary to find optimal action strategy for specific user goals.
 
 ### Project History
@@ -146,8 +144,8 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
 - Annual tax detail CSV federal/state tax columns populated with placeholder values - requires TaxState architectural changes for proper separation
-
 - Annual tax detail CSV missing federal/state breakdown fields - all showing 0 when they should have values from TaxState
+- ~~Charitable deduction carryforward expiration timing~~ (FIXED - now correctly expires at end of year 5)
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
@@ -226,11 +224,9 @@ See CHANGELOG.md for complete feature history and implementation details.
 **Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
 
 ### E2E Testing Plan for Critical Financial Pathways
-**Context**: The AMT credit carryforward bug revealed a critical gap - multi-year state management wasn't properly tested. This could affect other financial calculations with similar patterns. We've already discovered a CRITICAL bug in charitable deduction carryforward where AGI limits are ignored!
-
 **High-Risk Areas Requiring E2E Tests:**
 
-1. **Pledge Obligation & Company Match Tracking** (CRITICAL)
+**Pledge Obligation & Company Match Tracking** (CRITICAL)
    - Risk: 3-year match window, company match not tracked, lost opportunities
    - Impact: Understated charitable impact, missed match deadlines, incorrect scenario comparison
    - Test Scenarios:
@@ -248,7 +244,7 @@ See CHANGELOG.md for complete feature history and implementation details.
      * Verify CSV outputs show personal vs total impact
    - Validation: Ensure company match aggregates correctly across years
 
-3. **ISO Disqualifying Disposition** (HIGH)
+**ISO Disqualifying Disposition** (HIGH)
    - Risk: Complex date calculations (exercise + 2yr AND grant + 1yr)
    - Impact: Wrong tax treatment (ordinary income vs LTCG)
    - Test Scenarios:
@@ -258,7 +254,7 @@ See CHANGELOG.md for complete feature history and implementation details.
      * Edge case: Exactly 365 vs 366 days
    - Validation: Compare tax treatment against IRS Publication 525
 
-4. **Cash Flow Viability** (CRITICAL)
+**Cash Flow Viability** (CRITICAL)
    - Risk: Strategies requiring negative cash
    - Impact: Impossible-to-execute strategies
    - Test Scenarios:
@@ -268,7 +264,7 @@ See CHANGELOG.md for complete feature history and implementation details.
      * Sequence of actions depleting cash mid-year
    - Implementation: Add cash_flow_valid flag and warnings
 
-5. **NSO Withholding Reconciliation** (MEDIUM)
+**NSO Withholding Reconciliation** (MEDIUM)
    - Risk: Withholding ≠ actual tax owed
    - Impact: Surprise tax bills or phantom refunds
    - Test Scenarios:
@@ -282,65 +278,13 @@ See CHANGELOG.md for complete feature history and implementation details.
 2. **Then**: ISO disposition and cash flow validation tests
 3. **Later**: NSO withholding reconciliation tests
 
-**Test Structure Template:**
-```python
-def test_[pathway]_e2e():
-    # 1. Setup multi-year scenario
-    # 2. Execute projection
-    # 3. Validate year 1 state
-    # 4. Validate carryforward to year 2
-    # 5. Check edge cases
-    # 6. Assert against hand calculations
-```
-
-### Raw Data Table - Residual Work
-
-**Residual Work** (from original 5-table plan):
-1. **EQUITY POSITION table** (→ equity_holdings.csv) was not implemented
-2. **Column name validation** - Ensure terminal headers exactly match CSV headers
 
 ### TODO Burndown Plan - Structured Groups
-
-**Current State: 9 TODOs Remaining** (Groups A1, A2, and federal/state persistence completed)
-
-#### Group B: User Experience & Configuration (4 TODOs)
-*Priority: MEDIUM - Scenario realism and flexibility*
-
-**B1. User-Configurable Parameters:**
-- Investment return rate hardcoded at 7%, should be user specified (via an extension of input_data/market_assemptions/price_scenarios.json)
-- Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
-
-**B2. Market Intelligence:**
-- Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
-
-**Rationale**: Enable realistic scenario modeling with user control
-**Impact**: Medium-High - Strategy accuracy
-
-#### Group C: Code Quality & Robustness (4 TODOs)
-*Priority: LOWER - Technical debt cleanup*
-
-**C1. Profile Loading Cleanup:**
-- Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
-- Profile loading redundancy - loading profile twice in natural_evolution_generator.py
-- Use regular profile loader and delete simplified version (natural_evolution_generator.py)
-
-**C2. Documentation & Edge Cases:**
-- Improve documentation for basis election logic (projection_calculator.py)
-- Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
-- Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
-
-**Rationale**: Improve maintainability and prevent edge case failures
-**Impact**: Low-Medium - Developer experience
 
 ### Additional Improvements Identified
 - **Search codebase systematically for other hardcoded tax values** that should be in tax_constants.py (comprehensive audit needed)
 - **TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting
-- **CA AMT credit tracking** when real use cases emerge requiring state-specific AMT credit carryforward
-
-### Implementation Priorities
-- **High Priority**: Group B - User experience & configuration (scenario realism)
-- **Medium Priority**: Group C - Code quality & robustness (technical debt cleanup)
-- **Ongoing**: E2E testing for pledge obligations and cash flow validation
+- **CA AMT credit tracking** postpone until when real use cases emerge requiring state-specific AMT credit carryforward
 
 ### CSV Output Improvements Plan
 
@@ -349,8 +293,6 @@ def test_[pathway]_e2e():
 - **Add field**: `current_share_price` - FMV at action time (not just strike price)
 - **Add field**: `lot_options_remaining` - for unexercised options after this action
 - **Add field**: `lot_shares_remaining` - for exercised shares after this action
-
-
 
 #### annual_summary.csv Improvements:
 - **Add field**: `shares_exercised_count` - quantity of shares exercised this year
@@ -378,7 +320,7 @@ def test_[pathway]_e2e():
 #TaxState Planning
 ## Recommendations for TaxState Enhancement
 
-Based on the usage patterns I found, here's a minimal but effective enhancement to `TaxState`:
+Here's a minimal but effective enhancement to `TaxState`:
 
 ```python
 @dataclass

@@ -367,9 +367,9 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
         fieldnames = [
             'year', 'cash_donations', 'stock_donations', 'agi',
             'federal_cash_limit', 'federal_stock_limit', 'federal_cash_used', 'federal_stock_used',
-            'federal_cash_carryforward', 'federal_stock_carryforward',
+            'federal_cash_carryforward', 'federal_stock_carryforward', 'federal_expired_this_year',
             'ca_cash_limit', 'ca_stock_limit', 'ca_cash_used', 'ca_stock_used',
-            'ca_cash_carryforward', 'ca_stock_carryforward',
+            'ca_cash_carryforward', 'ca_stock_carryforward', 'ca_expired_this_year',
             'carryforward_expiration_year', 'basis_election', 'stock_deduction_type'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -506,12 +506,14 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 'federal_stock_used': round(federal_stock_used, 2),
                 'federal_cash_carryforward': round(federal_cash_carryforward, 2),
                 'federal_stock_carryforward': round(federal_stock_carryforward, 2),
+                'federal_expired_this_year': round(state.charitable_state.federal_expired_this_year, 2),
                 'ca_cash_limit': round(ca_cash_limit, 2),
                 'ca_stock_limit': round(ca_stock_limit, 2),
                 'ca_cash_used': round(ca_cash_used, 2),
                 'ca_stock_used': round(ca_stock_used, 2),
                 'ca_cash_carryforward': round(ca_cash_carryforward, 2),
                 'ca_stock_carryforward': round(ca_stock_carryforward, 2),
+                'ca_expired_this_year': round(state.charitable_state.ca_expired_this_year, 2),
                 'carryforward_expiration_year': carryforward_expiration,
                 'basis_election': basis_election,
                 'stock_deduction_type': 'basis' if basis_election else 'fmv'

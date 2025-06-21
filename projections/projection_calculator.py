@@ -33,7 +33,8 @@ from calculators.tax_constants import (
     FEDERAL_SUPPLEMENTAL_WITHHOLDING_RATE,
     CALIFORNIA_SUPPLEMENTAL_WITHHOLDING_RATE,
     MEDICARE_RATE,
-    CALIFORNIA_SDI_RATE
+    CALIFORNIA_SDI_RATE,
+    CHARITABLE_CARRYFORWARD_YEARS
 )
 from calculators.components import (
     ISOExerciseComponents,
@@ -79,8 +80,8 @@ class ProjectionCalculator:
         # Initialize carryforward states
         # AMT credits from profile apply to the first projection year
         amt_credits_remaining = self.profile.amt_credit_carryforward
-        federal_charitable_carryforward = {}  # year -> amount (federal)
-        ca_charitable_carryforward = {}  # year -> amount (California)
+        federal_charitable_carryforward = {}  # year -> {creation_year: amount} (federal)
+        ca_charitable_carryforward = {}  # year -> {creation_year: amount} (California)
         pledge_state = PledgeState()
         cumulative_shares_sold = {}  # Track cumulative sales across years
         cumulative_shares_donated = {}  # Track cumulative donations across years
@@ -186,9 +187,14 @@ class ProjectionCalculator:
             if 'charitable_basis_election_years' in plan.tax_elections:
                 elect_basis = year in plan.tax_elections['charitable_basis_election_years']
 
-            # Extract charitable carryforwards for current year (federal and state)
-            federal_current_year_carryforward = federal_charitable_carryforward.get(year, 0.0)
-            ca_current_year_carryforward = ca_charitable_carryforward.get(year, 0.0)
+            # Extract current year carryforward by creation year for FIFO (no expiration - let annual tax calculator handle that)
+
+            federal_carryforward_by_creation_year_current = self._extract_current_year_carryforward(
+                federal_charitable_carryforward, year
+            )
+            ca_carryforward_by_creation_year_current = self._extract_current_year_carryforward(
+                ca_charitable_carryforward, year
+            )
 
             tax_result = self.annual_tax_calculator.calculate_annual_tax(
                 year=year,
@@ -201,8 +207,8 @@ class ProjectionCalculator:
                 sale_components=annual_components.sale_components,
                 donation_components=annual_components.donation_components,
                 existing_amt_credit=amt_credits_remaining,
-                carryforward_stock_deduction=federal_current_year_carryforward,
-                ca_carryforward_stock_deduction=ca_current_year_carryforward,
+                carryforward_stock_by_creation_year=federal_carryforward_by_creation_year_current,
+                ca_carryforward_stock_by_creation_year=ca_carryforward_by_creation_year_current,
                 elect_basis_deduction=elect_basis
             )
 
@@ -228,29 +234,66 @@ class ProjectionCalculator:
                            - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
 
-            # Update charitable carryforward tracking with new carryforward amounts (federal and state)
-            federal_new_carryforward = tax_result.charitable_deduction_result.total_carryforward
-            ca_new_carryforward = tax_result.ca_charitable_deduction_result.total_carryforward
+            # Use FIFO-compliant carryforward propagation from annual tax calculator results
+            # The annual tax calculator now returns detailed consumption by creation year
 
-            if federal_new_carryforward > 0:
-                # Add federal carryforward for next year
+            # Propagate federal carryforward using FIFO consumption results
+            federal_remaining_by_creation_year = tax_result.charitable_deduction_result.carryforward_remaining_by_creation_year
+
+            if federal_remaining_by_creation_year:
                 next_year = year + 1
-                federal_charitable_carryforward[next_year] = federal_charitable_carryforward.get(next_year, 0) + federal_new_carryforward
+                if next_year not in federal_charitable_carryforward:
+                    federal_charitable_carryforward[next_year] = {}
+                # Propagate remaining amounts by creation year
+                for creation_year, remaining_amount in federal_remaining_by_creation_year.items():
+                    if remaining_amount > 0:
+                        federal_charitable_carryforward[next_year][creation_year] = remaining_amount
 
-            if ca_new_carryforward > 0:
-                # Add California carryforward for next year
+            # Add new carryforward from current year donations (if any)
+            federal_new_carryforward = tax_result.charitable_deduction_result.total_carryforward - sum(federal_remaining_by_creation_year.values())
+
+            if federal_new_carryforward > 0 and year_donation_value > 0:
                 next_year = year + 1
-                ca_charitable_carryforward[next_year] = ca_charitable_carryforward.get(next_year, 0) + ca_new_carryforward
+                if next_year not in federal_charitable_carryforward:
+                    federal_charitable_carryforward[next_year] = {}
+                federal_charitable_carryforward[next_year][year] = federal_new_carryforward
 
-            # Remove current year carryforwards since they've been used
+            # Propagate California carryforward using FIFO consumption results
+            ca_remaining_by_creation_year = tax_result.ca_charitable_deduction_result.carryforward_remaining_by_creation_year
+
+            if ca_remaining_by_creation_year:
+                next_year = year + 1
+                if next_year not in ca_charitable_carryforward:
+                    ca_charitable_carryforward[next_year] = {}
+                # Propagate remaining amounts by creation year
+                for creation_year, remaining_amount in ca_remaining_by_creation_year.items():
+                    if remaining_amount > 0:
+                        ca_charitable_carryforward[next_year][creation_year] = remaining_amount
+
+            # Add new carryforward from current year donations (if any)
+            ca_new_carryforward = tax_result.ca_charitable_deduction_result.total_carryforward - sum(ca_remaining_by_creation_year.values())
+
+            if ca_new_carryforward > 0 and year_donation_value > 0:
+                next_year = year + 1
+                if next_year not in ca_charitable_carryforward:
+                    ca_charitable_carryforward[next_year] = {}
+                ca_charitable_carryforward[next_year][year] = ca_new_carryforward
+
+            # Remove current year carryforwards since they've been processed
             if year in federal_charitable_carryforward:
                 del federal_charitable_carryforward[year]
             if year in ca_charitable_carryforward:
                 del ca_charitable_carryforward[year]
 
+            # Use expiration amounts from tax calculator (single source of truth)
+            federal_expired = tax_result.charitable_deduction_result.expired_carryforward
+            ca_expired = tax_result.ca_charitable_deduction_result.expired_carryforward
+
+
             # Calculate charitable deduction state using AGI-limited amounts from tax calculation (federal and state)
             charitable_state = self._calculate_charitable_state(
-                year_donation_value, federal_charitable_carryforward, ca_charitable_carryforward, year, tax_result
+                year_donation_value, federal_charitable_carryforward, ca_charitable_carryforward,
+                year, tax_result, federal_expired, ca_expired
             )
 
             # Pledge state is already maintained and updated throughout the year
@@ -519,26 +562,60 @@ class ProjectionCalculator:
         }
 
     def _calculate_charitable_state(self, year_donation: float,
-                                  federal_carryforward: Dict[int, float],
-                                  ca_carryforward: Dict[int, float],
+                                  federal_carryforward: Dict[int, Dict[int, float]],
+                                  ca_carryforward: Dict[int, Dict[int, float]],
                                   year: int,
-                                  tax_result) -> CharitableDeductionState:
+                                  tax_result,
+                                  federal_expired: float = 0.0,
+                                  ca_expired: float = 0.0) -> CharitableDeductionState:
         """Calculate charitable deduction state with carryforward using AGI-limited amounts for both federal and state."""
         # Use the AGI-limited deduction amounts from the tax calculation results
         # for both federal and California to properly respect their different AGI limits
         federal_agi_limited_deduction = tax_result.charitable_deduction_result.total_deduction_used
         ca_agi_limited_deduction = tax_result.ca_charitable_deduction_result.total_deduction_used
 
-        # The carryforward tracking is already handled in the main projection loop
-        # We just need to return the current state with both federal and state data
+        # Convert carryforward structure for display (flatten creation year tracking)
+        federal_remaining_flat = {}
+        for future_year, creation_dict in federal_carryforward.items():
+            federal_remaining_flat[future_year] = sum(creation_dict.values())
+
+        ca_remaining_flat = {}
+        for future_year, creation_dict in ca_carryforward.items():
+            ca_remaining_flat[future_year] = sum(creation_dict.values())
+
         return CharitableDeductionState(
             federal_current_year_deduction=federal_agi_limited_deduction,
-            federal_carryforward_remaining=federal_carryforward.copy(),
-            federal_total_available=federal_agi_limited_deduction + sum(federal_carryforward.values()),
+            federal_carryforward_remaining=federal_remaining_flat,
+            federal_total_available=federal_agi_limited_deduction + sum(federal_remaining_flat.values()),
+            federal_expired_this_year=federal_expired,
             ca_current_year_deduction=ca_agi_limited_deduction,
-            ca_carryforward_remaining=ca_carryforward.copy(),
-            ca_total_available=ca_agi_limited_deduction + sum(ca_carryforward.values())
+            ca_carryforward_remaining=ca_remaining_flat,
+            ca_total_available=ca_agi_limited_deduction + sum(ca_remaining_flat.values()),
+            ca_expired_this_year=ca_expired
         )
+
+    def _extract_current_year_carryforward(self, carryforward_dict: Dict[int, Dict[int, float]],
+                                         current_year: int) -> Dict[int, float]:
+        """
+        Extract current year carryforward by creation year for FIFO processing.
+
+        No expiration logic - the Annual Tax Calculator handles all expiration as the single source of truth.
+
+        Args:
+            carryforward_dict: Dictionary mapping year -> {creation_year: amount}
+            current_year: Current tax year
+
+        Returns:
+            Dict[int, float]: current_year_carryforward_by_creation_year
+        """
+        current_year_carryforward_by_creation_year = {}
+
+        if current_year in carryforward_dict:
+            creation_year_dict = carryforward_dict[current_year]
+            # Return all carryforwards by creation year - let annual tax calculator handle expiration
+            current_year_carryforward_by_creation_year = creation_year_dict.copy()
+
+        return current_year_carryforward_by_creation_year
 
     def _calculate_pledge_state(self, pledge_state: PledgeState, year: int) -> PledgeState:
         """Return the current pledge state (no calculation needed as it's maintained throughout)."""
