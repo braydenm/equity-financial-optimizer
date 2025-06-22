@@ -143,12 +143,14 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Known Issues
 
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
-- Annual tax detail CSV federal/state tax columns populated with placeholder values - requires TaxState architectural changes for proper separation
-- Annual tax detail CSV missing federal/state breakdown fields - all showing 0 when they should have values from TaxState
+- ~~Annual tax detail CSV federal/state tax columns populated with placeholder values~~ (FIXED - TaxState enhanced with separate federal/state tracking)
+- ~~Annual tax detail CSV missing federal/state breakdown fields~~ (FIXED - now shows real values from enhanced TaxState)
 - ~~Charitable deduction carryforward expiration timing~~ (FIXED - now correctly expires at end of year 5)
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
+
+**Note**: Runtime validation system now prevents duplicate exercise actions - scenarios are validated before execution to catch planning errors early with clear error messages.
 - Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
 - Profile loading redundancy - loading profile twice in natural_evolution_generator.py
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
@@ -283,7 +285,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 ### Additional Improvements Identified
 - **Search codebase systematically for other hardcoded tax values** that should be in tax_constants.py (comprehensive audit needed)
-- **TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting
+- ~~**TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting~~ (COMPLETED - TaxState enhanced with separate federal/state tax components)
 - **CA AMT credit tracking** postpone until when real use cases emerge requiring state-specific AMT credit carryforward
 
 ### CSV Output Improvements Plan
@@ -306,10 +308,14 @@ See CHANGELOG.md for complete feature history and implementation details.
 - **Rename field**: `ending_investments` → `crypto_plus_growth` for clarity
 - **Add field**: `company_match_received` - the 3:1 match amount received this year
 
+#### charitable_carryforward.csv Enhancements:
+- ~~**Add field**: `total_federal_deduction` - shows actual federal deduction used per year~~ (COMPLETED - shows combined cash + stock federal deduction)
+- ~~**Add field**: `federal_stock_carryforward_remaining_by_year` - dictionary showing carryforward by creation year~~ (COMPLETED - enables tracking of remaining carryforward amounts by year of origin)
+
 #### annual_tax_detail.csv Fixes:
-- **Fix implementation**: `federal_regular_tax`, `federal_amt_tax`, `ca_regular_tax`, `ca_amt_tax` all showing 0
-- **Root cause**: Need to extract these values from TaxState object after annual tax calculation
-- **Note**: May require TaxState architectural enhancement to properly separate federal/state components
+- ~~**Fix implementation**: `federal_regular_tax`, `federal_amt_tax`, `ca_regular_tax`, `ca_amt_tax` all showing 0~~ (FIXED - enhanced TaxState with separate federal/state tracking)
+- ~~**Root cause**: Need to extract these values from TaxState object after annual tax calculation~~ (FIXED - projection_calculator now populates separate federal/state components)
+- ~~**Note**: May require TaxState architectural enhancement to properly separate federal/state components~~ (COMPLETED - TaxState enhanced with federal_regular_tax, federal_amt_tax, ca_regular_tax, ca_amt_tax fields)
 
 #### tax_component_breakdown.csv Context:
 - **Purpose**: Shows tax implications of each income component (ISO/NSO exercises, STCG/LTCG, W2)

@@ -161,6 +161,8 @@ class PortfolioManager:
             supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
             quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
             taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
+            crypto=financial['liquid_assets'].get('crypto', 0),
+            real_estate_equity=financial['illiquid_assets'].get('real_estate_equity', 0),
             amt_credit_carryforward=carryforwards.get('amt_credit', 0)
         )
 

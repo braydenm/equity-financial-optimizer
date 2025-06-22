@@ -38,6 +38,12 @@ def print_scenario_results(result, detailed=True):
     print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
     print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
 
+    # Calculate total federal charitable carryforward
+    total_federal_carryforward = 0
+    if final_state and hasattr(final_state, 'charitable_state') and final_state.charitable_state:
+        total_federal_carryforward = sum(final_state.charitable_state.federal_carryforward_remaining.values())
+    print(f"  📝 Charitable Carryforward (Federal): ${total_federal_carryforward:,.0f}")
+
     if detailed and final_state:
         # Equity position details
         vested_unexercised = sum(lot.quantity for lot in final_state.equity_holdings
@@ -61,7 +67,7 @@ def print_scenario_results(result, detailed=True):
             print(f"  📊 Average Loss per Share: ${total_opportunity_cost/total_expired_shares:.2f}")
 
             for detail in expiration_details:
-                print(f"  🔥 {detail['year']}: {detail['quantity']:,} shares expired - LOST ${detail['opportunity_cost']:,.0f} (${detail['per_share_loss']:.2f}/share)")
+                print(f"  🔥 {detail['year']}: Lot {detail['lot_id']} - {detail['quantity']:,} shares expired - LOST ${detail['opportunity_cost']:,.0f} (${detail['per_share_loss']:.2f}/share)")
 
             print(f"  ⚡ Consider exercising valuable vested options before expiration!")
 
@@ -100,6 +106,58 @@ def print_scenario_results(result, detailed=True):
             print(f"  {state.year:<6} ${total_income:>9,.0f} ${expenses:>9,.0f} ${exercise_costs:>9,.0f} "
                   f"${sale_proceeds:>9,.0f} ${net_tax:>9,.0f} ${donations:>9,.0f} ${net_flow:>9,.0f} {eff_tax_rate:>8.1f}%")
 
+        # Tax breakdown by major components (like Schedule K-1)
+        print(f"\nTAX BREAKDOWN BY MAJOR COMPONENTS:")
+        print(f"  {'Year':<6} {'W2 Income':>12} {'Spouse Inc':>12} {'NSO Ord':>12} {'STCG':>12} {'LTCG':>12} {'ISO AMT':>12} {'Reg Tax':>12} {'AMT Tax':>12} {'Total Tax':>12}")
+        print(f"  {'-'*120}")
+        for state in result.yearly_states:
+            # Extract component details from annual tax components or use state values
+            w2_income = state.income
+            spouse_income = state.spouse_income if hasattr(state, 'spouse_income') else 0
+
+            nso_ordinary = 0
+            stcg = 0
+            ltcg = 0
+            iso_bargain = 0
+
+            if state.annual_tax_components:
+                # Extract from exercise components
+                if hasattr(state.annual_tax_components, 'exercise_components'):
+                    for comp in state.annual_tax_components.exercise_components:
+                        if hasattr(comp, 'ordinary_income'):
+                            nso_ordinary += comp.ordinary_income
+                        if hasattr(comp, 'amt_adjustment'):
+                            iso_bargain += comp.amt_adjustment
+
+                # Extract from sale components
+                if hasattr(state.annual_tax_components, 'sale_components'):
+                    for comp in state.annual_tax_components.sale_components:
+                        if hasattr(comp, 'short_term_gain'):
+                            stcg += comp.short_term_gain
+                        if hasattr(comp, 'long_term_gain'):
+                            ltcg += comp.long_term_gain
+
+            # Get tax calculations from tax state
+            regular_tax = 0
+            amt_tax = 0
+            total_tax = 0
+
+            if hasattr(state, 'tax_state') and state.tax_state:
+                total_tax = state.tax_state.total_tax
+                # Try to get regular vs AMT breakdown if available
+                if hasattr(state.tax_state, 'federal_regular_tax'):
+                    regular_tax = state.tax_state.federal_regular_tax + (state.tax_state.ca_regular_tax if hasattr(state.tax_state, 'ca_regular_tax') else 0)
+                if hasattr(state.tax_state, 'federal_amt_tax'):
+                    amt_tax = state.tax_state.federal_amt_tax + (state.tax_state.ca_amt_tax if hasattr(state.tax_state, 'ca_amt_tax') else 0)
+
+                # If we don't have the breakdown, show total in regular tax column
+                if regular_tax == 0 and amt_tax == 0:
+                    regular_tax = total_tax
+
+            print(f"  {state.year:<6} ${w2_income:>11,.0f} ${spouse_income:>11,.0f} ${nso_ordinary:>11,.0f} "
+                  f"${stcg:>11,.0f} ${ltcg:>11,.0f} ${iso_bargain:>11,.0f} ${regular_tax:>11,.0f} "
+                  f"${amt_tax:>11,.0f} ${total_tax:>11,.0f}")
+
         # Cash flow waterfall
         print(f"\nCASH FLOW WATERFALL:")
         print(f"  {'Year':<6} {'Start Cash':>12} {'+ Income':>12} {'+ Sales':>12} {'- Expenses':>12} {'- Exercise':>12} {'- Tax':>12} {'= End Cash':>12}")
@@ -118,45 +176,67 @@ def print_scenario_results(result, detailed=True):
                   f"${sale_proceeds:>11,.0f} ${expenses:>11,.0f} ${state.exercise_costs:>11,.0f} "
                   f"${state.tax_paid:>11,.0f} ${state.ending_cash:>11,.0f}")
 
-        # Investment tracking
+        # Investment tracking with equity details
         if any(hasattr(state, 'investment_balance') and state.investment_balance > 0 for state in result.yearly_states):
             print(f"\nINVESTMENT TRACKING:")
-            print(f"  {'Year':<6} {'Balance':>12} {'Growth':>12} {'Total Return':>12}")
-            print(f"  {'-'*48}")
+            print(f"  {'Year':<6} {'Price/Share':>12} {'Shares Held':>12} {'Equity Value':>12} {'Other Invst':>12} {'Total Port':>12} {'Equity %':>12}")
+            print(f"  {'-'*84}")
             initial_investments = result.user_profile.taxable_investments
             for i, state in enumerate(result.yearly_states):
-                balance = state.investment_balance if hasattr(state, 'investment_balance') else 0
-                if i == 0:
-                    growth = balance - initial_investments
-                else:
-                    prev_balance = result.yearly_states[i-1].investment_balance if hasattr(result.yearly_states[i-1], 'investment_balance') else 0
-                    growth = balance - prev_balance
-                total_return = ((balance / initial_investments - 1) * 100) if initial_investments > 0 else 0
-                print(f"  {state.year:<6} ${balance:>11,.0f} ${growth:>11,.0f} {total_return:>11.1f}%")
+                # Get price per share from projections
+                share_price = result.plan.price_projections.get(state.year, 0)
+
+                # Calculate held shares
+                held_shares = sum(lot.quantity for lot in state.equity_holdings
+                                if lot.lifecycle_state.value in ['exercised_not_disposed', 'vested_not_exercised'])
+
+                # Calculate equity value
+                equity_value = state.total_equity_value
+
+                # Other investments (taxable investments + crypto + real estate)
+                taxable_investments = state.investment_balance if hasattr(state, 'investment_balance') else 0
+                crypto = result.user_profile.crypto if hasattr(result.user_profile, 'crypto') else 0
+                real_estate = result.user_profile.real_estate_equity if hasattr(result.user_profile, 'real_estate_equity') else 0
+                other_investments = taxable_investments + crypto + real_estate
+
+                # Total portfolio value
+                total_portfolio = equity_value + other_investments
+
+                # Equity percentage of total portfolio
+                equity_percentage = (equity_value / total_portfolio * 100) if total_portfolio > 0 else 0
+
+                print(f"  {state.year:<6} ${share_price:>11.2f} {held_shares:>11,} ${equity_value:>11,.0f} "
+                      f"${other_investments:>11,.0f} ${total_portfolio:>11,.0f} {equity_percentage:>11.1f}%")
 
         # Assets breakdown table
         print(f"\nASSETS BREAKDOWN:")
-        print(f"  {'Year':<6} {'Cash':>12} {'Investments':>12} {'Equity':>12} {'Total NW':>12} {'YoY Growth':>12}")
-        print(f"  {'-'*78}")
+        print(f"  {'Year':<6} {'Cash':>12} {'Investments':>12} {'Equity':>12} {'Crypto':>12} {'Real Estate':>12} {'Total NW':>12} {'YoY Growth':>12}")
+        print(f"  {'-'*102}")
         prev_net_worth = 0
         for i, state in enumerate(result.yearly_states):
             cash = state.ending_cash
             investments = state.investment_balance if hasattr(state, 'investment_balance') else 0
             equity = state.total_equity_value
-            net_worth = state.total_net_worth
+
+            # Add crypto and real estate from user profile (these don't change in current model)
+            crypto = result.user_profile.crypto if hasattr(result.user_profile, 'crypto') else 0
+            real_estate = result.user_profile.real_estate_equity if hasattr(result.user_profile, 'real_estate_equity') else 0
+
+            # Calculate total net worth including all assets
+            net_worth = cash + investments + equity + crypto + real_estate
 
             if i == 0:
-                # Calculate starting net worth
+                # Calculate starting net worth including all components
                 start_cash = state.starting_cash
                 start_investments = result.user_profile.taxable_investments
                 start_equity = sum(lot.quantity for lot in result.plan.initial_lots
                                  if lot.lifecycle_state.value in ['exercised_not_disposed', 'vested_not_exercised']) * \
                                result.plan.price_projections[state.year]
-                prev_net_worth = start_cash + start_investments + start_equity
+                prev_net_worth = start_cash + start_investments + start_equity + crypto + real_estate
 
             yoy_growth = ((net_worth / prev_net_worth - 1) * 100) if prev_net_worth > 0 else 0
             print(f"  {state.year:<6} ${cash:>11,.0f} ${investments:>11,.0f} "
-                  f"${equity:>11,.0f} ${net_worth:>11,.0f} {yoy_growth:>11.1f}%")
+                  f"${equity:>11,.0f} ${crypto:>11,.0f} ${real_estate:>11,.0f} ${net_worth:>11,.0f} {yoy_growth:>11.1f}%")
             prev_net_worth = net_worth
 
         # Charitable donations table (only if donations exist)
@@ -243,7 +323,7 @@ def print_raw_data_tables(result):
     print(f"\n{'-'*80}")
     print("ASSETS BREAKDOWN (→ annual_summary.csv)")
     print(f"{'-'*80}")
-    print(f"{'Year':<6} {'Cash':<12} {'Investments':<12} {'Equity':<12} {'Total_NW':<12} {'YoY_Growth':<12}")
+    print(f"{'Year':<6} {'Cash':<12} {'Investments':<12} {'Equity':<12} {'Crypto':<12} {'Real_Estate':<12} {'Total_NW':<12} {'YoY_Growth':<12}")
     print(f"{'-'*80}")
 
     prev_net_worth = 0
@@ -251,10 +331,16 @@ def print_raw_data_tables(result):
         cash = state.ending_cash
         investments = state.investment_balance
         equity = state.total_equity_value
-        total_nw = state.total_net_worth
+
+        # Add crypto and real estate from user profile
+        crypto = result.user_profile.crypto if hasattr(result.user_profile, 'crypto') else 0
+        real_estate = result.user_profile.real_estate_equity if hasattr(result.user_profile, 'real_estate_equity') else 0
+
+        # Calculate total net worth including all assets
+        total_nw = cash + investments + equity + crypto + real_estate
         yoy_growth = ((total_nw - prev_net_worth) / prev_net_worth * 100) if prev_net_worth > 0 else 0
 
-        print(f"{state.year:<6} {cash:<12.0f} {investments:<12.0f} {equity:<12.0f} {total_nw:<12.0f} {yoy_growth:<12.1f}")
+        print(f"{state.year:<6} {cash:<12.0f} {investments:<12.0f} {equity:<12.0f} {crypto:<12.0f} {real_estate:<12.0f} {total_nw:<12.0f} {yoy_growth:<12.1f}")
         prev_net_worth = total_nw
 
     # 4. ACTION SUMMARY TABLE

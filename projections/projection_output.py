@@ -72,10 +72,10 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
                 'short_term_gains': round(stcg, 2),
                 'long_term_gains': round(ltcg, 2),
                 'iso_bargain_element': round(iso_bargain, 2),
-                'federal_regular_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
-                'federal_amt_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
-                'ca_regular_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
-                'ca_amt_tax': 0,  # TODO: TaxState only has combined values, need separate tracking
+                'federal_regular_tax': round(state.tax_state.federal_regular_tax, 2),
+                'federal_amt_tax': round(state.tax_state.federal_amt_tax, 2),
+                'ca_regular_tax': round(state.tax_state.ca_regular_tax, 2),
+                'ca_amt_tax': round(state.tax_state.ca_amt_tax, 2),
                 'total_tax_combined': round(state.tax_state.total_tax, 2),
                 'federal_amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
                 'federal_amt_credits_used': round(state.tax_state.amt_credits_used, 2),
@@ -370,7 +370,8 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             'federal_cash_carryforward', 'federal_stock_carryforward', 'federal_expired_this_year',
             'ca_cash_limit', 'ca_stock_limit', 'ca_cash_used', 'ca_stock_used',
             'ca_cash_carryforward', 'ca_stock_carryforward', 'ca_expired_this_year',
-            'carryforward_expiration_year', 'basis_election', 'stock_deduction_type'
+            'carryforward_expiration_year', 'basis_election', 'stock_deduction_type',
+            'total_federal_deduction', 'federal_stock_carryforward_remaining_by_year'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -495,6 +496,14 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                                   ca_cash_carryforward > 0 or ca_stock_carryforward > 0)
             carryforward_expiration = state.year + 5 if has_any_carryforward else ''
 
+            # Calculate total federal deduction for the year
+            total_federal_deduction = federal_cash_used + federal_stock_used
+
+            # Create remaining carryforward dictionary for federal stock carryforward
+            federal_stock_remaining_dict = {}
+            if hasattr(state, 'charitable_state') and state.charitable_state:
+                federal_stock_remaining_dict = dict(state.charitable_state.federal_carryforward_remaining)
+
             writer.writerow({
                 'year': state.year,
                 'cash_donations': round(cash_donations, 2),
@@ -516,7 +525,9 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 'ca_expired_this_year': round(state.charitable_state.ca_expired_this_year, 2),
                 'carryforward_expiration_year': carryforward_expiration,
                 'basis_election': basis_election,
-                'stock_deduction_type': 'basis' if basis_election else 'fmv'
+                'stock_deduction_type': 'basis' if basis_election else 'fmv',
+                'total_federal_deduction': round(total_federal_deduction, 2),
+                'federal_stock_carryforward_remaining_by_year': str(federal_stock_remaining_dict)
             })
 
 

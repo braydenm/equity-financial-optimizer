@@ -62,6 +62,34 @@ class ProjectionCalculator:
         self.donation_calculator = ShareDonationCalculator()
         self.annual_tax_calculator = AnnualTaxCalculator()
 
+    def _validate_exercise_plan(self, plan: ProjectionPlan) -> None:
+        """
+        Validate that total planned exercises don't exceed lot sizes.
+
+        Args:
+            plan: ProjectionPlan to validate
+
+        Raises:
+            ValueError: If any lot would be over-exercised
+        """
+        # Group exercise actions by lot_id and sum quantities
+        exercise_totals = {}
+        for action in plan.planned_actions:
+            if action.action_type == ActionType.EXERCISE:
+                lot_id = action.lot_id
+                exercise_totals[lot_id] = exercise_totals.get(lot_id, 0) + action.quantity
+
+        # Check against initial lot sizes
+        for lot_id, total_exercise_quantity in exercise_totals.items():
+            # Find the lot in initial_lots
+            lot = next((l for l in plan.initial_lots if l.lot_id == lot_id), None)
+            if not lot:
+                raise ValueError(f"Exercise planned for lot {lot_id} but lot not found in initial position")
+
+            if total_exercise_quantity > lot.quantity:
+                raise ValueError(f"Total planned exercises for lot {lot_id} ({total_exercise_quantity} shares) "
+                               f"exceed lot size ({lot.quantity} shares). Check for duplicate exercise actions.")
+
     def evaluate_projection_plan(self, plan: ProjectionPlan) -> ProjectionResult:
         """
         Evaluate a complete projection plan over multiple years.
@@ -72,6 +100,9 @@ class ProjectionCalculator:
         Returns:
             ProjectionResult with yearly states and summary metrics
         """
+        # Validate the exercise plan before processing
+        self._validate_exercise_plan(plan)
+
         yearly_states = []
         current_lots = deepcopy(plan.initial_lots)
         current_cash = plan.initial_cash
@@ -222,6 +253,12 @@ class ProjectionCalculator:
             year_tax_state.total_tax = tax_result.total_tax
             year_tax_state.amt_credits_generated = tax_result.federal_amt_credit_generated
             year_tax_state.amt_credits_used = tax_result.federal_amt_credit_used
+
+            # Store separate federal/state components for detailed reporting
+            year_tax_state.federal_regular_tax = tax_result.federal_regular_tax
+            year_tax_state.federal_amt_tax = tax_result.federal_amt
+            year_tax_state.ca_regular_tax = tax_result.ca_tax_owed
+            year_tax_state.ca_amt_tax = tax_result.ca_amt
 
             # Update AMT credits for next year
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward

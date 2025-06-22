@@ -118,6 +118,12 @@ class TaxState:
     amt_credits_used: float = 0.0
     amt_credits_remaining: float = 0.0
 
+    # Separate federal/state components for detailed reporting
+    federal_regular_tax: float = 0.0
+    federal_amt_tax: float = 0.0
+    ca_regular_tax: float = 0.0
+    ca_amt_tax: float = 0.0
+
 
 @dataclass
 class CharitableDeductionState:
@@ -466,6 +472,8 @@ class UserProfile:
     # Investment tracking
     taxable_investments: float = 0.0
     investment_return_rate: float = 0.07  # Default 7% annual return #Claude TODO: Plan to move this out to be user specified.
+    crypto: float = 0.0
+    real_estate_equity: float = 0.0
 
     # Tax carryforwards
     amt_credit_carryforward: float = 0.0

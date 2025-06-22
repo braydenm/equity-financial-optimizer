@@ -263,3 +263,29 @@
   - Changed condition from `> 5` to `>= 5` for proper 5-year expiration
   - Updated all related tests to match corrected behavior
 - Verified with comprehensive test suite covering simple, complex, and edge cases
+
+## Runtime Validation System for Scenario Integrity
+- Added comprehensive exercise plan validation in projection_calculator.py to prevent duplicate lot exercises
+- Validates total planned exercises don't exceed lot sizes before processing begins
+- Provides clear error messages identifying specific lots and quantities that exceed limits
+- Prevents confusing "Lot not found" runtime errors by catching planning issues early
+- Educational error messages guide users to check for duplicate exercise actions
+- Eliminates scenario debugging time by validating plan consistency upfront
+
+## Complete Asset Tracking Enhancement
+- Enhanced net worth calculations to include all user assets from profile
+- Added crypto and real_estate_equity fields to UserProfile class for comprehensive tracking
+- Updated portfolio_manager.py to load crypto and real estate values from user profile financial_position
+- Enhanced text output with separate Crypto and Real Estate columns in assets breakdown table
+- Updated investment tracking table to include all non-equity assets for accurate portfolio concentration percentages
+- Raw data tables now include crypto and real_estate columns for complete financial visibility
+- Fixed concentration risk calculations to reflect true diversification across all asset classes
+
+## CSV Output and Tax Reporting Improvements
+- Fixed annual_tax_detail.csv federal/state tax separation by adding dedicated fields to TaxState
+- Added federal_regular_tax, federal_amt_tax, ca_regular_tax, ca_amt_tax tracking in projection_calculator.py
+- Enhanced charitable_carryforward.csv with total_federal_deduction and federal_stock_carryforward_remaining_by_year columns
+- Improved text output with comprehensive tax breakdown table showing major 1065-style components by year
+- Enhanced investment tracking table with per-share price, held shares, total value, and portfolio percentages
+- Added charitable carryforward display to cumulative metrics in text summary
+- Updated lot ID display in expiration warnings for better debugging visibility
