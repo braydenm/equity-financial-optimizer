@@ -32,7 +32,7 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
             'year', 'w2_income', 'spouse_income', 'nso_ordinary_income',
             'short_term_gains', 'long_term_gains', 'iso_bargain_element',
             'federal_regular_tax', 'federal_amt_tax', 'ca_regular_tax', 'ca_amt_tax', 'total_tax_combined',
-            'federal_amt_credits_generated', 'federal_amt_credits_used',
+            'federal_amt_credits_generated', 'federal_amt_credits_used', 'amt_credits_remaining',
             'charitable_deduction_cash', 'charitable_deduction_stock'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -79,6 +79,7 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
                 'total_tax_combined': round(state.tax_state.total_tax, 2),
                 'federal_amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
                 'federal_amt_credits_used': round(state.tax_state.amt_credits_used, 2),
+                'amt_credits_remaining': round(state.tax_state.amt_credits_remaining, 2),
                 'charitable_deduction_cash': round(charitable_cash, 2),
                 'charitable_deduction_stock': round(charitable_stock, 2)
             })

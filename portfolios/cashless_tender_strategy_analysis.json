@@ -1,0 +1,24 @@
+{
+  "name": "Cashless Tender Strategy Analysis",
+  "description": "Comprehensive analysis of cashless tender + ISO reinvestment strategy variants, comparing optimization approaches for pledge fulfillment, AMT credit usage, option expiration prevention, and cash flow management",
+  "scenarios": [
+    "009_updated_comprehensive_strategy",
+    "010_optimized_comprehensive_strategy",
+    "011_no_expiration_strategy",
+    "013_cashless_tender_iso_reinvestment",
+    "014_optimized_cashless_tender_strategy",
+    "015_fully_optimized_strategy"
+  ],
+  "price_scenario": "moderate",
+  "projection_years": 10,
+  "notes": [
+    "This portfolio compares six cashless tender strategy variants:",
+    "1. 009 - Baseline comprehensive strategy with standard timing",
+    "2. 010 - Diversification-focused with aggressive risk reduction",
+    "3. 011 - Zero expiration losses with systematic option capture",
+    "4. 013 - Aggressive reinvestment with execution flaws (demonstrates poor approach)",
+    "5. 014 - Optimized execution addressing all major constraints",
+    "6. 015 - Fully optimized with maximum AMT credit usage and tax smoothing",
+    "Key analysis: Compare execution quality impact on pledge fulfillment, option expiration prevention, and total value creation"
+  ]
+}

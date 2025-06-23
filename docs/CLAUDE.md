@@ -293,6 +293,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 - ~~**Fix implementation**: `federal_regular_tax`, `federal_amt_tax`, `ca_regular_tax`, `ca_amt_tax` all showing 0~~ (FIXED - enhanced TaxState with separate federal/state tracking)
 - ~~**Root cause**: Need to extract these values from TaxState object after annual tax calculation~~ (FIXED - projection_calculator now populates separate federal/state components)
 - ~~**Note**: May require TaxState architectural enhancement to properly separate federal/state components~~ (COMPLETED - TaxState enhanced with federal_regular_tax, federal_amt_tax, ca_regular_tax, ca_amt_tax fields)
+- ~~**Add field**: `amt_credits_remaining` - show unused AMT credit balance for optimization tracking~~ (COMPLETED - added to annual_tax_detail.csv to help minimize unused AMT credits in scenario planning)
 
 #### tax_component_breakdown.csv Context:
 - **Purpose**: Shows tax implications of each income component (ISO/NSO exercises, STCG/LTCG, W2)
