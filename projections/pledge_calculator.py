@@ -50,8 +50,8 @@ class PledgeCalculator:
             ValueError: If pledge_percentage >= 1.0 or other invalid inputs
         """
         # Validate inputs
-        if pledge_percentage >= 1.0:
-            raise ValueError(f"Pledge percentage must be less than 100%, got {pledge_percentage * 100}%")
+        if pledge_percentage > 1.0:
+            raise ValueError(f"Pledge percentage must be less than or equal to 100%, got {pledge_percentage * 100}%")
         if pledge_percentage < 0:
             raise ValueError(f"Pledge percentage cannot be negative, got {pledge_percentage}")
         if shares_sold <= 0:
@@ -77,7 +77,7 @@ class PledgeCalculator:
         return PledgeObligation(
             parent_transaction_id=transaction_id,
             commencement_date=sale_date,
-            deadline_date=deadline,
+            match_window_closes=deadline,
             total_pledge_obligation=obligation_amount,
             donations_made=0.0,
             shares_sold=shares_sold,
@@ -145,16 +145,16 @@ class PledgeCalculator:
     @staticmethod
     def days_until_deadline(obligation: PledgeObligation, as_of_date: date) -> int:
         """
-        Calculate days remaining until pledge deadline.
+        Calculate days remaining until match window closes.
 
         Args:
             obligation: Pledge obligation
             as_of_date: Date to calculate from
 
         Returns:
-            Days until deadline (negative if past deadline)
+            Days until match window closes (negative if past deadline)
         """
-        return (obligation.deadline_date - as_of_date).days
+        return (obligation.match_window_closes - as_of_date).days
 
     @staticmethod
     def validate_donation_strategy(
@@ -179,7 +179,7 @@ class PledgeCalculator:
         if pledge_percentage == 0:
             return True  # No pledge requirement
 
-        if pledge_percentage >= 1:
+        if pledge_percentage > 1:
             return False  # Invalid pledge percentage
 
         # Calculate required donation ratio
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     print(f"Shares sold: {obligation.shares_sold}")
     print(f"Shares required to donate: {obligation.maximalist_shares_required}")
     print(f"Dollar obligation: ${obligation.total_pledge_obligation:,.2f}")
-    print(f"Deadline: {obligation.deadline_date}")
+    print(f"Match window closes: {obligation.match_window_closes}")
 
     # Validate strategies
     print("\nStrategy validation:")

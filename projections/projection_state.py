@@ -148,13 +148,22 @@ class PledgeObligation:
     """Individual pledge obligation tracking from a specific tender/sale event."""
     parent_transaction_id: str  # Unique ID of the sale/tender that created this obligation
     commencement_date: Optional[date] = None  # Date when obligation was created (tender/sale date)
-    deadline_date: Optional[date] = None  # 3-year deadline from commencement
+    match_window_closes: Optional[date] = None  # 3-year match window from commencement
     total_pledge_obligation: float = 0.0  # Total dollar obligation from pledge % of tender/sale proceeds
     donations_made: float = 0.0  # Total donations made toward this specific obligation
     shares_sold: int = 0  # Number of shares tendered/sold that created this obligation
     pledge_percentage: float = 0.5  # Pledge percentage (0.5 = 50%)
     maximalist_shares_donated: int = 0  # Number of shares actually donated toward this obligation
     outstanding_obligation: float = 0.0  # Remaining dollar obligation
+    lost_match_opportunity: float = 0.0  # Forfeited company match value when window closes
+
+    @property
+    def match_eligibility_active(self) -> bool:
+        """Check if company match window is still open."""
+        if not self.match_window_closes:
+            return True  # No window means always eligible
+        from datetime import date
+        return date.today() <= self.match_window_closes
 
     @property
     def maximalist_shares_required(self) -> int:
@@ -207,10 +216,15 @@ class PledgeState:
         """Add a new pledge obligation."""
         self.obligations.append(obligation)
 
-    def discharge_donation(self, donation_amount: float, shares_donated: int = 0) -> None:
-        """Apply donation to obligations in FIFO order."""
+    def discharge_donation(self, donation_amount: float, shares_donated: int = 0, donation_date: Optional[date] = None) -> dict:
+        """Apply donation to obligations in FIFO order, respecting match window eligibility.
+
+        Returns:
+            dict with 'eligible_amount': amount applied to match-eligible obligations
+        """
         remaining_amount = donation_amount
         remaining_shares = shares_donated
+        eligible_match_amount = 0.0
 
         # Sort by commencement date to ensure FIFO discharge
         sorted_obligations = sorted(self.obligations, key=lambda o: o.commencement_date or date.min)
@@ -219,6 +233,11 @@ class PledgeState:
             if remaining_amount <= 0 and remaining_shares <= 0:
                 break
 
+            # Check if match window is still open
+            if (donation_date and obligation.match_window_closes and
+                donation_date > obligation.match_window_closes):
+                continue  # Skip closed match windows
+
             if obligation.outstanding_obligation > 0:
                 # Apply dollar amount
                 applied_amount = min(remaining_amount, obligation.outstanding_obligation)
@@ -226,24 +245,61 @@ class PledgeState:
                 obligation.outstanding_obligation -= applied_amount
                 remaining_amount -= applied_amount
 
+                # Track amount applied to eligible obligation
+                eligible_match_amount += applied_amount
+
                 # Apply shares
                 shares_needed = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
                 applied_shares = min(remaining_shares, shares_needed)
                 obligation.maximalist_shares_donated += applied_shares
                 remaining_shares -= applied_shares
 
+        return {'eligible_amount': eligible_match_amount}
+
     @property
     def total_outstanding_obligation(self) -> float:
         """Total outstanding obligation across all pledges."""
         return sum(obligation.outstanding_obligation for obligation in self.obligations)
 
+    def process_window_closures(self, current_year: int, current_price: float, company_match_ratio: float) -> float:
+        """
+        Process match window closures and calculate lost opportunities.
+
+        Args:
+            current_year: Current year being processed
+            current_price: Current share price for valuation
+            company_match_ratio: Company match ratio (e.g., 3.0 for 3:1)
+
+        Returns:
+            Total lost match opportunity value for this year
+        """
+        from datetime import date
+        current_date = date(current_year, 12, 31)  # End of year processing
+        total_lost_value = 0.0
+
+        for obligation in self.obligations:
+            if (obligation.match_window_closes and
+                current_date > obligation.match_window_closes and
+                obligation.lost_match_opportunity == 0.0):  # Not yet processed
+
+                # Calculate unfulfilled shares
+                unfulfilled_shares = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
+
+                if unfulfilled_shares > 0:
+                    # Calculate lost company match value
+                    lost_value = unfulfilled_shares * current_price * company_match_ratio
+                    obligation.lost_match_opportunity = lost_value
+                    total_lost_value += lost_value
+
+        return total_lost_value
+
     @property
     def next_deadline(self) -> Optional[date]:
-        """Next approaching deadline among unfulfilled obligations."""
-        unfulfilled = [o for o in self.obligations if not o.is_fulfilled and o.deadline_date]
+        """Next approaching match window close among unfulfilled obligations."""
+        unfulfilled = [o for o in self.obligations if not o.is_fulfilled and o.match_window_closes]
         if not unfulfilled:
             return None
-        return min(o.deadline_date for o in unfulfilled)
+        return min(o.match_window_closes for o in unfulfilled)
 
 
 @dataclass
@@ -257,6 +313,7 @@ class YearlyState:
     exercise_costs: float
     tax_paid: float
     donation_value: float
+    company_match_received: float  # Company match amount received this year
     ending_cash: float
 
     # Tax state
@@ -273,6 +330,7 @@ class YearlyState:
     living_expenses: float = 0.0
     investment_income: float = 0.0
     investment_balance: float = 0.0
+    lost_match_opportunities: float = 0.0  # Forfeited company match value from closed windows
 
     # Equity holdings
     equity_holdings: List[ShareLot] = field(default_factory=list)
@@ -380,6 +438,9 @@ class ProjectionResult:
         final_state = self.get_final_state()
         total_taxes = sum(state.tax_state.total_tax for state in self.yearly_states)
         total_donations = sum(state.donation_value for state in self.yearly_states)
+        total_company_match = sum(state.company_match_received for state in self.yearly_states)
+        total_charitable_impact = total_donations + total_company_match
+        total_lost_match_value = sum(state.lost_match_opportunities for state in self.yearly_states)
 
         # Calculate overall pledge fulfillment from individual obligations
         pledge_fulfillment_max = 0.0
@@ -414,6 +475,9 @@ class ProjectionResult:
             'total_cash_final': final_state.ending_cash if final_state else 0,
             'total_taxes_all_years': total_taxes,
             'total_donations_all_years': total_donations,
+            'total_company_match_all_years': total_company_match,
+            'total_charitable_impact': total_charitable_impact,
+            'total_lost_match_value': total_lost_match_value,
             'total_equity_value_final': final_state.total_equity_value if final_state else 0,
             'pledge_fulfillment_maximalist': pledge_fulfillment_max,
             'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,

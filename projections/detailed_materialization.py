@@ -501,6 +501,7 @@ class DetailedMaterializer:
                 'capital_gains': round(year.total_capital_gains, 2),
                 'donations': round(sum(a.donation_value for a in year.actions), 2),
                 'company_match': round(sum(a.company_match for a in year.actions), 2),
+                'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + sum(a.company_match for a in year.actions), 2),
                 'regular_tax': round(year.regular_tax_before_credits, 2),
                 'amt_tax': round(year.amt_tax, 2),
                 'total_tax': round(year.total_tax_liability, 2),

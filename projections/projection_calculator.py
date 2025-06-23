@@ -134,6 +134,7 @@ class ProjectionCalculator:
             year_exercise_costs = 0.0
             year_tax_paid = 0.0
             year_donation_value = 0.0
+            year_company_match = 0.0
 
             # Initialize annual tax components for this year
             annual_components = AnnualTaxComponents(year=year)
@@ -155,6 +156,7 @@ class ProjectionCalculator:
                 exercise_costs=0.0,
                 tax_paid=0.0,
                 donation_value=0.0,
+                company_match_received=0.0,
                 ending_cash=0.0,
                 tax_state=year_tax_state,
                 charitable_state=CharitableDeductionState(),
@@ -205,10 +207,19 @@ class ProjectionCalculator:
                     donation_result = self._process_donation(action, current_lots, annual_components, yearly_state)
                     year_donation_value += donation_result['donation_value']
                     # Apply donation to pledge obligations using FIFO discharge
-                    pledge_state.discharge_donation(
+                    discharge_result = pledge_state.discharge_donation(
                         donation_amount=donation_result['donation_value'],
-                        shares_donated=action.quantity
+                        shares_donated=action.quantity,
+                        donation_date=action.action_date
                     )
+
+                    # Calculate company match based on eligible amount only
+                    eligible_amount = discharge_result.get('eligible_amount', 0.0)
+                    actual_company_match = eligible_amount * self.profile.company_match_ratio
+                    year_company_match += actual_company_match
+
+                    # Update the donation result with actual company match
+                    donation_result['company_match'] = actual_company_match
 
             # Calculate annual tax using aggregated components
             annual_components.aggregate_components()
@@ -344,6 +355,13 @@ class ProjectionCalculator:
                                    if lot.lifecycle_state in [LifecycleState.VESTED_NOT_EXERCISED,
                                                              LifecycleState.EXERCISED_NOT_DISPOSED])
 
+            # Process match window closures and calculate lost opportunities
+            lost_match_value = pledge_state.process_window_closures(
+                current_year=year,
+                current_price=current_price,
+                company_match_ratio=self.profile.company_match_ratio
+            )
+
             # Update yearly state with final values
             yearly_state.exercise_costs = year_exercise_costs
             yearly_state.annual_tax_components = annual_components
@@ -354,6 +372,8 @@ class ProjectionCalculator:
             yearly_state.investment_income = year_investment_income
             yearly_state.investment_balance = current_investments
             yearly_state.donation_value = year_donation_value
+            yearly_state.company_match_received = year_company_match
+            yearly_state.lost_match_opportunities = lost_match_value
             yearly_state.ending_cash = year_end_cash
             yearly_state.charitable_state = charitable_state
             yearly_state.equity_holdings = deepcopy(current_lots)
@@ -558,9 +578,8 @@ class ProjectionCalculator:
         # Calculate donation value (FMV for display purposes)
         donation_value = action.quantity * donation_price
 
-        # Calculate company match (if applicable)
-        # Note: This is a simplified calculation - actual match may have limits
-        company_match_amount = donation_value * self.profile.company_match_ratio
+        # Company match will be calculated after pledge discharge based on eligible amount
+        company_match_amount = 0.0
 
         # Create donation components
         donation_components = DonationComponents(

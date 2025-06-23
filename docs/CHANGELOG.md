@@ -198,6 +198,24 @@
 - Maintained backward compatibility in tax calculations while improving withholding accuracy and cash flow projections
 - Updated `DATA_CONTRACT.md` to reflect new profile structure with rate-based withholding
 
+## Company Match Tracking & Match Window Enforcement
+- Implemented comprehensive company match tracking system with complete visibility into charitable leverage
+- Added company match aggregation across all years with new summary metrics: `total_company_match_all_years`, `total_charitable_impact`, and `match_leverage_ratio`
+- Enhanced `YearlyState` with `company_match_received` field for annual tracking and `lost_match_opportunities` for expired window tracking
+- Replaced "deadline" terminology with "match window" concept for clarity, updating `PledgeObligation` with `match_window_closes` field
+- Implemented strict 3-year match window enforcement preventing donations from receiving company match after window expiration
+- Added match window validation in `discharge_donation()` method with donation date parameter for proper temporal validation
+- Built `process_window_closures()` method to calculate lost match opportunities when windows expire unfulfilled
+- Enhanced company match calculation to only apply to donation amounts actually applied to match-eligible pledge obligations
+- Fixed cash flow calculation to exclude company match from net cash flow since match goes directly to DAF, not user cash
+- Updated comprehensive CSV outputs: added `company_match_received` to `comprehensive_cashflow.csv` and `total_charitable_impact` to `annual_summary.csv`
+- Enhanced `charitable_carryforward.csv` with pledge obligation tracking: `pledge_obligations_unmet`, `cumulative_match_expiries`, and `match_earned` fields
+- Created comprehensive test suite covering 7 complex scenarios plus 3 profile comparison scenarios testing 50% pledge/3:1 match vs 25% pledge/1:1 match configurations
+- Added proper pledge mathematics with `calculate_required_donation_shares()` helper using formula: `shares_donated = (pledge_percentage * shares_sold) / (1 - pledge_percentage)`
+- Implemented FIFO discharge logic for multiple pledge obligations with proper match window eligibility validation
+- Added lost match opportunity calculations valued at current market prices when windows close with unfulfilled obligations
+- Impact: Complete visibility into charitable leverage enables users to maximize hundreds of thousands in additional charitable impact through strategic timing within 3-year match windows
+
 ## Option Expiration Implementation
 - Added `EXPIRED` lifecycle state to LifecycleState enum
 - Added `expiration_date` field to ShareLot model with proper flow from grants
@@ -274,7 +292,7 @@
 
 ## Complete Asset Tracking Enhancement
 - Enhanced net worth calculations to include all user assets from profile
-- Added crypto and real_estate_equity fields to UserProfile class for comprehensive tracking
+- Added other assets and real_estate_equity fields to UserProfile class for comprehensive tracking
 - Updated portfolio_manager.py to load crypto and real estate values from user profile financial_position
 - Enhanced text output with separate Crypto and Real Estate columns in assets breakdown table
 - Updated investment tracking table to include all non-equity assets for accurate portfolio concentration percentages

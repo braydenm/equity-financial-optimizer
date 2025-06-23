@@ -332,7 +332,7 @@ def save_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> N
     with open(output_path, 'w', newline='') as f:
         fieldnames = [
             'obligation_id', 'creation_date', 'source_sale_lot', 'sale_proceeds',
-            'pledge_percentage', 'pledge_amount', 'deadline_date',
+            'pledge_percentage', 'pledge_amount', 'match_window_closes',
             'fulfilled_amount', 'remaining_amount', 'days_until_deadline'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -343,7 +343,7 @@ def save_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> N
 
         # Write all obligations
         for obligation in final_state.pledge_state.obligations:
-            days_until_deadline = (obligation.deadline_date - calc_date).days
+            days_until_deadline = (obligation.match_window_closes - calc_date).days
 
             writer.writerow({
                 'obligation_id': obligation.parent_transaction_id,
@@ -352,7 +352,7 @@ def save_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> N
                 'sale_proceeds': round(obligation.total_pledge_obligation / obligation.pledge_percentage if obligation.pledge_percentage > 0 else 0, 2),
                 'pledge_percentage': round(obligation.pledge_percentage, 4),
                 'pledge_amount': round(obligation.total_pledge_obligation, 2),
-                'deadline_date': obligation.deadline_date.isoformat(),
+                'match_window_closes': obligation.match_window_closes.isoformat(),
                 'fulfilled_amount': round(obligation.donations_made, 2),
                 'remaining_amount': round(obligation.outstanding_obligation, 2),
                 'days_until_deadline': days_until_deadline
@@ -371,7 +371,9 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             'ca_cash_limit', 'ca_stock_limit', 'ca_cash_used', 'ca_stock_used',
             'ca_cash_carryforward', 'ca_stock_carryforward', 'ca_expired_this_year',
             'carryforward_expiration_year', 'basis_election', 'stock_deduction_type',
-            'total_federal_deduction', 'federal_stock_carryforward_remaining_by_year'
+            'total_federal_deduction', 'federal_stock_carryforward_remaining_by_year',
+            'pledge_obligations_unmet', 'cumulative_match_expiries', 'match_earned',
+            'unmatched_donations'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -381,6 +383,9 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
         cumulative_federal_stock_carryforward = {}  # year -> amount
         cumulative_ca_cash_carryforward = {}  # year -> amount
         cumulative_ca_stock_carryforward = {}  # year -> amount
+
+        # Track cumulative match expiries
+        cumulative_match_expiries = 0.0
 
         for state in result.yearly_states:
             # Get AGI for this year
@@ -504,6 +509,39 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             if hasattr(state, 'charitable_state') and state.charitable_state:
                 federal_stock_remaining_dict = dict(state.charitable_state.federal_carryforward_remaining)
 
+            # Calculate pledge obligation tracking
+            pledge_obligations_unmet = 0.0
+            match_earned = 0.0
+
+            if hasattr(state, 'pledge_state') and state.pledge_state:
+                # Calculate unmet obligations that haven't expired (as of end of this year)
+                from datetime import date as date_class
+                year_end = date_class(state.year, 12, 31)
+
+                for obligation in state.pledge_state.obligations:
+                    # Only count obligations where match window is still open
+                    if (obligation.match_window_closes is None or
+                        year_end <= obligation.match_window_closes):
+                        pledge_obligations_unmet += obligation.outstanding_obligation
+
+                # Track lost match opportunities (cumulative)
+                cumulative_match_expiries += state.lost_match_opportunities
+
+            # Company match earned this year
+            if hasattr(state, 'company_match_received'):
+                match_earned = state.company_match_received
+
+            # Calculate unmatched donations (donations that didn't receive company match)
+            total_donations_this_year = cash_donations + stock_donations
+            if match_earned > 0 and hasattr(result, 'user_profile') and result.user_profile.company_match_ratio > 0:
+                # Calculate how much donation value was actually matched
+                # For pledge-based matching, only the amount applied to active obligations gets matched
+                matched_donation_value = match_earned / result.user_profile.company_match_ratio
+                unmatched_donations = max(0, total_donations_this_year - matched_donation_value)
+            else:
+                # No match earned, so all donations were unmatched
+                unmatched_donations = total_donations_this_year
+
             writer.writerow({
                 'year': state.year,
                 'cash_donations': round(cash_donations, 2),
@@ -527,7 +565,11 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                 'basis_election': basis_election,
                 'stock_deduction_type': 'basis' if basis_election else 'fmv',
                 'total_federal_deduction': round(total_federal_deduction, 2),
-                'federal_stock_carryforward_remaining_by_year': str(federal_stock_remaining_dict)
+                'federal_stock_carryforward_remaining_by_year': str(federal_stock_remaining_dict),
+                'pledge_obligations_unmet': round(pledge_obligations_unmet, 2),
+                'cumulative_match_expiries': round(cumulative_match_expiries, 2),
+                'match_earned': round(match_earned, 2),
+                'unmatched_donations': round(unmatched_donations, 2)
             })
 
 
@@ -743,6 +785,7 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
             comp.gross_proceeds
             for comp in state.annual_tax_components.sale_components
         ) if state.annual_tax_components else 0
+        company_match_received = state.company_match_received
 
         # Cash outflows
         exercise_costs = state.exercise_costs
@@ -752,7 +795,7 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
         net_tax_payment = max(0, gross_tax - tax_withholdings)
         donation_value = state.donation_value
 
-        # Net cash flow
+        # Net cash flow (company match goes directly to DAF, not user cash)
         net_cash_flow = (total_income + sale_proceeds - exercise_costs -
                         living_expenses - net_tax_payment)
 
@@ -778,6 +821,7 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
             'total_income': round(total_income, 2),
             # Cash inflows
             'sale_proceeds': round(sale_proceeds, 2),
+            'company_match_received': round(company_match_received, 2),
             # Cash outflows
             'exercise_costs': round(exercise_costs, 2),
             'living_expenses': round(living_expenses, 2),

@@ -215,6 +215,7 @@ class TestOptionExpiration(unittest.TestCase):
             exercise_costs=0,
             tax_paid=0,
             donation_value=0,
+            company_match_received=0,
             ending_cash=300000,
             tax_state=TaxState(),
             charitable_state=CharitableDeductionState(),
