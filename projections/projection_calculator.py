@@ -117,6 +117,11 @@ class ProjectionCalculator:
         cumulative_shares_sold = {}  # Track cumulative sales across years
         cumulative_shares_donated = {}  # Track cumulative donations across years
 
+        # Resolve pledge settings (scenario overrides profile)
+        pledge_elections = plan.tax_elections.get('pledge_elections', {})
+        self.pledge_percentage = pledge_elections.get('pledge_percentage', self.profile.pledge_percentage)
+        self.company_match_ratio = pledge_elections.get('company_match_ratio', self.profile.company_match_ratio)
+
         # Process each year in the projection
         for year in range(plan.start_date.year, plan.end_date.year + 1):
             year_start_cash = current_cash
@@ -197,7 +202,7 @@ class ProjectionCalculator:
                     obligation = PledgeCalculator.calculate_obligation(
                         shares_sold=action.quantity,
                         sale_price=action.price if action.price else 0,
-                        pledge_percentage=self.profile.pledge_percentage,
+                        pledge_percentage=self.pledge_percentage,
                         sale_date=action.action_date,
                         lot_id=action.lot_id
                     )
@@ -215,7 +220,7 @@ class ProjectionCalculator:
 
                     # Calculate company match based on eligible amount only
                     eligible_amount = discharge_result.get('eligible_amount', 0.0)
-                    actual_company_match = eligible_amount * self.profile.company_match_ratio
+                    actual_company_match = eligible_amount * self.company_match_ratio
                     year_company_match += actual_company_match
 
                     # Update the donation result with actual company match
@@ -238,6 +243,8 @@ class ProjectionCalculator:
                 ca_charitable_carryforward, year
             )
 
+
+
             tax_result = self.annual_tax_calculator.calculate_annual_tax(
                 year=year,
                 user_profile=self.profile,
@@ -253,6 +260,8 @@ class ProjectionCalculator:
                 ca_carryforward_stock_by_creation_year=ca_carryforward_by_creation_year_current,
                 elect_basis_deduction=elect_basis
             )
+
+
 
             # Calculate net tax payment (gross tax minus withholdings)
             year_gross_tax = tax_result.total_tax
@@ -359,7 +368,7 @@ class ProjectionCalculator:
             lost_match_value = pledge_state.process_window_closures(
                 current_year=year,
                 current_price=current_price,
-                company_match_ratio=self.profile.company_match_ratio
+                company_match_ratio=self.company_match_ratio
             )
 
             # Update yearly state with final values
@@ -592,7 +601,7 @@ class ProjectionCalculator:
             holding_period_days=holding_period_days,
             donation_value=donation_value,
             deduction_type='stock',
-            company_match_ratio=self.profile.company_match_ratio,
+            company_match_ratio=self.company_match_ratio,
             company_match_amount=company_match_amount
         )
 

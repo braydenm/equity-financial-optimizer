@@ -268,11 +268,37 @@ class DetailedMaterializer:
             detailed.strike_price = lot.strike_price
 
             # Extract acquisition date and expiration date from lot
-            if hasattr(lot, 'acquisition_date'):
-                detailed.acquisition_date = lot.acquisition_date
-                # Calculate holding period
+            # Determine acquisition date based on action type and lot characteristics
+            acquisition_date = None
+
+            if action.action_type == ActionType.EXERCISE:
+                # For exercise actions, acquisition date is always grant date (when option was granted)
+                acquisition_date = lot.grant_date
+            elif lot.share_type == ShareType.RSU:
+                # For RSUs, acquisition date is when they vested (exercise_date)
+                acquisition_date = lot.exercise_date
+            elif lot.share_type in [ShareType.ISO, ShareType.NSO]:
+                if lot.exercise_date:
+                    # For exercised options, acquisition date is exercise date
+                    acquisition_date = lot.exercise_date
+                else:
+                    # For unexercised options, acquisition date is grant date
+                    acquisition_date = lot.grant_date
+            else:
+                # Fallback to grant_date for other types
+                acquisition_date = lot.grant_date
+
+            if acquisition_date:
+                detailed.acquisition_date = acquisition_date
+                # Calculate holding period for sales and donations
                 if action.action_type in [ActionType.SELL, ActionType.DONATE]:
-                    detailed.holding_period_days = (action.action_date - lot.acquisition_date).days
+                    detailed.holding_period_days = (action.action_date - acquisition_date).days
+
+                    # Update tax treatment based on actual holding period
+                    if detailed.holding_period_days >= 365:
+                        detailed.tax_treatment = "LTCG"
+                    else:
+                        detailed.tax_treatment = "STCG"
 
             if hasattr(lot, 'expiration_date'):
                 detailed.vest_expiration_date = lot.expiration_date
@@ -486,12 +512,76 @@ class DetailedMaterializer:
             if all_actions:
                 writer.writerows(all_actions)
 
-    def save_annual_summary_csv(self, detailed_years: List[DetailedYear], output_path: str):
+    def _calculate_pledge_metrics_through_year(self, result: ProjectionResult, target_year: int) -> dict:
+        """Calculate pledge metrics as of end of target year based on actual progression."""
+        from datetime import date as date_class
+        target_year_end = date_class(target_year, 12, 31)
+
+        # Track cumulative metrics through all years up to target year
+        cumulative_obligations = {}  # obligation_id -> shares_required
+        cumulative_donations = {}    # obligation_id -> shares_donated
+
+        # Process each year up to and including target year
+        for year_state in result.yearly_states:
+            if year_state.year > target_year:
+                break
+
+            year_end = date_class(year_state.year, 12, 31)
+
+            if year_state.pledge_state and year_state.pledge_state.obligations:
+                for obligation in year_state.pledge_state.obligations:
+                    # Only process obligations that existed by this year
+                    if (obligation.commencement_date and
+                        obligation.commencement_date <= year_end):
+
+                        obligation_id = obligation.parent_transaction_id
+
+                        # Track obligation requirements (these don't change once created)
+                        if obligation_id not in cumulative_obligations:
+                            cumulative_obligations[obligation_id] = obligation.maximalist_shares_required
+
+                        # Update donated shares to the state as of this year
+                        # Only count donations that happened by end of this year
+                        cumulative_donations[obligation_id] = obligation.maximalist_shares_donated
+
+        # Calculate final metrics
+        total_obligated = sum(cumulative_obligations.values())
+        total_donated = sum(cumulative_donations.values())
+        total_outstanding = total_obligated - total_donated
+
+        # Calculate expired window shares as of target year end
+        expired_window_shares = 0
+        if result.yearly_states and len(result.yearly_states) > 0:
+            # Use the final pledge state to check window status
+            final_state = result.yearly_states[-1]
+            if final_state.pledge_state and final_state.pledge_state.obligations:
+                for obligation in final_state.pledge_state.obligations:
+                    if (obligation.commencement_date and
+                        obligation.commencement_date <= target_year_end and
+                        obligation.match_window_closes and
+                        target_year_end > obligation.match_window_closes):
+
+                        obligation_id = obligation.parent_transaction_id
+                        donated_by_target = cumulative_donations.get(obligation_id, 0)
+                        required = cumulative_obligations.get(obligation_id, 0)
+                        expired_window_shares += max(0, required - donated_by_target)
+
+        return {
+            'obligated': total_obligated,
+            'donated': total_donated,
+            'outstanding': total_outstanding,
+            'expired_window': expired_window_shares
+        }
+
+    def save_annual_summary_csv(self, detailed_years: List[DetailedYear], result: ProjectionResult, output_path: str):
         """Save annual summaries with key metrics."""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         summaries = []
         for year in detailed_years:
+            # Calculate pledge metrics based on actual progression through years
+            pledge_metrics = self._calculate_pledge_metrics_through_year(result, year.year)
+
             summaries.append({
                 'year': year.year,
                 'w2_income': round(year.w2_income, 2),
@@ -502,6 +592,10 @@ class DetailedMaterializer:
                 'donations': round(sum(a.donation_value for a in year.actions), 2),
                 'company_match': round(sum(a.company_match for a in year.actions), 2),
                 'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + sum(a.company_match for a in year.actions), 2),
+                'pledge_shares_obligated': pledge_metrics['obligated'],
+                'pledge_shares_donated': pledge_metrics['donated'],
+                'pledge_shares_outstanding': pledge_metrics['outstanding'],
+                'pledge_shares_expired_window': pledge_metrics['expired_window'],
                 'regular_tax': round(year.regular_tax_before_credits, 2),
                 'amt_tax': round(year.amt_tax, 2),
                 'total_tax': round(year.total_tax_liability, 2),
@@ -552,5 +646,6 @@ def materialize_detailed_projection(result: ProjectionResult,
     # Annual summary
     materializer.save_annual_summary_csv(
         detailed_years,
+        result,
         f"{output_dir}/{base_name}_annual_summary.csv"
     )

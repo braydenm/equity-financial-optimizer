@@ -175,10 +175,8 @@
   },
   "charitable_giving": {
     "pledge_percentage": 0,
-    "pledge_type": "non_binding",
     "company_match_ratio": 3.0,
-    "donation_window_months": 12,
-    "preferred_vehicle": "DAF"
+    "donation_window_months": 36
   },
   "market_assumptions": {
     "scenarios": [],

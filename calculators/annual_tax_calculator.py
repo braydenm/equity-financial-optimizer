@@ -232,6 +232,8 @@ class AnnualTaxCalculator:
         donation_components = donation_components or []
         cash_donation_components = cash_donation_components or []
 
+
+
         # Use profile values if not overridden
         if filing_status is None:
             filing_status = user_profile.filing_status
@@ -424,16 +426,24 @@ class AnnualTaxCalculator:
         """
         # Calculate total donations by type
         if elect_basis_deduction:
-            # When electing basis, use cost basis instead of FMV
-            stock_donations = sum(d.cost_basis * d.shares_donated for d in donation_components)
+            # When electing basis, use cost basis for deduction amount
+            # This provides access to higher AGI limit (50% vs 30%) for carryforward optimization
+            basis_total = sum(d.cost_basis * d.shares_donated for d in donation_components)
+            fmv_total = sum(d.donation_value for d in donation_components)
+            stock_donations = basis_total
+
+
         else:
             # Default: use FMV (donation_value)
             stock_donations = sum(d.donation_value for d in donation_components)
+
         cash_donations = sum(d.amount for d in cash_donation_components)
 
         # Handle None carryforward dictionary - convert to empty dict for processing
         if carryforward_stock_by_creation_year is None:
             carryforward_stock_by_creation_year = {}
+
+
 
         # Don't expire carryforwards before processing - they can be used in their 5th year
         # Expiration happens AFTER consumption, not before
@@ -442,6 +452,8 @@ class AnnualTaxCalculator:
         total_stock_carryforward = sum(carryforward_stock_by_creation_year.values())
         total_stock_available = stock_donations + total_stock_carryforward
         total_cash_available = cash_donations + carryforward_cash
+
+
 
         # Require limits to be set if donations exist
         if total_cash_available > 0 and cash_limit_pct is None:
@@ -459,9 +471,13 @@ class AnnualTaxCalculator:
         stock_limit = agi * stock_limit_pct
         cash_limit = agi * cash_limit_pct
 
+
+
         # Cash deductions (apply first)
         cash_used = min(total_cash_available, cash_limit)
         cash_carryforward = total_cash_available - cash_used
+
+
 
         # Stock deductions with FIFO ordering (apply after cash)
         # Stock is limited by BOTH the stock-specific limit AND the remaining overall charitable limit
@@ -473,6 +489,8 @@ class AnnualTaxCalculator:
         remaining_charitable_limit = max(0, overall_charitable_limit - cash_used)
         effective_stock_limit = min(stock_limit, remaining_charitable_limit)
 
+
+
         stock_used = 0.0
         carryforward_consumed_by_creation_year = {}
         carryforward_remaining_by_creation_year = {}
@@ -481,26 +499,36 @@ class AnnualTaxCalculator:
         # First, use current year donations
         remaining_stock_limit = effective_stock_limit
         current_year_used = 0.0
+
+
+
         if stock_donations > 0 and remaining_stock_limit > 0:
             current_year_used = min(stock_donations, remaining_stock_limit)
             stock_used += current_year_used
             remaining_stock_limit -= current_year_used
 
+
         # Use carryforward in FIFO order (oldest first) with remaining limit
         # Note: Carryforwards can be used in their 5th year before expiring
+
+
         for creation_year in sorted(carryforward_stock_by_creation_year.keys()):
             if remaining_stock_limit <= 0:
                 # No more limit available, carry forward the rest
                 carryforward_remaining_by_creation_year[creation_year] = carryforward_stock_by_creation_year[creation_year]
+
                 continue
 
             available_from_year = carryforward_stock_by_creation_year[creation_year]
             used_from_year = min(available_from_year, remaining_stock_limit)
 
+
+
             if used_from_year > 0:
                 carryforward_consumed_by_creation_year[creation_year] = used_from_year
                 stock_used += used_from_year
                 remaining_stock_limit -= used_from_year
+
 
             remaining_from_year = available_from_year - used_from_year
             if remaining_from_year > 0:
@@ -522,6 +550,8 @@ class AnnualTaxCalculator:
         # Calculate total carryforward: existing carryforward + unused current year donations
         unused_current_year_donations = stock_donations - current_year_used
         stock_carryforward = sum(carryforward_remaining_by_creation_year.values()) + unused_current_year_donations
+
+
 
         return CharitableDeductionResult(
             cash_deduction_used=cash_used,

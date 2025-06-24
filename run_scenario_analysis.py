@@ -36,7 +36,9 @@ def print_scenario_results(result, detailed=True):
     print(f"  💸 Total Taxes Paid: ${metrics['total_taxes_all_years']:,.0f}")
     print(f"  🎁 Total Donations: ${metrics['total_donations_all_years']:,.0f}")
     print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
-    print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
+    print(f"  ✅ Pledge Status: {metrics.get('pledge_shares_donated', 0)}/{metrics.get('pledge_shares_obligated', 0)} shares donated")
+    if metrics.get('pledge_shares_expired_window', 0) > 0:
+        print(f"  ⚠️  Expired Window: {metrics['pledge_shares_expired_window']} shares lost match opportunity")
 
     # Calculate total federal charitable carryforward
     total_federal_carryforward = 0

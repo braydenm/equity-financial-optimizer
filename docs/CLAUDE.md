@@ -126,10 +126,11 @@ equity-financial-optimizer/
 Production-ready core with comprehensive test coverage and complete federal vs state tax separation.
 Main calculators operational, handling complex scenarios including tender offers, ISO exercises,
 charitable donations with basis elections, multi-year projections, Federal and California
-charitable deductions and carryforward management, and complete company match tracking with 
-3-year match window enforcement.
-Company match tracking provides full visibility into charitable leverage with proper timing
-validation, lost opportunity tracking, and comprehensive CSV reporting for strategic planning.
+charitable deductions and carryforward management with both fmv basis and basis election support,
+and complete company match tracking with 3-year match window enforcement. Company match tracking
+provides full visibility into charitable leverage with proper timing validation, lost opportunity
+tracking, and comprehensive CSV reporting for strategic planning.
+
 Some initial user scenarios ready with further exploration necessary to find optimal action strategy for specific user goals.
 
 ### Project History
@@ -146,61 +147,24 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Known Issues
 
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
-- ~~Annual tax detail CSV federal/state tax columns populated with placeholder values~~ (FIXED - TaxState enhanced with separate federal/state tracking)
-- ~~Annual tax detail CSV missing federal/state breakdown fields~~ (FIXED - now shows real values from enhanced TaxState)
-- ~~Charitable deduction carryforward expiration timing~~ (FIXED - now correctly expires at end of year 5)
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
-
-**Note**: Runtime validation system now prevents duplicate exercise actions - scenarios are validated before execution to catch planning errors early with clear error messages.
 - Explain why simplified profile loader exists and whether regular loader can be used (natural_evolution_generator.py)
 - Profile loading redundancy - loading profile twice in natural_evolution_generator.py
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
 - Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
 - Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
-- Improve documentation for basis election logic (projection_calculator.py)
 - Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
+- **Charitable giving refactor** - Move charitable_giving from profile-level to per-grant level within original_grants (see "Charitable Giving Per-Grant Refactor" section below)
+- **Grant ID tracking in timeline** - Add grant_id column to equity_position_timeline.csv to track which grant each lot originated from (see "Grant ID Timeline Tracking" section below)
 
-### ✅ COMPLETED: Company Match Tracking and Match Window Enforcement
-**COMPLETED IMPLEMENTATION**:
-
-✅ **Company Match Tracking System**:
-   - Added complete company match aggregation with summary metrics: `total_company_match_all_years`, `total_charitable_impact`, `match_leverage_ratio`
-   - Enhanced YearlyState with `company_match_received` for annual tracking
-   - Updated all CSV outputs to show both personal and total charitable impact
-
-✅ **Match Window Enforcement**:
-   - Replaced "deadline" terminology with "match window" concept for clarity
-   - Added `match_window_closes` field to PledgeObligation with 3-year window from sale date
-   - Implemented strict match window validation in `discharge_donation()` method
-   - Company match only applies to donations within active match windows
-
-✅ **Lost Match Opportunity Tracking**:
-   - Added `lost_match_opportunities` to YearlyState for annual tracking
-   - Built `process_window_closures()` method to calculate forfeited company match when windows expire
-   - Added `total_lost_match_value` to summary metrics for complete visibility
-   - Enhanced charitable CSV with `cumulative_match_expiries` field
-
-✅ **Enhanced CSV Reporting**:
-   - Added `company_match_received` to comprehensive_cashflow.csv
-   - Added `total_charitable_impact` to annual_summary.csv
-   - Enhanced charitable_carryforward.csv with pledge tracking: `pledge_obligations_unmet`, `cumulative_match_expiries`, `match_earned`
-   - Fixed cash flow calculations to exclude company match (goes directly to DAF)
-
-✅ **Comprehensive Test Coverage**:
-   - Created 7 complex test scenarios covering all edge cases
-   - Added 3 profile comparison scenarios (50% pledge/3:1 match vs 25% pledge/1:1 match)
-   - Implemented proper pledge mathematics with `calculate_required_donation_shares()` helper
-   - Added FIFO discharge testing for multiple pledge obligations
-
-**Impact**: Users can now maximize charitable leverage through strategic timing within 3-year match windows, with complete visibility into total charitable impact and lost opportunities.
 
 ### Immediate Priorities
-**Partner on Detailed Scenarios** - Work with user on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
+**Partner on Real-World Scenarios** - Work with users on specific equity compensation scenarios to stress test the model end to end and provide feedback on accuracy and usability.
 
 ### E2E Testing Plan for Critical Financial Pathways
 **High-Risk Areas Requiring E2E Tests:**
@@ -264,6 +228,113 @@ See CHANGELOG.md for complete feature history and implementation details.
 - **Search codebase systematically for other hardcoded tax values** that should be in tax_constants.py (comprehensive audit needed)
 - ~~**TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting~~ (COMPLETED - TaxState enhanced with separate federal/state tax components)
 - **CA AMT credit tracking** postpone until when real use cases emerge requiring state-specific AMT credit carryforward
+
+### Charitable Giving Per-Grant Refactor
+
+**Current Issue**: Charitable giving (pledge percentage and company match ratio) is currently stored at the profile level, but should be associated with individual grants based on employment timing.
+
+**Background**: Different employees have different charitable programs based on when they joined:
+- Earlier employees: 50% pledge with 3:1 match
+- Newer employees: 25% pledge with 1:1 match
+- Some employees: No pledge/match program available
+
+**Proposed Structure**:
+```json
+"original_grants": [
+  {
+    "grant_id": "GRANT_001",
+    "grant_date": "2020-01-01",
+    "charitable_program": {
+      "pledge_percentage": 0.50,
+      "company_match_ratio": 3.0,
+      "program_type": "early_employee_program"
+    }
+  },
+  {
+    "grant_id": "GRANT_002",
+    "grant_date": "2023-01-01",
+    "charitable_program": {
+      "pledge_percentage": 0.25,
+      "company_match_ratio": 1.0,
+      "program_type": "newer_employee_program"
+    }
+  }
+]
+```
+
+**Implementation Notes**:
+- Remove `charitable_giving` section from top-level profile
+- Add `charitable_program` object to each grant in `original_grants`
+- When processing sales/donations, look up the charitable program from the grant that originated the shares
+- No scenario-level overrides allowed - this is determined by employment terms
+- One-shot migration approach - no migration utility, test-driven migration
+
+**Test Strategy**: Create test with multiple grants having different charitable programs, verify correct pledge/match applied based on which grant the shares came from.
+
+### Grant ID Timeline Tracking
+
+**Current Issue**: The equity_position_timeline.csv doesn't track which original grant each lot came from, making it difficult to trace shares back to their grant-specific terms (like charitable programs).
+
+**Current CSV Structure**:
+```csv
+date,lot_id,share_type,quantity,strike_price,lifecycle_state,tax_treatment
+```
+
+**Proposed Enhancement**:
+```csv
+date,lot_id,grant_id,share_type,quantity,strike_price,lifecycle_state,tax_treatment
+```
+
+**Implementation Notes**:
+- Add `grant_id` field to ShareLot dataclass
+- Update equity_loader to populate grant_id when creating lots from grants
+- Update timeline_generator to include grant_id in CSV output
+- For exercised lots, track the original grant_id they came from
+- For vesting events, use the grant_id from the vesting calendar
+
+### CSV Generation Architecture Consolidation Plan
+
+**Current Architecture Issues**:
+1. CSV generation split between `projection_output.py` and `detailed_materialization.py`
+2. Multiple entry points with inconsistent CSV generation
+3. `run_scenario_analysis.py` doesn't generate CSVs at all
+
+**Current Split**:
+- `projection_output.py`: Core financial CSVs (cashflow, tax, equity, charitable, pledge)
+- `detailed_materialization.py`: Analysis CSVs (action_summary, annual_summary)
+
+**Consolidation Plan**:
+
+**Phase 1: Unify CSV Generation Functions**
+1. Move `DetailedMaterializer` class from `detailed_materialization.py` to `projection_output.py`
+2. Rename methods for consistency:
+   - `save_action_level_csv()` → `save_action_summary_csv()`
+   - `save_annual_summary_csv()` → keep as is
+3. Update `save_all_projection_csvs()` to directly call these methods instead of delegating to `materialize_detailed_projection()`
+
+**Phase 2: Standardize Entry Points**
+1. Create `generate_complete_csv_suite()` as the single entry point
+2. Update all callers:
+   - `portfolio_manager.py`: Already uses `save_all_projection_csvs()`
+   - `run_scenario_analysis.py`: Add CSV generation after projection
+   - Test files: Use the unified entry point
+
+**Phase 3: Clean Up Architecture**
+1. Delete `detailed_materialization.py` after moving all functionality
+2. Consolidate duplicate CSV field calculations
+3. Standardize CSV field naming conventions
+
+**Benefits**:
+- Single source of truth for all CSV generation
+- Consistent output regardless of entry point
+- Easier to maintain and test
+- Clear data flow from ProjectionResult → CSVs
+
+**Migration Strategy**:
+1. Add deprecation notices to `detailed_materialization.py`
+2. Create parallel implementation in `projection_output.py`
+3. Update callers one by one with tests
+4. Remove old implementation once all callers migrated
 
 ### CSV Output Improvements Plan
 

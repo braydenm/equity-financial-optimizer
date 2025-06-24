@@ -1,0 +1,79 @@
+{
+  "scenario_name": "904_basis_election_corrected",
+  "description": "Demonstrates charitable basis election with pledge tracking using correct lot IDs",
+  "tax_elections": {
+    "charitable_basis_election_years": [2025, 2026, 2027],
+    "election_notes": "Electing to deduct cost basis instead of FMV for stock donations. This increases AGI limit from 30% to 50% for stock donations."
+  },
+  "pledge_elections": {
+    "pledge_percentage": 0.25,
+    "company_match_ratio": 2.0,
+    "notes": "25% pledge with 2:1 company match on all share sales"
+  },
+  "actions": [
+    {
+      "action_date": "2025-03-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Sell highly appreciated RSUs - creates 250 share pledge obligation (25% of 1000)"
+    },
+    {
+      "action_date": "2025-06-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 250,
+      "price": null,
+      "notes": "Donate to fulfill pledge from March sale - basis election beneficial for low-appreciation RSUs"
+    },
+    {
+      "action_date": "2025-09-15",
+      "action_type": "sell",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1500,
+      "price": null,
+      "notes": "Sell qualified ISOs - creates 375 share pledge obligation"
+    },
+    {
+      "action_date": "2026-01-15",
+      "action_type": "exercise",
+      "lot_id": "ISO",
+      "quantity": 6000,
+      "price": null,
+      "notes": "Exercise half of vested ISOs for future diversification"
+    },
+    {
+      "action_date": "2026-06-15",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 375,
+      "price": null,
+      "notes": "Donate recently acquired RSUs to fulfill Sep 2025 pledge - minimal appreciation, basis election helps"
+    },
+    {
+      "action_date": "2026-11-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2022_001",
+      "quantity": 800,
+      "price": null,
+      "notes": "Additional sale - creates 200 share pledge obligation"
+    },
+    {
+      "action_date": "2027-03-01",
+      "action_type": "donate",
+      "lot_id": "ISO_EX_20260115",
+      "quantity": 200,
+      "price": null,
+      "notes": "Donate shares from 2026 exercise to fulfill Nov 2026 pledge"
+    },
+    {
+      "action_date": "2027-12-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Year-end sale for tax planning - creates 125 share pledge"
+    }
+  ]
+}

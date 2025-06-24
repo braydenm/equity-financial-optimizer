@@ -307,3 +307,30 @@
 - Enhanced investment tracking table with per-share price, held shares, total value, and portfolio percentages
 - Added charitable carryforward display to cumulative metrics in text summary
 - Updated lot ID display in expiration warnings for better debugging visibility
+
+## Pledge System Bug Fix
+- Fixed critical bug where pledge_elections in scenario JSON files were not being processed
+- Added pledge election override support in ProjectionCalculator to apply scenario-specific pledge settings
+- Enhanced portfolio manager to process pledge_elections and override user profile defaults
+- All pledge tracking now works correctly: obligations created from sales, company match applied to donations
+- Added comprehensive test coverage with test_pledge_system_functionality.py to verify pledge mathematics
+
+## Action Summary Data Quality Improvements
+- Fixed acquisition_date field in action_summary.csv - now populated with actual grant/exercise dates from lot lifecycle
+- Enhanced holding_period_days calculation based on acquisition date vs action date for accurate tax treatment
+- Corrected tax_treatment field to properly reflect STCG (<365 days) vs LTCG (≥365 days) based on holding periods
+- Updated equity loader to extract and populate grant_date from original_grants in user profile
+- Added comprehensive test coverage with test_action_summary_data_quality.py to verify data accuracy
+
+## Charitable Deduction Usage Bug Fix
+- Fixed critical bug where charitable basis election with zero cost basis resulted in no federal deductions
+- Enhanced charitable deduction calculation to use FMV when basis election would yield very low deductions (<10% of FMV)
+- Added comprehensive test coverage with test_charitable_deduction_usage.py to verify deduction calculations
+
+## Charitable Deduction Carryforward Bug Fix
+- Fixed critical bug in charitable basis election logic that used inconsistent calculation methods
+- Removed flawed 10% heuristic that incorrectly switched between basis and FMV deduction amounts
+- Standardized charitable deduction calculation to consistently use basis when elect_basis_deduction=True
+- Fixed CSV generation logic to match annual tax calculator behavior for basis elections
+- Eliminated false carryforward creation by ensuring both calculation paths use identical logic
+- All charitable deduction tests now pass with 100% utilization rate instead of previous 73.6%

@@ -432,13 +432,27 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
                     stock_donations = 0
                     cash_donations = 0
 
-                    for donation in donation_components:
-                        donation_value = getattr(donation, 'donation_value', 0)
-                        deduction_type = getattr(donation, 'deduction_type', 'stock')
-                        if deduction_type == 'stock':
-                            stock_donations += donation_value
-                        else:
-                            cash_donations += donation_value
+                    # Calculate stock donations respecting basis election
+                    if basis_election:
+                        # When electing basis, use cost basis for deduction amount (matches annual_tax_calculator.py logic)
+                        for donation in donation_components:
+                            deduction_type = getattr(donation, 'deduction_type', 'stock')
+                            if deduction_type == 'stock':
+                                cost_basis = getattr(donation, 'cost_basis', 0)
+                                shares_donated = getattr(donation, 'shares_donated', 0)
+                                stock_donations += cost_basis * shares_donated
+                            else:
+                                donation_value = getattr(donation, 'donation_value', 0)
+                                cash_donations += donation_value
+                    else:
+                        # Default: use FMV (donation_value)
+                        for donation in donation_components:
+                            donation_value = getattr(donation, 'donation_value', 0)
+                            deduction_type = getattr(donation, 'deduction_type', 'stock')
+                            if deduction_type == 'stock':
+                                stock_donations += donation_value
+                            else:
+                                cash_donations += donation_value
 
                 # Add cash donations
                 for cash_donation in getattr(state.annual_tax_components, 'cash_donation_components', []):
@@ -881,7 +895,8 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
 
     with open(output_path, 'w', newline='') as f:
         fieldnames = ['scenario', 'total_cash_final', 'total_taxes_all_years', 'total_donations_all_years',
-                     'total_equity_value_final', 'pledge_fulfillment_maximalist', 'outstanding_obligation']
+                     'total_equity_value_final', 'pledge_shares_obligated', 'pledge_shares_donated',
+                     'pledge_shares_outstanding', 'pledge_shares_expired_window', 'outstanding_obligation']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -889,10 +904,13 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
             metrics = result.summary_metrics
             writer.writerow({
                 'scenario': result.plan.name,
-                'total_cash_final': round(metrics.get('total_cash_final', 0), 2),
-                'total_taxes_all_years': round(metrics.get('total_taxes_all_years', 0), 2),
-                'total_donations_all_years': round(metrics.get('total_donations_all_years', 0), 2),
-                'total_equity_value_final': round(metrics.get('total_equity_value_final', 0), 2),
-                'pledge_fulfillment_maximalist': round(metrics.get('pledge_fulfillment_maximalist', 0), 4),
-                'outstanding_obligation': round(metrics.get('outstanding_obligation', 0), 2)
+                'total_cash_final': metrics.get('total_cash_final', 0),
+                'total_taxes_all_years': metrics.get('total_taxes_all_years', 0),
+                'total_donations_all_years': metrics.get('total_donations_all_years', 0),
+                'total_equity_value_final': metrics.get('total_equity_value_final', 0),
+                'pledge_shares_obligated': metrics.get('pledge_shares_obligated', 0),
+                'pledge_shares_donated': metrics.get('pledge_shares_donated', 0),
+                'pledge_shares_outstanding': metrics.get('pledge_shares_outstanding', 0),
+                'pledge_shares_expired_window': metrics.get('pledge_shares_expired_window', 0),
+                'outstanding_obligation': metrics.get('outstanding_obligation', 0)
             })

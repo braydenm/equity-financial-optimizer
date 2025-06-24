@@ -70,7 +70,7 @@ class EquityLoader:
                 share_type=share_type,
                 quantity=lot_data['shares'],
                 strike_price=lot_data['strike_price'],
-                grant_date=None,  # Not provided in exercised lots
+                grant_date=self._get_grant_date_from_grants(equity_position),
                 exercise_date=exercise_date,
                 lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
                 tax_treatment=tax_treatment,
@@ -89,6 +89,7 @@ class EquityLoader:
         # Get strike price from original grants
         strike_price = self._get_strike_price_from_grants(equity_position)
         expiration_date = self._get_expiration_date_from_grants(equity_position)
+        grant_date = self._get_grant_date_from_grants(equity_position)
 
         # ISO shares
         if vested.get('iso_shares', 0) > 0:
@@ -97,7 +98,7 @@ class EquityLoader:
                 share_type=ShareType.ISO,
                 quantity=vested['iso_shares'],
                 strike_price=strike_price,
-                grant_date=None,  # Could be derived from grants if needed
+                grant_date=grant_date,
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
                 tax_treatment=TaxTreatment.NA,
@@ -111,7 +112,7 @@ class EquityLoader:
                 share_type=ShareType.NSO,
                 quantity=vested['nso_shares'],
                 strike_price=strike_price,
-                grant_date=None,
+                grant_date=grant_date,
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
                 tax_treatment=TaxTreatment.NA,
@@ -125,7 +126,7 @@ class EquityLoader:
                 share_type=ShareType.RSU,
                 quantity=vested['rsu_shares'],
                 strike_price=0.0,  # RSUs have no strike price
-                grant_date=None,
+                grant_date=grant_date,
                 exercise_date=None,
                 lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
                 tax_treatment=TaxTreatment.NA,
@@ -202,6 +203,15 @@ class EquityLoader:
             expiration_str = grants[0]['expiration_date']
             if expiration_str:
                 return datetime.fromisoformat(expiration_str).date()
+        return None
+
+    def _get_grant_date_from_grants(self, equity_position: dict) -> Optional[date]:
+        """Extract grant date from original grants."""
+        grants = equity_position.get('original_grants', [])
+        if grants and 'grant_date' in grants[0]:
+            grant_str = grants[0]['grant_date']
+            if grant_str:
+                return datetime.fromisoformat(grant_str).date()
         return None
 
     def summarize_lots(self, lots: List[ShareLot]) -> Dict[str, Any]:

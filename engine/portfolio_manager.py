@@ -260,9 +260,6 @@ class PortfolioManager:
             scenario=portfolio.price_scenario
         )
 
-        # Initialize calculator
-        calculator = ProjectionCalculator(self._user_profile)
-
         # Execute each scenario
         results = []
         for scenario_path in portfolio.scenario_paths:
@@ -277,6 +274,9 @@ class PortfolioManager:
                     end_date=end_date,
                     price_projections=price_projections
                 )
+
+                # Initialize calculator
+                calculator = ProjectionCalculator(self._user_profile)
 
                 # Execute projection
                 result = calculator.evaluate_projection_plan(plan)

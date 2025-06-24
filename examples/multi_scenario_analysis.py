@@ -67,7 +67,9 @@ def print_scenario_summary(name: str, result: Any) -> None:
     print(f"  💸 Total Taxes Paid: ${metrics['total_taxes_all_years']:,.0f}")
     print(f"  🎁 Total Donations: ${metrics['total_donations_all_years']:,.0f}")
     print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
-    print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
+    print(f"  ✅ Pledge Status: {metrics.get('pledge_shares_donated', 0)}/{metrics.get('pledge_shares_obligated', 0)} shares donated")
+    if metrics.get('pledge_shares_expired_window', 0) > 0:
+        print(f"  ⚠️  Expired Window: {metrics['pledge_shares_expired_window']} shares lost match opportunity")
 
     if final_state:
         vested_unexercised = sum(lot.quantity for lot in final_state.equity_holdings
@@ -234,8 +236,16 @@ def main():
             donation_diff = tender_metrics['total_donations_all_years'] - natural_metrics['total_donations_all_years']
             print(f"  🎁 Total Donations: ${donation_diff:,.0f}")
 
-            pledge_fulfillment = tender_metrics['pledge_fulfillment_maximalist']
-            print(f"  ✅ Pledge Fulfillment: {pledge_fulfillment:.1%}")
+            pledge_donated = tender_metrics.get('pledge_shares_donated', 0)
+            pledge_obligated = tender_metrics.get('pledge_shares_obligated', 0)
+            pledge_outstanding = tender_metrics.get('pledge_shares_outstanding', 0)
+            pledge_expired = tender_metrics.get('pledge_shares_expired_window', 0)
+
+            print(f"  ✅ Pledge Status: {pledge_donated}/{pledge_obligated} shares donated")
+            if pledge_outstanding > 0:
+                print(f"  📋 Outstanding: {pledge_outstanding} shares still needed")
+            if pledge_expired > 0:
+                print(f"  ⚠️  Expired Window: {pledge_expired} shares lost match opportunity")
 
             net_worth_tender = tender_metrics['total_cash_final'] + tender_metrics['total_equity_value_final']
             net_worth_diff_tender = net_worth_tender - net_worth_natural

@@ -442,12 +442,27 @@ class ProjectionResult:
         total_charitable_impact = total_donations + total_company_match
         total_lost_match_value = sum(state.lost_match_opportunities for state in self.yearly_states)
 
-        # Calculate overall pledge fulfillment from individual obligations
-        pledge_fulfillment_max = 0.0
+        # Calculate pledge share metrics from individual obligations
+        pledge_shares_obligated = 0
+        pledge_shares_donated = 0
+        pledge_shares_outstanding = 0
+        pledge_shares_expired_window = 0
+
         if final_state and final_state.pledge_state.obligations:
-            total_obligations = len(final_state.pledge_state.obligations)
-            fulfilled_obligations = sum(1 for obs in final_state.pledge_state.obligations if obs.maximalist_fulfillment >= 1.0)
-            pledge_fulfillment_max = fulfilled_obligations / total_obligations if total_obligations > 0 else 0.0
+            from datetime import date as date_class
+            final_year_end = date_class(final_state.year, 12, 31)
+
+            for obligation in final_state.pledge_state.obligations:
+                pledge_shares_obligated += obligation.maximalist_shares_required
+                pledge_shares_donated += obligation.maximalist_shares_donated
+
+                # Calculate shares with expired windows (unfulfilled obligations past window)
+                if (obligation.match_window_closes and
+                    final_year_end > obligation.match_window_closes and
+                    not obligation.is_fulfilled):
+                    pledge_shares_expired_window += (obligation.maximalist_shares_required - obligation.maximalist_shares_donated)
+
+            pledge_shares_outstanding = pledge_shares_obligated - pledge_shares_donated
 
         # Calculate option expiration opportunity costs
         total_opportunity_cost = 0.0
@@ -479,7 +494,10 @@ class ProjectionResult:
             'total_charitable_impact': total_charitable_impact,
             'total_lost_match_value': total_lost_match_value,
             'total_equity_value_final': final_state.total_equity_value if final_state else 0,
-            'pledge_fulfillment_maximalist': pledge_fulfillment_max,
+            'pledge_shares_obligated': pledge_shares_obligated,
+            'pledge_shares_donated': pledge_shares_donated,
+            'pledge_shares_outstanding': pledge_shares_outstanding,
+            'pledge_shares_expired_window': pledge_shares_expired_window,
             'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,
             'total_opportunity_cost': total_opportunity_cost,
             'total_expired_shares': total_expired_shares,
@@ -582,3 +600,42 @@ class UserProfile:
         regular_withholding = regular_income * self.regular_income_withholding_rate
         supplemental_withholding = supplemental_income * self.supplemental_income_withholding_rate
         return regular_withholding + supplemental_withholding + self.quarterly_payments
+
+
+def calculate_pledge_metrics_for_year(pledge_state: PledgeState, year: int) -> dict:
+    """Calculate pledge share metrics as of end of specified year.
+
+    Args:
+        pledge_state: The pledge state containing all obligations
+        year: The year to calculate metrics for (as of end of year)
+
+    Returns:
+        Dict with keys: obligated, donated, outstanding, expired_window
+    """
+    from datetime import date as date_class
+    year_end = date_class(year, 12, 31)
+
+    obligated = 0
+    donated = 0
+    expired_window = 0
+
+    for obligation in pledge_state.obligations:
+        # Only count obligations that existed by end of this year
+        if obligation.commencement_date and obligation.commencement_date <= year_end:
+            obligated += obligation.maximalist_shares_required
+            donated += obligation.maximalist_shares_donated
+
+            # Calculate shares with expired windows (unfulfilled obligations past window)
+            if (obligation.match_window_closes and
+                year_end > obligation.match_window_closes and
+                not obligation.is_fulfilled):
+                expired_window += (obligation.maximalist_shares_required - obligation.maximalist_shares_donated)
+
+    outstanding = obligated - donated
+
+    return {
+        'obligated': obligated,
+        'donated': donated,
+        'outstanding': outstanding,
+        'expired_window': expired_window
+    }

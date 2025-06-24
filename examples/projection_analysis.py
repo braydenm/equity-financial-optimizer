@@ -107,7 +107,11 @@ def display_projection_results(result):
 
     print(f"\nPLEDGE OBLIGATIONS:")
     print(f"  Outstanding Obligation: ${metrics.get('outstanding_obligation', 0):,.0f}")
-    print(f"  Pledge Fulfillment: {metrics.get('pledge_fulfillment_maximalist', 0):.1%}")
+    print(f"  Shares Obligated: {metrics.get('pledge_shares_obligated', 0):,}")
+    print(f"  Shares Donated: {metrics.get('pledge_shares_donated', 0):,}")
+    print(f"  Shares Outstanding: {metrics.get('pledge_shares_outstanding', 0):,}")
+    if metrics.get('pledge_shares_expired_window', 0) > 0:
+        print(f"  Shares with Expired Windows: {metrics.get('pledge_shares_expired_window', 0):,}")
 
 
 def main():

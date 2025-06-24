@@ -59,7 +59,13 @@ This document defines the canonical format for user profile data in the Equity F
         "strike_price": 2.50,  // 0 for RSUs
         "vesting_start_date": "2022-01-15",
         "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12
+        "cliff_months": 12,
+        "charitable_program": {
+          "pledge_percentage": 0.50,  // 0.50 = 50% pledge, 0.25 = 25% pledge, 0 = no program
+          "company_match_ratio": 3.0,  // 3.0 = 3:1 match, 1.0 = 1:1 match
+          "program_type": "early_employee_program|newer_employee_program|none",
+          "notes": "50% pledge with 3:1 match for employees joining before 2021"
+        }
       }
     ],
 
@@ -183,10 +189,9 @@ This document defines the canonical format for user profile data in the Equity F
     "time_horizon_years": 10
   },
 
-  "charitable_giving": {
-    "pledge_percentage": 0.50,  // Of equity
-    "company_match_ratio": 3.0,
-    "donation_window_months": 36  // After liquidity event
+  // MIGRATION NOTE: charitable_giving has been moved to per-grant level
+  // Each grant in original_grants now has its own charitable_program object
+  // This reflects that charitable programs are determined by employment timing, not user choice
   },
 
   "market_assumptions": {
@@ -273,5 +278,3 @@ These fields must always be present:
 
 ### Optional Fields
 All other fields are optional but should follow the schema when present.
-
-
