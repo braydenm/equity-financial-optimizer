@@ -582,6 +582,19 @@ class DetailedMaterializer:
             # Calculate pledge metrics based on actual progression through years
             pledge_metrics = self._calculate_pledge_metrics_through_year(result, year.year)
 
+            # Calculate action counts for new tracking fields
+            options_exercised_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'exercise')
+            shares_sold_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'sell')
+            shares_donated_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'donate')
+
+            # AMT credit tracking (placeholder values for now - will be implemented in Phase 3)
+            amt_credits_generated = getattr(year, 'amt_credits_generated', 0)
+            amt_credits_consumed = getattr(year, 'amt_credits_consumed', 0)
+            amt_credits_balance = getattr(year, 'amt_credits_balance', 0)
+
+            # Option expiration tracking
+            expired_option_count = getattr(year, 'expired_option_count', 0)
+
             summaries.append({
                 'year': year.year,
                 'w2_income': round(year.w2_income, 2),
@@ -595,14 +608,21 @@ class DetailedMaterializer:
                 'pledge_shares_obligated': pledge_metrics['obligated'],
                 'pledge_shares_donated': pledge_metrics['donated'],
                 'pledge_shares_outstanding': pledge_metrics['outstanding'],
-                'pledge_shares_expired_window': pledge_metrics['expired_window'],
+                'pledge_shares_expired': pledge_metrics['expired_window'],
+                'options_exercised_count': options_exercised_count,
+                'shares_sold_count': shares_sold_count,
+                'shares_donated_count': shares_donated_count,
+                'amt_credits_generated': round(amt_credits_generated, 2),
+                'amt_credits_consumed': round(amt_credits_consumed, 2),
+                'amt_credits_balance': round(amt_credits_balance, 2),
+                'expired_option_count': expired_option_count,
                 'regular_tax': round(year.regular_tax_before_credits, 2),
                 'amt_tax': round(year.amt_tax, 2),
                 'total_tax': round(year.total_tax_liability, 2),
                 'ending_cash': round(year.ending_cash, 2),
                 'equity_value': round(year.total_equity_value, 2),
                 'net_worth': round(year.ending_cash + year.total_equity_value, 2),
-                'opportunity_cost': round(year.opportunity_cost, 2)
+                'expired_option_loss': round(year.opportunity_cost, 2)
             })
 
         if summaries:

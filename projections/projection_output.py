@@ -906,7 +906,10 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
     with open(output_path, 'w', newline='') as f:
         fieldnames = ['scenario', 'total_cash_final', 'total_taxes_all_years', 'total_donations_all_years',
                      'total_equity_value_final', 'pledge_shares_obligated', 'pledge_shares_donated',
-                     'pledge_shares_outstanding', 'pledge_shares_expired_window', 'outstanding_obligation']
+                     'pledge_shares_outstanding', 'pledge_shares_expired', 'outstanding_obligation',
+                     'charitable_personal_value', 'charitable_match_value', 'charitable_total_impact',
+                     'pledge_fulfillment_rate', 'outstanding_amt_credits', 'expired_charitable_deduction',
+                     'expired_option_count', 'expired_option_loss']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -921,6 +924,14 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                 'pledge_shares_obligated': metrics.get('pledge_shares_obligated', 0),
                 'pledge_shares_donated': metrics.get('pledge_shares_donated', 0),
                 'pledge_shares_outstanding': metrics.get('pledge_shares_outstanding', 0),
-                'pledge_shares_expired_window': metrics.get('pledge_shares_expired_window', 0),
-                'outstanding_obligation': metrics.get('outstanding_obligation', 0)
+                'pledge_shares_expired': metrics.get('pledge_shares_expired_window', 0),
+                'outstanding_obligation': metrics.get('outstanding_obligation', 0),
+                'charitable_personal_value': metrics.get('total_donations_all_years', 0),
+                'charitable_match_value': metrics.get('total_company_match_all_years', 0),
+                'charitable_total_impact': metrics.get('total_charitable_impact_all_years', 0),
+                'pledge_fulfillment_rate': metrics.get('pledge_fulfillment_rate', 0),
+                'outstanding_amt_credits': metrics.get('amt_credits_final', 0),
+                'expired_charitable_deduction': metrics.get('expired_charitable_deduction', 0),
+                'expired_option_count': metrics.get('expired_option_count', 0),
+                'expired_option_loss': metrics.get('expired_option_loss', 0)
             })
