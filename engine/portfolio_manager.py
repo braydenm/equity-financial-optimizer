@@ -424,8 +424,21 @@ class PortfolioManager:
             else:
                 raise ValueError(f"Lot {lot_id} not found for exercise action")
 
-        # Check tender price for both SELL and DONATE actions (same calendar year)
-        if action_type in [ActionType.SELL, ActionType.DONATE]:
+        # Check tender price for SELL actions, snaps to any nearby tenders if exist
+        if action_type in [ActionType.SELL]:
+            # Check tender offers in user profile
+            tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
+            tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
+
+            if tender_date and tender_price:
+                # Parse tender date
+                tender_date_obj = date.fromisoformat(tender_date)
+                # Allow some flexibility (within 30 days)
+                if abs((action_date - tender_date_obj).days) <= 30:
+                    return tender_price
+
+        # Check tender price for DONATE actions, uses most recent tender as donation value if exists in same calendar year
+        if action_type in [ActionType.DONATE]:
             # Check tender offers in user profile
             tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
             tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
@@ -437,7 +450,7 @@ class PortfolioManager:
                 if action_date.year == tender_date_obj.year:
                     return tender_price
 
-        # For sales and donations, use projected price for the year
+        # Otherwise, for both sales and donations, use projected price for the year
         if action_type in [ActionType.SELL, ActionType.DONATE]:
             year = action_date.year
             if year in price_projections:
