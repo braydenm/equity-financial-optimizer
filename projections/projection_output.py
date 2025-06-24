@@ -297,8 +297,18 @@ def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str)
                 # ISO qualifying requires 2 years from grant AND 1 year from exercise
                 if hasattr(lot, 'grant_date') and hasattr(lot, 'exercise_date'):
                     if lot.grant_date and lot.exercise_date:
-                        two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2)
-                        one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1)
+                        # Handle leap year edge cases
+                        try:
+                            two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2)
+                        except ValueError:
+                            # Handle Feb 29 -> Feb 28 for non-leap years
+                            two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2, day=28)
+
+                        try:
+                            one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1)
+                        except ValueError:
+                            # Handle Feb 29 -> Feb 28 for non-leap years
+                            one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1, day=28)
                         iso_qualifying_date = max(two_years_from_grant, one_year_from_exercise)
 
             # Build notes about tax treatment

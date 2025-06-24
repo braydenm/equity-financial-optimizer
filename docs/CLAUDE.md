@@ -142,10 +142,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 **Immediate Opportunities:**
 - Real-world scenario validation with users to stress-test edge cases
 
-### Known Issues</parameter>
-
 ### Known Issues
-
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
 
 ### Inline TODOs in Code
@@ -155,12 +152,15 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Use regular profile loader and delete simplified version (natural_evolution_generator.py)
 - Option expiration date hardcoded at 10 years, should pull from user profile (natural_evolution_generator.py)
 - Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
-- Lot ID parsing in pledge obligations assumes specific underscore convention (projection_output.py)
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
 - **Charitable giving refactor** - Move charitable_giving from profile-level to per-grant level within original_grants (see "Charitable Giving Per-Grant Refactor" section below)
 - **Grant ID tracking in timeline** - Add grant_id column to equity_position_timeline.csv to track which grant each lot originated from (see "Grant ID Timeline Tracking" section below)
+- **IPO timing configuration** - Add assumed_ipo field to profile for pledge expiration calculations (see "Comprehensive Output Improvements" section)
+- **AMT credit carryforward** - Ensure first year uses profile carryforward values (see "Comprehensive Output Improvements" section)
+- **NSO AMT adjustment bug** - Debug why NSO exercises show AMT adjustments (see "Bugs to Fix" section)
+- **Transition timeline bug** - ISO marked as expiring when already exercised (see "Bugs to Fix" section)
 
 
 ### Immediate Priorities
@@ -222,12 +222,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 3. **Later**: NSO withholding reconciliation tests
 
 
-### TODO Burndown Plan - Structured Groups
 
-### Additional Improvements Identified
-- **Search codebase systematically for other hardcoded tax values** that should be in tax_constants.py (comprehensive audit needed)
-- ~~**TaxState architectural enhancement** to support separate federal/state tax tracking for improved CSV reporting~~ (COMPLETED - TaxState enhanced with separate federal/state tax components)
-- **CA AMT credit tracking** postpone until when real use cases emerge requiring state-specific AMT credit carryforward
 
 ### Charitable Giving Per-Grant Refactor
 
@@ -246,51 +241,245 @@ See CHANGELOG.md for complete feature history and implementation details.
     "grant_date": "2020-01-01",
     "charitable_program": {
       "pledge_percentage": 0.50,
-      "company_match_ratio": 3.0,
-      "program_type": "early_employee_program"
-    }
-  },
-  {
-    "grant_id": "GRANT_002",
-    "grant_date": "2023-01-01",
-    "charitable_program": {
-      "pledge_percentage": 0.25,
-      "company_match_ratio": 1.0,
-      "program_type": "newer_employee_program"
+      "company_match_ratio": 3.0
     }
   }
 ]
 ```
 
-**Implementation Notes**:
-- Remove `charitable_giving` section from top-level profile
-- Add `charitable_program` object to each grant in `original_grants`
-- When processing sales/donations, look up the charitable program from the grant that originated the shares
-- No scenario-level overrides allowed - this is determined by employment terms
-- One-shot migration approach - no migration utility, test-driven migration
-
-**Test Strategy**: Create test with multiple grants having different charitable programs, verify correct pledge/match applied based on which grant the shares came from.
+**Implementation**: Part of Phase 4 - move charitable_giving from top-level to per-grant level.
 
 ### Grant ID Timeline Tracking
 
-**Current Issue**: The equity_position_timeline.csv doesn't track which original grant each lot came from, making it difficult to trace shares back to their grant-specific terms (like charitable programs).
-
-**Current CSV Structure**:
-```csv
-date,lot_id,share_type,quantity,strike_price,lifecycle_state,tax_treatment
-```
-
-**Proposed Enhancement**:
+**Enhancement**: Add grant_id to equity_position_timeline.csv to track grant origins:
 ```csv
 date,lot_id,grant_id,share_type,quantity,strike_price,lifecycle_state,tax_treatment
 ```
 
-**Implementation Notes**:
-- Add `grant_id` field to ShareLot dataclass
-- Update equity_loader to populate grant_id when creating lots from grants
-- Update timeline_generator to include grant_id in CSV output
-- For exercised lots, track the original grant_id they came from
-- For vesting events, use the grant_id from the vesting calendar
+**Implementation**: Part of Phase 4 - enables proper charitable program tracking.
+
+### Comprehensive Output Improvements Plan
+
+**Goal**: Enable fully informed scenario comparisons by tracking all forms of value creation and destruction.
+
+#### Value Tracking Framework
+
+**1. Personal Net Worth Components**:
+Assets:
+- Cash position
+- Investment balance (other (inc crypto) + investment growth)
+- Equity value (vested exercised shares at current price)
+- AMT credit value (full dollar amount of remaining accumulated credits)
+- Charitable Deduction Carryfoward value (full dollar amount of remaining accumulated carryforward)
+Liability:
+- Unfulfilled pledge obligations (shares pledged but not yet donated)
+
+**2. Charitable Impact Components**:
+- Personal donations (shares donated × {recent tender price or FMV})
+- Company match value (shares donated × match ratio × {recent tender price or FMV})
+- Total charitable impact (personal + match)
+- Lost match opportunity (expired match eligible share count × {recent tender price or FMV})
+
+**3. Efficiency Metrics**:
+- AMT credit utilization (credits used vs generated)
+- Option expiration losses (value of expired in-the-money options)
+- Pledge fulfilled (total shares matched vs original total pledge)
+- Charitable deduction utilization (deductions used vs expired)
+
+- Add recently expired pledge obligations that have passed deadlines, either from the 3 year post sale constraint or the 1 year post IPO constraint.
+
+#### CSV Field Enhancements
+
+**action_summary.csv**:
+- **Add**: `lot_options_remaining` - unexercised options after action
+- **Add**: `lot_shares_remaining` - exercised shares after action
+- **Add**: `current_share_price` - FMV at action time
+- **Add**: `action_value` - dollar value of action (shares × price)
+
+**annual_summary.csv**:
+- **Add**: `options_exercised_count` - quantity exercised this year
+- **Add**: `shares_sold_count` - quantity sold this year
+- **Add**: `shares_donated_count` - quantity donated this year
+- **Add**: `amt_credits_generated` - new AMT credits this year
+- **Add**: `amt_credits_consumed` - AMT credits used this year
+- **Add**: `amt_credits_balance` - ending AMT credit balance
+- **Add**: `charitable_total_impact` - personal donations + any company match, if applicable
+- **Add**: `pledge_shares_expired` - count of shares that passed their pledge obligation window expiration before being donated
+- **Add**: `expired_option_count` - quantity of expired options
+- **Rename**: `expired_option_loss` - value of expired options (was: opportunity cost)
+
+**portfolio_comparison.csv**:
+- **Add**: `charitable_personal_value` - total personal donations $
+- **Add**: `charitable_match_value` - total company match $
+- **Add**: `charitable_total_impact` - total charitable value $
+- **Add**: `pledge_fulfillment_rate` - percentage of pledged shares that were donated (up to 100% of fraction of total shares that were earmarked for donation)
+- **Add**: `outstanding_amt_credits` - ending unused AMT credit balance $
+- **Add**: `pledge_shares_expired` - share of lost match opportunities
+- **Add**: `expired_charitable_deduction` - unused deductions that expired $
+- **Add**: `expired_option_count` - share of lost match opportunities
+- **Add**: `expired_option_loss` - total value of expired options (value at time of expiration, if in-the-money)
+
+**comprehensive_cashflow.csv**:
+- **Add**: `starting_cash` - beginning cash balance
+- **Add**: `other_investments` - includes a bucket for crypto or other investments
+
+#### Profile Configuration Enhancements
+
+**Add to user profile (and placeholders to template and demo)**:
+```json
+"charitable_giving": {
+    "pledge_percentage": 0.5,
+    "company_match_ratio": 3.0,
+    "post_sale_donation_window_months": 36,
+    "assumed_ipo": "2033-03-24",
+    "post_ipo_donation_window_months": 12
+}
+```
+
+**Remove from user profile**:
+- Delete entire `market_assumptions` section (lines 199+) and decision parameters.
+- Inclused removing price scenarios from profile in favor of price_scenarios.json already in use
+- Investment return rate remains hardcoded at 7% pending future fix
+
+#### Warning System Enhancements
+
+**1. Pledge Obligation Warnings**:
+- **3-year window**: Warn expired due to 3 years post-sale without donation
+- **IPO+1 year deadline**: Warn when expired due to remaining pledge obligations that have expired 1 year post-IPO
+
+**2. Option Expiration Warnings** (implemented):
+- Show option count and dollar value of potential loss
+
+**3. AMT Credit Warnings**:
+- Calculate: final_year_amt_credits / final_year_amt_consumption > 20
+- If true, warn: "AMT credits of $X will take >20 years to consume at current rate of $Y/year"
+- Implementation: In projection_output.py summary section
+
+**4. Charitable Deduction Warnings**:
+- Track 5-year carryforward expiration
+- Warn when deductions have expired unused
+
+#### Specific Improvements
+
+**pledge_obligations.csv overhaul**:
+- Primary unit: shares. Secondary unit: dollars.
+- Track by lot: grant_id, lot_id, shares_sold, shares_pledged, shares_donated, shares_outstanding
+- Match tracking: match_ratio, match_value_earned, match_value_potential, match_window_expiry
+- Dollar values as secondary fields with price assumptions clearly stated
+- **Calculation logic**:
+  - **Current implementation**: In `projection_calculator.py`, when processing SELL actions:
+    - Creates pledge via `PledgeCalculator.calculate_obligation()` in `pledge_calculator.py`
+    - Currently uses hardcoded 3-year window: `deadline = sale_date + timedelta(days=pledge_window_years * 365)`
+  - **Required changes** to `PledgeCalculator.calculate_obligation()`:
+    - Add parameter `assumed_ipo: Optional[date]`
+    - Change deadline calculation to: `deadline = min(sale_date + timedelta(days=3*365), assumed_ipo + timedelta(days=365))`
+    - Pass `assumed_ipo` from UserProfile through projection_calculator
+  - **FIFO tracking**: Already implemented in `PledgeState.discharge_donation()` in `projection_state.py`
+  - **Expiration checking**: Add to `PledgeState.process_window_closures()` to mark expired when `current_date > match_window_closes`
+
+**holding_period_tracking.csv replacement**:
+- Create new `generate_holding_milestones_csv()` in `projection_output.py`
+- For each lot, calculate milestone dates based on current state:
+  - **Granted not vested**: option_expiration_date (expiration_date from user_profile)
+  - **Vested not exercised**: option_expiration_date, ipo_pledge_deadline (assumed_ipo + post_ipo_donation_window_months)
+  - **Exercised**: ltcg_date (exercise_date + 1 year), ipo_pledge_deadline
+  - **Sold**: pledge_window_expiry (min(sale_date + post_sale_donation_window_months, assumed_ipo + post_ipo_donation_window_months))
+  - **Donated**: deduction_expiry (donation_year + 5 years, EOY)
+  - **ISO specific**: qualifying_disposition_date (max(grant_date + 1 year, exercise_date + 2 years))
+- Include countdown years + days to each milestone as of the scenario end date for which this csv is being generated.
+
+**Donation Value Calculation**:
+- **Current implementation**: Donation pricing happens in `portfolio_manager._determine_action_price()`:
+  - Currently only checks tender price for SELL actions (within 30 days)
+  - For DONATE actions, uses projected price from price_projections
+- **Required changes** to `portfolio_manager._determine_action_price()`:
+  - Move tender price check before the action type check
+  - Expand for donations specifically to change tender date check from 30 days to the most recent tender from the same calendar year:
+    ```python
+    if tender_date and tender_price:
+        tender_date_obj = date.fromisoformat(tender_date)
+        # Check if same calendar year
+        if action_date.year == tender_date_obj.year:
+            return tender_price
+    ```
+  - Keep the 30 day check for SELL actions, and use the same-year check for DONATE actions.
+  - Add logging to indicate which price was used: "Using most recent same-year tender price" vs "Using projected FMV"
+- **Price source tracking**: Add `price_source` field to donation records in CSV outputs
+  - Add field `price_used` to donation records indicating "tender" or "fmv"
+- Clear documentation of which price was used in CSV outputs
+
+**Scenario Duration**:
+- Default to 15 years for complete charitable deduction lifecycle
+- Year 1 (2025): Current year
+- Year 9 (2033): Assumed IPO (March 24, 2033 for user_profile.json)
+- Year 10 (2034): Final match-eligible donation window (IPO + 1 year), initial charitable deduction consumption
+- Years 11-15: Charitable deduction carryforward consumption period
+- Year 16 (2040): First year where all carryforward deductions have expired
+- Run 16 years to see final state after all expirations
+
+#### Bugs to Fix
+
+**1. NSO AMT Adjustment** (scenario 036, 2025-06-24):
+- NSO exercise showing $27,838.72 AMT adjustment
+- Debug in `iso_exercise_calculator.py`:
+  - Add logging at AMT adjustment calculation line
+  - Verify `share_type` is correctly identified as NSO not ISO
+  - NSOs should have zero AMT adjustment by definition
+  - Check if bargain element is being incorrectly added to AMT base
+  - Trace through `calculate_exercise_tax()` with debug prints
+- Expected: NSO exercises should not create AMT adjustments
+
+**2. Transition Timeline Bug** (scenario 036, row 7):
+- ISO marked as "expiring" when already exercised
+- Fix lifecycle state tracking logic
+
+**3. AMT Credit Initialization**:
+- In `annual_tax_calculator.py`:
+  - Year 1: Use `user_profile.tax_situation.carryforwards.amt_credit`
+  - Years 2+: Use previous year's ending AMT credit balance
+- Verify credits flow properly through YearlyState objects
+- Test with both zero and non-zero initial AMT credit. Try demo_profile.json
+
+#### Implementation Phases
+
+**Phase 1: Profile & Data Model Updates** (Foundation)
+1. Add `assumed_ipo` field to profile with 2033-03-24 default
+2. Remove `market_assumptions` section from all profiles
+3. Add grant_id tracking to ShareLot and timeline CSV
+4. Update profile loader to handle new fields
+5. No migration script - test-driven one-shot rewrite approach
+
+**Phase 2: Value Tracking Enhancements** (Core Metrics)
+1. Enhance annual_summary.csv with all new fields
+2. Update portfolio_comparison.csv with comprehensive metrics
+3. Add AMT credit tracking and warnings
+4. Implement charitable impact calculations (personal + match)
+
+**Phase 3: Warning System** (User Guidance)
+1. Implement pledge obligation expiration warnings
+2. Add IPO+1 year deadline warnings (LOUD)
+3. Create AMT credit consumption trajectory warnings
+4. Add charitable deduction expiration tracking
+
+**Phase 4: Charitable System Refactor** (Complex)
+1. Move charitable_giving to per-grant level
+2. Implement grant-based pledge tracking
+3. Update pledge_obligations.csv with share-based tracking
+4. Add match window enforcement logic
+
+**Phase 5: Bug Fixes & CSV Cleanup**
+1. Fix NSO AMT adjustment bug
+2. Fix transition timeline expiring/exercised bug
+3. Replace holding_period_tracking.csv with simplified version
+4. Consolidate CSV generation architecture
+
+**Phase 6: Testing & Validation**
+1. Create E2E tests for pledge obligations
+2. Test 15-year scenarios for full lifecycle
+3. Validate all warning triggers
+4. Run comprehensive test suite before and after changes
+
+**Priority Order**: Start with Phase 1-2 for immediate value, then Phase 5 for bug fixes, followed by Phase 3-4 for enhanced functionality.
 
 ### CSV Generation Architecture Consolidation Plan
 
@@ -335,93 +524,3 @@ date,lot_id,grant_id,share_type,quantity,strike_price,lifecycle_state,tax_treatm
 2. Create parallel implementation in `projection_output.py`
 3. Update callers one by one with tests
 4. Remove old implementation once all callers migrated
-
-### CSV Output Improvements Plan
-
-#### action_summary.csv Improvements:
-- **Remove fields**: `acquisition_date` and `holding_period_days` (always empty/0)
-- **Add field**: `current_share_price` - FMV at action time (not just strike price)
-- **Add field**: `lot_options_remaining` - for unexercised options after this action
-- **Add field**: `lot_shares_remaining` - for exercised shares after this action
-
-#### annual_summary.csv Improvements:
-- **Add field**: `shares_exercised_count` - quantity of shares exercised this year
-- **Add field**: `shares_sold_count` - quantity of shares sold this year
-- **Add field**: `amt_credits_generated` - AMT credits created this year
-- **Add field**: `amt_credits_consumed` - AMT credits used this year
-- **Add field**: `investment_balance` - explicitly show crypto + growth (currently buried in net_worth)
-- **Add field**: `starting_cash` - to easily see year-over-year cash flow change
-
-#### comprehensive_cashflow.csv Improvements:
-- **Rename field**: `ending_investments` → `crypto_plus_growth` for clarity
-- **Add field**: `company_match_received` - the 3:1 match amount received this year
-
-#### charitable_carryforward.csv Enhancements:
-- ~~**Add field**: `total_federal_deduction` - shows actual federal deduction used per year~~ (COMPLETED - shows combined cash + stock federal deduction)
-- ~~**Add field**: `federal_stock_carryforward_remaining_by_year` - dictionary showing carryforward by creation year~~ (COMPLETED - enables tracking of remaining carryforward amounts by year of origin)
-
-#### annual_tax_detail.csv Fixes:
-- ~~**Fix implementation**: `federal_regular_tax`, `federal_amt_tax`, `ca_regular_tax`, `ca_amt_tax` all showing 0~~ (FIXED - enhanced TaxState with separate federal/state tracking)
-- ~~**Root cause**: Need to extract these values from TaxState object after annual tax calculation~~ (FIXED - projection_calculator now populates separate federal/state components)
-- ~~**Note**: May require TaxState architectural enhancement to properly separate federal/state components~~ (COMPLETED - TaxState enhanced with federal_regular_tax, federal_amt_tax, ca_regular_tax, ca_amt_tax fields)
-- ~~**Add field**: `amt_credits_remaining` - show unused AMT credit balance for optimization tracking~~ (COMPLETED - added to annual_tax_detail.csv to help minimize unused AMT credits in scenario planning)
-
-#### tax_component_breakdown.csv Context:
-- **Purpose**: Shows tax implications of each income component (ISO/NSO exercises, STCG/LTCG, W2)
-- **Issue**: Uses hardcoded tax rates (37% federal, 20% LTCG, 9.3% CA) instead of progressive brackets
-- **Note**: This is a simplified view - actual taxes are calculated with progressive brackets in annual_tax_calculator
-- **Recommendation**: Remove this CSV entirely - it's redundant since action_summary.csv already contains all tax-contributing components (amt_adjustment, capital_gain, exercise_cost, donation_value) and the hardcoded rates are misleading
-
-#TaxState Planning
-## Recommendations for TaxState Enhancement
-
-Here's a minimal but effective enhancement to `TaxState`:
-
-```python
-@dataclass
-class TaxState:
-    """Tax-related state for a given year."""
-    # Keep existing combined values for backward compatibility
-    regular_tax: float = 0.0
-    amt_tax: float = 0.0
-    total_tax: float = 0.0
-
-    # Federal-specific values (most critical for downstream)
-    federal_tax_owed: float = 0.0
-    federal_amt_credits_generated: float = 0.0
-    federal_amt_credits_used: float = 0.0
-    federal_amt_credits_remaining: float = 0.0
-
-    # State-specific values (add only CA for now)
-    ca_tax_owed: float = 0.0
-
-    # Add these helper properties for clarity
-    @property
-    def federal_is_amt(self) -> bool:
-        """Whether federal taxes are subject to AMT."""
-        return self.federal_amt_credits_generated > 0
-```
-
-### Rationale:
-
-1. **Minimal Changes**: Only adds 2 new fields (`federal_tax_owed`, `ca_tax_owed`) to address the most critical gap
-
-2. **Backward Compatible**: Keeps existing fields so no breaking changes
-
-3. **Most Critical Values**:
-   - Federal/state tax separation (needed for CSV output - see TODO at lines 75-78)
-   - AMT credit tracking already exists for federal (the most complex carryforward)
-   - CA AMT credits can wait until there's a real use case
-
-4. **What We're NOT Adding**:
-   - Separate regular/AMT for each jurisdiction (overengineering)
-   - CA AMT credits (no current use case per TODO comment)
-   - Detailed income breakdowns (already in AnnualTaxComponents)
-
-5. **Key Benefits**:
-   - CSV outputs can show federal vs state taxes
-   - Multi-state tax planning becomes possible
-   - AMT credit carryforward continues working
-   - Simple property makes AMT status clear
-
-This approach follows the "just enough" principle - it solves the immediate problems (CSV output gaps, federal/state visibility) without creating a complex tax state hierarchy.

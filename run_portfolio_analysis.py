@@ -35,8 +35,10 @@ def print_scenario_results(result, detailed=False):
     print(f"\nCUMULATIVE METRICS:")
     print(f"  💸 Total Taxes Paid: ${metrics['total_taxes_all_years']:,.0f}")
     print(f"  🎁 Total Donations: ${metrics['total_donations_all_years']:,.0f}")
-    print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
-    print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
+    if 'outstanding_obligation' in metrics:
+        print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
+    if 'pledge_fulfillment_maximalist' in metrics:
+        print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
 
     if detailed and final_state:
         # Equity position details

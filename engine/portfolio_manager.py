@@ -371,6 +371,7 @@ class PortfolioManager:
 
             # Skip actions outside projection period
             if action_date < start_date or action_date > end_date:
+                print(f"⚠️  Warning: Skipping action on {action_date} in scenario '{scenario_name}' (outside projection period {start_date} to {end_date})")
                 continue
 
             # Create action with dynamic price determination
