@@ -64,6 +64,7 @@ class ShareLot:
     amt_adjustment: float = 0.0
     fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
     expiration_date: Optional[date] = None  # Expiration date for options
+    grant_id: Optional[str] = None  # ID of the original grant this lot came from
 
     def __post_init__(self):
         """Validate ShareLot constraints after initialization."""
@@ -559,6 +560,9 @@ class UserProfile:
 
     # Tax carryforwards
     amt_credit_carryforward: float = 0.0
+
+    # IPO timing for pledge expiration calculations
+    assumed_ipo: Optional[date] = None
 
     def get_total_agi(self) -> float:
         """Calculate total AGI for charitable deduction limits."""

@@ -51,6 +51,11 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
     carryforwards = tax_situation.get('carryforwards', {})
     monthly_cash_flow = financial_pos.get('monthly_cash_flow', {})
 
+    # Parse assumed_ipo date if present
+    assumed_ipo = None
+    if 'assumed_ipo' in profile_data:
+        assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
+
     return UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
         federal_ltcg_rate=personal_info['federal_ltcg_rate'],
@@ -75,8 +80,9 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
         regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
         supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        taxable_investments=liquid_assets.get('taxable_investments', 0),
-        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+        taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+        assumed_ipo=assumed_ipo
     )
 
 
@@ -217,6 +223,11 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     carryforwards = tax_situation.get('carryforwards', {})
     monthly_cash_flow = financial.get('monthly_cash_flow', {})
 
+    # Parse assumed_ipo date if present
+    assumed_ipo = None
+    if 'assumed_ipo' in profile_data:
+        assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
+
     profile = UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
         federal_ltcg_rate=personal_info['federal_ltcg_rate'],
@@ -241,8 +252,9 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
         supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
-        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+        taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+        assumed_ipo=assumed_ipo
     )
 
     # Set up projection period

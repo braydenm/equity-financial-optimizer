@@ -178,22 +178,5 @@
     "company_match_ratio": 3.0,
     "donation_window_months": 36
   },
-  "market_assumptions": {
-    "scenarios": [],
-    "liquidity_timeline": {
-      "ipo_earliest": 2026,
-      "ipo_expected": 2028,
-      "acquisition_probability": 0.3,
-      "secondary_sales_frequency": "none"
-    }
-  },
-  "decision_parameters": {
-    "tender_participation": {
-      "max_shares_allowed": 20000,
-      "target_proceeds": 500000,
-      "max_percentage": 0.2
-    },
-    "exercise_strategy": "amt_optimize",
-    "donation_strategy": "immediate"
-  }
+  "assumed_ipo": "2033-03-24"
 }
