@@ -204,7 +204,8 @@ class ProjectionCalculator:
                         sale_price=action.price if action.price else 0,
                         pledge_percentage=self.pledge_percentage,
                         sale_date=action.action_date,
-                        lot_id=action.lot_id
+                        lot_id=action.lot_id,
+                        assumed_ipo=self.profile.assumed_ipo
                     )
                     pledge_state.add_obligation(obligation)
 

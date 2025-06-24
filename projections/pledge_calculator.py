@@ -23,6 +23,7 @@ class PledgeCalculator:
         pledge_percentage: float,
         sale_date: date,
         lot_id: str,
+        assumed_ipo: Optional[date] = None,
         pledge_window_years: int = 3
     ) -> PledgeObligation:
         """
@@ -41,6 +42,7 @@ class PledgeCalculator:
             pledge_percentage: Pledge percentage (e.g., 0.5 for 50%)
             sale_date: Date of the sale transaction
             lot_id: Identifier of the lot being sold
+            assumed_ipo: Expected IPO date for calculating match window expiry
             pledge_window_years: Years allowed to fulfill pledge (default: 3)
 
         Returns:
@@ -70,8 +72,14 @@ class PledgeCalculator:
         # Create transaction ID
         transaction_id = f"{lot_id}_{sale_date.isoformat()}"
 
-        # Calculate deadline
-        deadline = sale_date + timedelta(days=pledge_window_years * 365)
+        # Calculate deadline: min(sale_date + 3 years, assumed_ipo + 1 year)
+        sale_window_deadline = sale_date + timedelta(days=pledge_window_years * 365)
+
+        if assumed_ipo:
+            ipo_window_deadline = assumed_ipo + timedelta(days=365)
+            deadline = min(sale_window_deadline, ipo_window_deadline)
+        else:
+            deadline = sale_window_deadline
 
         # Create and return obligation
         return PledgeObligation(
