@@ -73,6 +73,63 @@ def print_scenario_results(result, detailed=True):
 
             print(f"  ⚡ Consider exercising valuable vested options before expiration!")
 
+        # AMT Credit consumption warning
+        amt_credits_final = metrics.get('amt_credits_final', 0)
+        if amt_credits_final > 0:
+            # Calculate AMT credit consumption rate from final years
+            final_year_consumption = 0
+            penultimate_year_consumption = 0
+
+            if len(result.yearly_states) >= 2:
+                # Get consumption from last two years to estimate rate
+                for i, state in enumerate(result.yearly_states[-2:]):
+                    if hasattr(state, 'tax_state') and hasattr(state.tax_state, 'amt_credit_used'):
+                        consumption = state.tax_state.amt_credit_used
+                        if i == 0:
+                            penultimate_year_consumption = consumption
+                        else:
+                            final_year_consumption = consumption
+
+            # Use average of last two years, or final year if only one available
+            avg_consumption = final_year_consumption
+            if penultimate_year_consumption > 0:
+                avg_consumption = (final_year_consumption + penultimate_year_consumption) / 2
+
+            if avg_consumption > 0:
+                years_to_consume = amt_credits_final / avg_consumption
+                if years_to_consume > 20:
+                    print(f"\n⚠️  AMT CREDIT CONSUMPTION WARNING:")
+                    print(f"  💰 AMT credits of ${amt_credits_final:,.0f} will take >{years_to_consume:.0f} years to consume at current rate of ${avg_consumption:,.0f}/year")
+                    print(f"  📈 Consider strategies to accelerate AMT credit usage")
+            elif amt_credits_final > 50000:  # Warn for large unused credits even if no recent consumption
+                print(f"\n⚠️  AMT CREDIT ACCUMULATION WARNING:")
+                print(f"  💰 Large AMT credit balance of ${amt_credits_final:,.0f} with no recent consumption")
+                print(f"  📈 Consider strategies to utilize these credits")
+
+        # Pledge obligation expiration warnings
+        pledge_shares_outstanding = metrics.get('pledge_shares_outstanding', 0)
+        pledge_shares_expired = metrics.get('pledge_shares_expired', 0)
+        outstanding_obligation = metrics.get('outstanding_obligation', 0)
+
+        if pledge_shares_outstanding > 0:
+            print(f"\n⚠️  PLEDGE OBLIGATION WARNINGS:")
+            print(f"  📋 Outstanding pledge: {pledge_shares_outstanding:,} shares (${outstanding_obligation:,.0f})")
+            print(f"  ⏰ These obligations have active match windows - donate before expiration!")
+
+        if pledge_shares_expired > 0:
+            print(f"\n⚠️  EXPIRED PLEDGE OBLIGATIONS:")
+            print(f"  💸 Lost match opportunities: {pledge_shares_expired:,} shares")
+            print(f"  🔥 These pledges expired without being fulfilled - company match no longer available")
+            print(f"  📝 Consider replanning future strategies to avoid missed deadlines")
+
+        # Charitable deduction expiration warnings
+        expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
+        if expired_charitable_deduction > 0:
+            print(f"\n⚠️  CHARITABLE DEDUCTION EXPIRATION WARNING:")
+            print(f"  📋 Expired deductions: ${expired_charitable_deduction:,.0f}")
+            print(f"  ⏰ These deductions expired after 5-year carryforward period")
+            print(f"  📈 Consider timing donations to maximize deduction utilization")
+
         # Comprehensive financial summary
         print(f"\nFINANCIAL SUMMARY:")
         print(f"  {'Year':<6} {'Income':>10} {'Expenses':>10} {'Exercise':>10} {'Sales':>10} {'Tax':>10} {'Donations':>10} {'Net Flow':>10} {'Eff Tax%':>9}")

@@ -826,9 +826,10 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
 
         # Ending balances
         ending_cash = state.ending_cash
-        ending_investments = state.investment_balance
+        crypto_balance = result.user_profile.crypto  # Static crypto balance from profile
+        other_investments = state.investment_balance  # Growth on taxable investments
         ending_equity_value = state.total_equity_value
-        total_net_worth = ending_cash + ending_investments + ending_equity_value
+        total_net_worth = ending_cash + other_investments + crypto_balance + ending_equity_value
 
         row = {
             'year': state.year,
@@ -858,7 +859,8 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
             'net_cash_flow': round(net_cash_flow, 2),
             # Ending balances
             'ending_cash': round(ending_cash, 2),
-            'ending_investments': round(ending_investments, 2),
+            'other_investments': round(other_investments, 2),
+            'crypto_balance': round(crypto_balance, 2),
             'ending_equity_value': round(ending_equity_value, 2),
             'total_net_worth': round(total_net_worth, 2),
             # Tax details
