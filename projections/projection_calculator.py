@@ -223,9 +223,12 @@ class ProjectionCalculator:
                         donation_date=action.action_date
                     )
 
-                    # Calculate company match based on eligible amount only
+                    # Calculate company match based on eligible amount using grant-specific ratio
                     eligible_amount = discharge_result.get('eligible_amount', 0.0)
-                    actual_company_match = eligible_amount * self.company_match_ratio
+                    # Get the company match ratio from the donation component that was just created
+                    latest_donation_component = annual_components.donation_components[-1]
+                    grant_company_match_ratio = latest_donation_component.company_match_ratio
+                    actual_company_match = eligible_amount * grant_company_match_ratio
                     year_company_match += actual_company_match
 
                     # Update the donation result with actual company match
@@ -629,6 +632,10 @@ class ProjectionCalculator:
         # Company match will be calculated after pledge discharge based on eligible amount
         company_match_amount = 0.0
 
+        # Get grant-specific charitable program for company match ratio
+        grant_charitable_program = self._get_charitable_program_for_grant(lot.grant_id)
+        grant_company_match_ratio = grant_charitable_program['company_match_ratio']
+
         # Create donation components
         donation_components = DonationComponents(
             lot_id=lot.lot_id,
@@ -640,7 +647,7 @@ class ProjectionCalculator:
             holding_period_days=holding_period_days,
             donation_value=donation_value,
             deduction_type='stock',
-            company_match_ratio=self.company_match_ratio,
+            company_match_ratio=grant_company_match_ratio,
             company_match_amount=company_match_amount
         )
 
