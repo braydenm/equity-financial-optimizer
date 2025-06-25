@@ -406,35 +406,7 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
 
         save_all_projection_csvs(result, "grant_specific_test", csv_output_dir)
 
-        # Validate pledge obligations CSV shows grant-specific data
-        pledge_csv_path = os.path.join(csv_output_dir, "grant_specific_test_pledge_obligations.csv")
-        self.assertTrue(os.path.exists(pledge_csv_path))
 
-        with open(pledge_csv_path, 'r') as f:
-            reader = csv.DictReader(f)
-            pledge_rows = list(reader)
-
-        # Should have 3 pledge obligation rows
-        self.assertEqual(len(pledge_rows), 3)
-
-        # Validate early grant pledge (fully fulfilled)
-        early_row = next((r for r in pledge_rows if "EARLY_EXERCISED_LOT" in r['obligation_id']), None)
-        self.assertIsNotNone(early_row)
-        self.assertEqual(float(early_row['pledge_percentage']), 0.5)
-        # Expected pledge amount: 2000 required shares * $25 = $50,000 (maximalist interpretation)
-        self.assertEqual(float(early_row['pledge_amount']), 50000.0)
-        self.assertEqual(float(early_row['fulfilled_amount']), 50000.0)  # Fully fulfilled
-        self.assertEqual(float(early_row['remaining_amount']), 0.0)  # Fully fulfilled
-
-        # Validate mid grant pledge (partially fulfilled)
-        mid_row = next((r for r in pledge_rows if "MID_EXERCISED_LOT" in r['obligation_id']), None)
-        self.assertIsNotNone(mid_row)
-        self.assertEqual(float(mid_row['pledge_percentage']), 0.25)
-        # Expected pledge amount: 333 required shares * $25 = $8,325 (maximalist interpretation)
-        self.assertEqual(float(mid_row['pledge_amount']), 8325.0)
-        # Fulfilled amount: 200 shares * $25 = $5,000
-        self.assertEqual(float(mid_row['fulfilled_amount']), 5000.0)
-        self.assertGreater(float(mid_row['remaining_amount']), 0.0)  # Partially fulfilled
 
         # 9. Validate summary metrics
         summary_metrics = result.summary_metrics

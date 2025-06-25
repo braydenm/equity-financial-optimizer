@@ -137,6 +137,7 @@ class ProjectionCalculator:
             current_investments = current_investments * (1 + self.profile.investment_return_rate)
 
             year_exercise_costs = 0.0
+            year_sale_proceeds = 0.0  # Track total sale proceeds for the year
             year_tax_paid = 0.0
             year_donation_value = 0.0
             year_company_match = 0.0
@@ -188,15 +189,15 @@ class ProjectionCalculator:
             for action in sorted(year_actions, key=lambda a: a.action_date):
                 if action.action_type == ActionType.EXERCISE:
                     # Get the FMV for this year from price projections
-                    year_fmv = plan.price_projections.get(year,
-                        self.profile.current_cash)  # Fallback to a default if missing
+                    if year not in plan.price_projections:
+                        raise ValueError(f"Price projection for year {year} not found in plan")
+                    year_fmv = plan.price_projections[year]
                     exercise_result = self._process_exercise(action, current_lots, annual_components, year_fmv)
                     year_exercise_costs += exercise_result['exercise_cost']
-                    current_cash -= exercise_result['exercise_cost']
 
                 elif action.action_type == ActionType.SELL:
                     sale_result = self._process_sale(action, current_lots, annual_components, yearly_state)
-                    current_cash += sale_result['gross_proceeds']  # Tax will be calculated at year-end
+                    year_sale_proceeds += sale_result['gross_proceeds']  # Track total sale proceeds
 
                     # Get grant-specific charitable program for pledge obligation
                     sold_lot = sale_result['lot']
@@ -292,10 +293,10 @@ class ProjectionCalculator:
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward
             year_tax_state.amt_credits_remaining = amt_credits_remaining
 
-            # Calculate end of year cash including all income/expenses
+            # Calculate end of year cash including all income/expenses and sale proceeds
             # Note: Investment growth stays in investments, not added to liquid cash
             year_expenses = self.profile.get_annual_expenses()
-            year_end_cash = (year_start_cash + year_total_income
+            year_end_cash = (year_start_cash + year_total_income + year_sale_proceeds
                            - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
 
@@ -553,13 +554,10 @@ class ProjectionCalculator:
         sale_price = action.price
 
         # Determine acquisition date and type based on lifecycle state
-        if lot.exercise_date:
-            acquisition_date = lot.exercise_date
-            acquisition_type = 'exercise'
-        else:
-            # For vested but not exercised shares, use grant date
-            acquisition_date = lot.grant_date
-            acquisition_type = 'vest'
+        exercise_date = lot.exercise_date
+        if not exercise_date:
+            # Fallback: use action date if lot doesn't have exercise date
+            exercise_date = action.action_date
 
         # Calculate sale components
         sale_components = self.sale_calculator.calculate_sale_components(
@@ -568,11 +566,9 @@ class ProjectionCalculator:
             shares_to_sell=action.quantity,
             sale_price=sale_price,
             cost_basis=lot.cost_basis,
-            acquisition_date=acquisition_date,
-            acquisition_type=acquisition_type,
+            exercise_date=exercise_date,
             is_iso=(lot.share_type == ShareType.ISO),
             grant_date=lot.grant_date,
-            exercise_date=lot.exercise_date,
             fmv_at_exercise=getattr(lot, 'fmv_at_exercise', None)
         )
 
@@ -619,12 +615,10 @@ class ProjectionCalculator:
 
         # Determine acquisition date and holding period
         if lot.exercise_date:
-            acquisition_date = lot.exercise_date
-            holding_period_days = (action.action_date - acquisition_date).days
+            exercise_date = lot.exercise_date
+            holding_period_days = (action.action_date - exercise_date).days
         else:
-            # For vested but not exercised shares, use grant date
-            acquisition_date = lot.grant_date
-            holding_period_days = (action.action_date - acquisition_date).days
+            holding_period_days = 0
 
         # Calculate donation value (FMV for display purposes)
         donation_value = action.quantity * donation_price
@@ -643,7 +637,7 @@ class ProjectionCalculator:
             shares_donated=action.quantity,
             fmv_at_donation=donation_price,
             cost_basis=lot.cost_basis,
-            acquisition_date=acquisition_date,
+            exercise_date=exercise_date,
             holding_period_days=holding_period_days,
             donation_value=donation_value,
             deduction_type='stock',

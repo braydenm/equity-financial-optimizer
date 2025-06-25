@@ -9,7 +9,7 @@ import csv
 import os
 from datetime import date
 from typing import List, Dict, Any
-from projections.projection_state import ProjectionResult, YearlyState, LifecycleState
+from projections.projection_state import ProjectionResult, YearlyState, LifecycleState, ShareType
 from projections.detailed_materialization import materialize_detailed_projection
 
 # Import tax constants for charitable deduction limits
@@ -242,132 +242,221 @@ def save_state_timeline_csv(result: ProjectionResult, output_path: str) -> None:
             writer.writerow(_create_group_total_row(group_lots, result.yearly_states, years))
 
 
-def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save holding period tracking for tax treatment determination."""
+def generate_holding_milestones_csv(result: ProjectionResult, output_path: str) -> None:
+    """Generate comprehensive milestone tracking for all equity lots based on current state."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     final_state = result.get_final_state()
     if not final_state:
         return
 
+    # Get assumed IPO date from user profile
+    assumed_ipo = None
+    if result.user_profile and hasattr(result.user_profile, 'assumed_ipo'):
+        assumed_ipo = result.user_profile.assumed_ipo #No silent fallback
+    if not assumed_ipo:
+        assumed_ipo = date(2040, 1, 1)  # Default fallback
+
+    # Calculate scenario end date for countdown
+    scenario_end_date = date(final_state.year, 12, 31)
+
     with open(output_path, 'w', newline='') as f:
         fieldnames = [
-            'lot_id', 'acquisition_date', 'acquisition_type', 'current_quantity',
-            'days_held', 'holding_status', 'iso_qualifying_date', 'notes'
+            'lot_id', 'current_quantity', 'lifecycle_state', 'share_type',
+            'grant_date', 'exercise_date', 'exercise_date',
+            'milestone_type', 'milestone_date', 'days_until_milestone', 'years_until_milestone',
+            'milestone_description'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Calculate from final state
-        calculation_date = final_state.year * 10000 + 1231  # Year-end date
-        calc_date = date(final_state.year, 12, 31)
-
+        # Process all current holdings
         for lot in final_state.equity_holdings:
-            # Skip expired lots - they're no longer held
             if lot.lifecycle_state == LifecycleState.EXPIRED:
                 continue
 
-            # Determine acquisition date and type
-            acquisition_date = None
-            acquisition_type = ''
-            iso_qualifying_date = None
+            milestones = []
 
-            if hasattr(lot, 'acquisition_date'):
-                acquisition_date = lot.acquisition_date
-            elif hasattr(lot, 'exercise_date'):
-                acquisition_date = lot.exercise_date
-                acquisition_type = 'exercise'
-            elif hasattr(lot, 'vest_date'):
-                acquisition_date = lot.vest_date
-                acquisition_type = 'vest'
-            elif hasattr(lot, 'grant_date'):
-                acquisition_date = lot.grant_date
-                acquisition_type = 'grant'
+            # Calculate milestones based on lifecycle state
+            if lot.lifecycle_state == LifecycleState.GRANTED_NOT_VESTED:
+                # Option expiration date
+                if hasattr(lot, 'expiration_date') and lot.expiration_date:
+                    milestones.append({
+                        'type': 'option_expiration',
+                        'date': lot.expiration_date,
+                        'description': 'Option expires - exercise before this date'
+                    })
 
-            # Calculate days held
-            days_held = 0
-            if acquisition_date:
-                days_held = (calc_date - acquisition_date).days
+            elif lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED:
+                # Option expiration date
+                if hasattr(lot, 'expiration_date') and lot.expiration_date:
+                    milestones.append({
+                        'type': 'option_expiration',
+                        'date': lot.expiration_date,
+                        'description': 'Option expires - exercise before this date'
+                    })
 
-            # Determine holding status
-            holding_status = 'short-term' if days_held <= 365 else 'long-term'
+                # IPO pledge deadline (assumed_ipo + 12 months)
+                try:
+                    ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
+                except ValueError:
+                    ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
+                milestones.append({
+                    'type': 'ipo_pledge_deadline',
+                    'date': ipo_pledge_deadline,
+                    'description': 'IPO pledge window closes - donate before this date for company match'
+                })
 
-            # For ISOs, calculate qualifying disposition date
-            if lot.share_type.value == 'ISO' and acquisition_date:
-                # ISO qualifying requires 2 years from grant AND 1 year from exercise
-                if hasattr(lot, 'grant_date') and hasattr(lot, 'exercise_date'):
-                    if lot.grant_date and lot.exercise_date:
-                        # Handle leap year edge cases
-                        try:
-                            two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2)
-                        except ValueError:
-                            # Handle Feb 29 -> Feb 28 for non-leap years
-                            two_years_from_grant = lot.grant_date.replace(year=lot.grant_date.year + 2, day=28)
+            elif lot.lifecycle_state == LifecycleState.EXERCISED_NOT_DISPOSED:
+                # LTCG date (exercise_date + 1 year)
+                if hasattr(lot, 'exercise_date') and lot.exercise_date:
+                    try:
+                        ltcg_date = date(lot.exercise_date.year + 1, lot.exercise_date.month, lot.exercise_date.day)
+                    except ValueError:
+                        ltcg_date = date(lot.exercise_date.year + 1, lot.exercise_date.month, 28)
 
-                        try:
-                            one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1)
-                        except ValueError:
-                            # Handle Feb 29 -> Feb 28 for non-leap years
-                            one_year_from_exercise = lot.exercise_date.replace(year=lot.exercise_date.year + 1, day=28)
-                        iso_qualifying_date = max(two_years_from_grant, one_year_from_exercise)
+                    milestones.append({
+                        'type': 'ltcg_eligible',
+                        'date': ltcg_date,
+                        'description': 'Long-term capital gains treatment begins'
+                    })
 
-            # Build notes about tax treatment
-            notes = []
-            if lot.share_type.value == 'ISO' and iso_qualifying_date:
-                if calc_date >= iso_qualifying_date:
-                    notes.append('Qualifying disposition eligible')
-                else:
-                    days_until_qualify = (iso_qualifying_date - calc_date).days
-                    notes.append(f'Disqualifying - {days_until_qualify} days until qualifying')
+                # IPO pledge deadline
+                try:
+                    ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
+                except ValueError:
+                    ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
+                milestones.append({
+                    'type': 'ipo_pledge_deadline',
+                    'date': ipo_pledge_deadline,
+                    'description': 'IPO pledge window closes - donate before this date for company match'
+                })
 
-            writer.writerow({
-                'lot_id': lot.lot_id,
-                'acquisition_date': acquisition_date.isoformat() if acquisition_date else '',
-                'acquisition_type': acquisition_type,
-                'current_quantity': lot.quantity,
-                'days_held': days_held,
-                'holding_status': holding_status,
-                'iso_qualifying_date': iso_qualifying_date.isoformat() if iso_qualifying_date else '',
-                'notes': '; '.join(notes)
-            })
+            # ISO-specific qualifying disposition date
+            if lot.share_type.value == 'ISO' and hasattr(lot, 'grant_date') and hasattr(lot, 'exercise_date'):
+                if lot.grant_date and lot.exercise_date:
+                    # max(grant_date + 2 years, exercise_date + 1 year)
+                    try:
+                        two_years_from_grant = date(lot.grant_date.year + 2, lot.grant_date.month, lot.grant_date.day)
+                    except ValueError:
+                        two_years_from_grant = date(lot.grant_date.year + 2, lot.grant_date.month, 28)
+
+                    try:
+                        one_year_from_exercise = date(lot.exercise_date.year + 1, lot.exercise_date.month, lot.exercise_date.day)
+                    except ValueError:
+                        one_year_from_exercise = date(lot.exercise_date.year + 1, lot.exercise_date.month, 28)
+
+                    qualifying_date = max(two_years_from_grant, one_year_from_exercise)
+                    milestones.append({
+                        'type': 'iso_qualifying_disposition',
+                        'date': qualifying_date,
+                        'description': 'ISO qualifying disposition eligibility begins'
+                    })
+
+            # Determine acquisition date
+            exercise_date = None
+            if hasattr(lot, 'exercise_date') and lot.exercise_date:
+                exercise_date = lot.exercise_date
+
+            # Write a row for each milestone
+            for milestone in milestones:
+                days_until = (milestone['date'] - scenario_end_date).days
+                years_until = round(days_until / 365.25, 1)
+
+                writer.writerow({
+                    'lot_id': lot.lot_id,
+                    'current_quantity': lot.quantity,
+                    'lifecycle_state': lot.lifecycle_state.value,
+                    'share_type': lot.share_type.value,
+                    'grant_date': lot.grant_date.isoformat() if hasattr(lot, 'grant_date') and lot.grant_date else '',
+                    'exercise_date': lot.exercise_date.isoformat() if hasattr(lot, 'exercise_date') and lot.exercise_date else '',
+                    'exercise_date': exercise_date.isoformat() if exercise_date else '',
+                    'milestone_type': milestone['type'],
+                    'milestone_date': milestone['date'].isoformat(),
+                    'days_until_milestone': days_until,
+                    'years_until_milestone': years_until,
+                    'milestone_description': milestone['description']
+                })
+
+        # Process disposed lots for additional milestones
+        # Build a map of actual sale dates from planned actions
+        sale_dates = {}
+        if result.plan and hasattr(result.plan, 'planned_actions'):
+            for action in result.plan.planned_actions:
+                if action.action_type.value == 'SELL':
+                    sale_dates[action.lot_id] = action.action_date
+
+        for year_state in result.yearly_states:
+            # Track sold lots for pledge window expiry
+            for lot_id, shares_sold in year_state.shares_sold.items():
+                if shares_sold > 0:
+                    # Use actual sale date from planned actions, fallback to mid-year
+                    sale_date = sale_dates.get(lot_id, date(year_state.year, 3, 1))
+
+                    # Calculate pledge window expiry (sale_date + 36 months, but max IPO + 12 months)
+                    try:
+                        sale_plus_36_months = date(sale_date.year + 3, sale_date.month, sale_date.day)
+                    except ValueError:
+                        sale_plus_36_months = date(sale_date.year + 3, sale_date.month, 28)
+
+                    try:
+                        ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
+                    except ValueError:
+                        ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
+                    pledge_window_expiry = min(sale_plus_36_months, ipo_plus_12_months)
+
+                    days_until = (pledge_window_expiry - scenario_end_date).days
+                    years_until = round(days_until / 365.25, 1)
+
+                    # Only include if the window hasn't expired yet
+                    if days_until > -365:  # Include if expired within last year for context
+                        writer.writerow({
+                            'lot_id': lot_id,
+                            'current_quantity': 0,
+                            'lifecycle_state': 'DISPOSED_SOLD',
+                            'share_type': '',
+                            'grant_date': '',
+                            'exercise_date': '',
+                            'exercise_date': '',
+                            'milestone_type': 'pledge_window_expiry',
+                            'milestone_date': pledge_window_expiry.isoformat(),
+                            'days_until_milestone': days_until,
+                            'years_until_milestone': years_until,
+                            'milestone_description': f'Pledge window expires for {shares_sold} shares sold'
+                        })
+
+            # Track donated lots for deduction expiry
+            for lot_id, shares_donated in year_state.shares_donated.items():
+                if shares_donated > 0:
+                    # Deduction expires 5 years after donation year
+                    deduction_expiry = date(year_state.year + 5, 12, 31)
+
+                    days_until = (deduction_expiry - scenario_end_date).days
+                    years_until = round(days_until / 365.25, 1)
+
+                    # Only include if the deduction hasn't expired yet
+                    if days_until > -365:  # Include if expired within last year for context
+                        writer.writerow({
+                            'lot_id': lot_id,
+                            'current_quantity': 0,
+                            'lifecycle_state': 'DISPOSED_DONATED',
+                            'share_type': '',
+                            'grant_date': '',
+                            'exercise_date': '',
+                            'exercise_date': '',
+                            'milestone_type': 'deduction_expiry',
+                            'milestone_date': deduction_expiry.isoformat(),
+                            'days_until_milestone': days_until,
+                            'years_until_milestone': years_until,
+                            'milestone_description': f'Charitable deduction expires for {shares_donated} shares donated in {year_state.year}'
+                        })
 
 
-def save_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save pledge obligations tracking from share sales."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str) -> None:
+    """Legacy wrapper - use generate_holding_milestones_csv for new comprehensive tracking."""
+    generate_holding_milestones_csv(result, output_path)
 
-    final_state = result.get_final_state()
-    if not final_state or not hasattr(final_state, 'pledge_state'):
-        return
 
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = [
-            'obligation_id', 'creation_date', 'source_sale_lot', 'sale_proceeds',
-            'pledge_percentage', 'pledge_amount', 'match_window_closes',
-            'fulfilled_amount', 'remaining_amount', 'days_until_deadline'
-        ]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        # Get current date for deadline calculation
-        calc_date = date(final_state.year, 12, 31)
-
-        # Write all obligations
-        for obligation in final_state.pledge_state.obligations:
-            days_until_deadline = (obligation.match_window_closes - calc_date).days
-
-            writer.writerow({
-                'obligation_id': obligation.parent_transaction_id,
-                'creation_date': obligation.commencement_date.isoformat(),
-                'source_sale_lot': obligation.parent_transaction_id.rsplit('_', 1)[0] if '_' in obligation.parent_transaction_id else obligation.parent_transaction_id, ##CLaude TODO: Confirm this isn't assuming always the second underscore since there might be other naming conventions used.
-                'sale_proceeds': round(obligation.total_pledge_obligation / obligation.pledge_percentage if obligation.pledge_percentage > 0 else 0, 2),
-                'pledge_percentage': round(obligation.pledge_percentage, 4),
-                'pledge_amount': round(obligation.total_pledge_obligation, 2),
-                'match_window_closes': obligation.match_window_closes.isoformat(),
-                'fulfilled_amount': round(obligation.donations_made, 2),
-                'remaining_amount': round(obligation.outstanding_obligation, 2),
-                'days_until_deadline': days_until_deadline
-            })
 
 
 def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str) -> None:
@@ -764,11 +853,39 @@ def save_transition_timeline_csv(result: ProjectionResult, output_path: str) -> 
                                         break
                                 # If not in events, calculate from state
                                 if quantity == 0:
-                                    # Make sure it wasn't sold or donated
-                                    total_sold = yearly_state.shares_sold.get(lot_id, 0)
-                                    total_donated = yearly_state.shares_donated.get(lot_id, 0)
-                                    if prev_lot.quantity > total_sold + total_donated:
-                                        quantity = prev_lot.quantity - total_sold - total_donated
+                                    # Only mark as expiring if it was an unexercised option that actually expired this year
+                                    # Exercised options disappear but don't expire - they become exercise lots
+                                    if (prev_lot.share_type in [ShareType.ISO, ShareType.NSO] and
+                                        prev_lot.lifecycle_state == LifecycleState.VESTED_NOT_EXERCISED and
+                                        prev_lot.expiration_date and
+                                        (prev_lot.expiration_date.year == yearly_state.year or
+                                         prev_lot.expiration_date.year == yearly_state.year - 1)):
+
+                                        # Calculate shares that were sold or donated
+                                        total_sold = yearly_state.shares_sold.get(lot_id, 0)
+                                        total_donated = yearly_state.shares_donated.get(lot_id, 0)
+
+                                        # Check for shares that were exercised THIS YEAR by looking for exercise lots created this year
+                                        # Only count exercises that happened in the current year to avoid double-counting
+                                        total_exercised_from_this_lot = 0
+                                        for curr_exercise_lot in yearly_state.equity_holdings:
+                                            if (curr_exercise_lot.lifecycle_state == LifecycleState.EXERCISED_NOT_DISPOSED and
+                                                curr_exercise_lot.grant_id == prev_lot.grant_id and
+                                                curr_exercise_lot.grant_date == prev_lot.grant_date and
+                                                curr_exercise_lot.strike_price == prev_lot.strike_price and
+                                                curr_exercise_lot.exercise_date and
+                                                curr_exercise_lot.exercise_date.year == yearly_state.year):
+                                                # Check if this exercise lot didn't exist in previous year
+                                                prev_exercise_lot = next((l for l in prev_state.equity_holdings
+                                                                        if l.lot_id == curr_exercise_lot.lot_id), None)
+                                                if not prev_exercise_lot:
+                                                    # This exercise lot was created this year from our disappeared lot
+                                                    total_exercised_from_this_lot += curr_exercise_lot.quantity
+
+                                        # Only mark as expired the shares that can't be accounted for by sales, donations, or exercises
+                                        unaccounted_shares = prev_lot.quantity - total_sold - total_donated - total_exercised_from_this_lot
+                                        if unaccounted_shares > 0:
+                                            quantity = unaccounted_shares
 
                         # Track disposals using year-over-year changes
                         if transition == 'Selling':
@@ -896,8 +1013,7 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     save_transition_timeline_csv(result, f"{output_dir}/{base_name}_transition_timeline.csv")
 
     # New tracking CSVs
-    save_holding_period_tracking_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
-    save_pledge_obligations_csv(result, f"{output_dir}/{base_name}_pledge_obligations.csv")
+    generate_holding_milestones_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
     save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
 
     # Comprehensive cash flow tracking

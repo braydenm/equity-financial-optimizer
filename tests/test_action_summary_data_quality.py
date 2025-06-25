@@ -170,20 +170,20 @@ def test_action_summary_data_quality():
             action_date = action['date']
             action_type = action['type']
             lot_id = action['lot_id']
-            acquisition_date = action['acquisition_date']
+            exercise_date = action['exercise_date']
             holding_period_days = action['holding_period_days']
             tax_treatment = action['tax_treatment']
 
             print(f"\n  Action {i+1}: {action_type} {lot_id} on {action_date}")
-            print(f"    Acquisition Date: '{acquisition_date}'")
+            print(f"    Acquisition Date: '{exercise_date}'")
             print(f"    Holding Period: {holding_period_days} days")
             print(f"    Tax Treatment: {tax_treatment}")
 
-            # Check if acquisition_date is populated (not empty)
-            if acquisition_date and acquisition_date.strip():
-                success_conditions.append(f"✅ {action_type} {lot_id}: acquisition_date populated")
+            # Check if exercise_date is populated (not empty)
+            if exercise_date and exercise_date.strip():
+                success_conditions.append(f"✅ {action_type} {lot_id}: exercise_date populated")
             else:
-                failures.append(f"❌ {action_type} {lot_id}: acquisition_date empty")
+                failures.append(f"❌ {action_type} {lot_id}: exercise_date empty")
 
             # Check if holding_period_days is calculated (not 0 for sales/donations)
             if action_type in ['sell', 'donate']:
@@ -209,7 +209,7 @@ def test_action_summary_data_quality():
                     failures.append(f"❌ {action_type} {lot_id}: cannot verify tax treatment consistency")
 
         # Check for additional fields that should be present
-        required_fields = ['year', 'date', 'type', 'lot_id', 'quantity', 'price', 'acquisition_date',
+        required_fields = ['year', 'date', 'type', 'lot_id', 'quantity', 'price', 'exercise_date',
                           'holding_period_days', 'tax_treatment', 'gross_proceeds', 'capital_gain']
 
         if actions:
@@ -248,7 +248,7 @@ def test_action_summary_data_quality():
 def test_expected_action_summary_behavior():
     """Display what action summary fields should contain."""
     print("\n🎯 EXPECTED ACTION SUMMARY BEHAVIOR:")
-    print("  acquisition_date: Actual grant/exercise date from lot lifecycle")
+    print("  exercise_date: Actual exercise date from lot lifecycle")
     print("  holding_period_days: Days between acquisition and action date")
     print("  tax_treatment: STCG (<365 days) or LTCG (≥365 days)")
     print("  current_share_price: FMV at time of action (not just strike)")

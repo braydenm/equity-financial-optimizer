@@ -45,7 +45,7 @@ class DetailedAction:
     strike_price: float = 0.0
     cost_basis: float = 0.0
     holding_period_days: int = 0
-    acquisition_date: Optional[date] = None
+    exercise_date: Optional[date] = None
     tax_treatment: str = ""
     vest_expiration_date: Optional[date] = None
     current_share_price: float = 0.0
@@ -271,38 +271,25 @@ class DetailedMaterializer:
             detailed.tax_treatment = lot.tax_treatment.value
             detailed.strike_price = lot.strike_price
 
-            # Extract acquisition date and expiration date from lot
-            # Determine acquisition date based on action type and lot characteristics
-            acquisition_date = None
-
+            # Extract exercise date and expiration date from lot
+            # Determine exercise date based on action type and lot characteristics
             if action.action_type == ActionType.EXERCISE:
-                # For exercise actions, acquisition date is always grant date (when option was granted)
-                acquisition_date = lot.grant_date
-            elif lot.share_type == ShareType.RSU:
-                # For RSUs, acquisition date is when they vested (exercise_date)
-                acquisition_date = lot.exercise_date
-            elif lot.share_type in [ShareType.ISO, ShareType.NSO]:
-                if lot.exercise_date:
-                    # For exercised options, acquisition date is exercise date
-                    acquisition_date = lot.exercise_date
-                else:
-                    # For unexercised options, acquisition date is grant date
-                    acquisition_date = lot.grant_date
+                # For exercise actions, the exercise date is the action date
+                detailed.exercise_date = action.action_date
             else:
-                # Fallback to grant_date for other types
-                acquisition_date = lot.grant_date
+                # For other actions, use the lot's exercise date
+                exercise_date = lot.exercise_date
+                if exercise_date:
+                    detailed.exercise_date = exercise_date
+                    # Calculate holding period for sales and donations
+                    if action.action_type in [ActionType.SELL, ActionType.DONATE]:
+                        detailed.holding_period_days = (action.action_date - exercise_date).days
 
-            if acquisition_date:
-                detailed.acquisition_date = acquisition_date
-                # Calculate holding period for sales and donations
-                if action.action_type in [ActionType.SELL, ActionType.DONATE]:
-                    detailed.holding_period_days = (action.action_date - acquisition_date).days
-
-                    # Update tax treatment based on actual holding period
-                    if detailed.holding_period_days >= 365:
-                        detailed.tax_treatment = "LTCG"
-                    else:
-                        detailed.tax_treatment = "STCG"
+                        # Update tax treatment based on actual holding period
+                        if detailed.holding_period_days >= 365:
+                            detailed.tax_treatment = "LTCG"
+                        else:
+                            detailed.tax_treatment = "STCG"
 
             if hasattr(lot, 'expiration_date'):
                 detailed.vest_expiration_date = lot.expiration_date
@@ -521,7 +508,7 @@ class DetailedMaterializer:
                     'lot_id': action.lot_id,
                     'quantity': action.quantity,
                     'price': round(action.price, 2),
-                    'acquisition_date': action.acquisition_date.isoformat() if action.acquisition_date else '',
+                    'exercise_date': action.exercise_date.isoformat() if action.exercise_date else '',
                     'holding_period_days': action.holding_period_days,
                     'tax_treatment': action.tax_treatment,
                     'calculator': action.calculator_used,
@@ -545,7 +532,7 @@ class DetailedMaterializer:
         # Always create the file, even if empty
         fieldnames = [
             'year', 'date', 'type', 'lot_id', 'quantity', 'price',
-            'acquisition_date', 'holding_period_days', 'tax_treatment',
+            'exercise_date', 'holding_period_days', 'tax_treatment',
             'calculator', 'gross_proceeds', 'exercise_cost', 'capital_gain',
             'amt_adjustment', 'tax', 'donation_value', 'company_match',
             'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes',

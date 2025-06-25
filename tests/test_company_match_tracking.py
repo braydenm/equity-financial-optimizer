@@ -93,6 +93,8 @@ class TestCompanyMatchTracking:
                 strike_price=10.0,
                 cost_basis=10.0,
                 grant_date=date(2022, 1, 1),
+                exercise_date=date(2022, 6, 1),
+                fmv_at_exercise=25.0,
                 lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
                 tax_treatment=TaxTreatment.NA
             ))
@@ -834,7 +836,7 @@ class TestCompanyMatchTracking:
             shares_donated=100,
             fmv_at_donation=50.0,
             cost_basis=10.0,
-            acquisition_date=date(2022, 1, 1),
+            exercise_date=date(2022, 1, 1),
             holding_period_days=365 * 3,  # Long-term
             company_match_ratio=3.0
         )

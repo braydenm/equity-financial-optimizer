@@ -164,16 +164,6 @@ def main():
     else:
         print(f"\n  ERROR: {holding_csv} not found!")
 
-    # Check pledge_obligations.csv
-    pledge_csv = os.path.join(output_dir, "debug_pledge_obligations.csv")
-    if os.path.exists(pledge_csv):
-        print(f"\n  {pledge_csv}:")
-        with open(pledge_csv, 'r') as f:
-            content = f.read()
-            print("    " + "\n    ".join(content.strip().split('\n')[:5]))  # First 5 lines
-    else:
-        print(f"\n  ERROR: {pledge_csv} not found!")
-
     print("\n" + "=" * 60)
     print("Debug complete. Check output/debug_csv/ for full CSV files.")
 

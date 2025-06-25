@@ -22,9 +22,9 @@ def test_share_donation_long_term():
     print("\nTest: Share Donation - Long-term Holding")
     print("-" * 50)
 
-    acquisition_date = date(2022, 1, 1)
+    exercise_date = date(2022, 1, 1)
     donation_date = date(2023, 6, 1)
-    holding_period_days = (donation_date - acquisition_date).days
+    holding_period_days = (donation_date - exercise_date).days
 
     result = ShareDonationCalculator.calculate_share_donation_components(
         lot_id="RSU-001",
@@ -32,7 +32,7 @@ def test_share_donation_long_term():
         shares_donated=1000,
         fmv_at_donation=60.0,
         cost_basis=20.0,
-        acquisition_date=acquisition_date,
+        exercise_date=exercise_date,
         holding_period_days=holding_period_days,
         company_match_ratio=3.0,
         pledge_id="PLEDGE-2023-001"
@@ -68,9 +68,9 @@ def test_share_donation_short_term():
     print("\nTest: Share Donation - Short-term Holding")
     print("-" * 50)
 
-    acquisition_date = date(2023, 1, 1)
+    exercise_date = date(2023, 1, 1)
     donation_date = date(2023, 6, 1)
-    holding_period_days = (donation_date - acquisition_date).days
+    holding_period_days = (donation_date - exercise_date).days
 
     result = ShareDonationCalculator.calculate_share_donation_components(
         lot_id="RSU-002",
@@ -78,7 +78,7 @@ def test_share_donation_short_term():
         shares_donated=500,
         fmv_at_donation=100.0,
         cost_basis=80.0,
-        acquisition_date=acquisition_date,
+        exercise_date=exercise_date,
         holding_period_days=holding_period_days,
         company_match_ratio=1.0
     )
@@ -106,8 +106,8 @@ def test_share_donation_exactly_one_year():
     print("\nTest: Share Donation - Exactly 365 Days")
     print("-" * 50)
 
-    acquisition_date = date(2022, 1, 1)
-    donation_date = acquisition_date + timedelta(days=365)
+    exercise_date = date(2022, 1, 1)
+    donation_date = exercise_date + timedelta(days=365)
 
     result = ShareDonationCalculator.calculate_share_donation_components(
         lot_id="STOCK-001",
@@ -115,7 +115,7 @@ def test_share_donation_exactly_one_year():
         shares_donated=100,
         fmv_at_donation=50.0,
         cost_basis=30.0,
-        acquisition_date=acquisition_date,
+        exercise_date=exercise_date,
         holding_period_days=365,
         company_match_ratio=0.0
     )
@@ -133,8 +133,8 @@ def test_share_donation_366_days():
     print("\nTest: Share Donation - 366 Days (Long-term)")
     print("-" * 50)
 
-    acquisition_date = date(2022, 1, 1)
-    donation_date = acquisition_date + timedelta(days=366)
+    exercise_date = date(2022, 1, 1)
+    donation_date = exercise_date + timedelta(days=366)
 
     result = ShareDonationCalculator.calculate_share_donation_components(
         lot_id="STOCK-002",
@@ -142,7 +142,7 @@ def test_share_donation_366_days():
         shares_donated=100,
         fmv_at_donation=50.0,
         cost_basis=30.0,
-        acquisition_date=acquisition_date,
+        exercise_date=exercise_date,
         holding_period_days=366,
         company_match_ratio=0.0
     )
@@ -199,7 +199,7 @@ def test_donation_no_company_match():
         shares_donated=1000,
         fmv_at_donation=40.0,
         cost_basis=10.0,
-        acquisition_date=date(2022, 1, 1),
+        exercise_date=date(2022, 1, 1),
         holding_period_days=517,
         company_match_ratio=0.0
     )
@@ -231,7 +231,7 @@ def test_zero_donation():
         shares_donated=0,
         fmv_at_donation=100.0,
         cost_basis=50.0,
-        acquisition_date=date(2022, 1, 1),
+        exercise_date=date(2022, 1, 1),
         holding_period_days=517,
         company_match_ratio=3.0
     )
@@ -264,7 +264,7 @@ def test_donation_without_pledge():
         shares_donated=500,
         fmv_at_donation=75.0,
         cost_basis=25.0,
-        acquisition_date=date(2022, 1, 1),
+        exercise_date=date(2022, 1, 1),
         holding_period_days=517,
         company_match_ratio=1.0,
         pledge_id=None,
@@ -308,7 +308,7 @@ def test_high_value_donation():
         shares_donated=10000,
         fmv_at_donation=250.0,
         cost_basis=50.0,
-        acquisition_date=date(2020, 1, 1),
+        exercise_date=date(2020, 1, 1),
         holding_period_days=1430,
         company_match_ratio=3.0,
         pledge_id="MAJOR-PLEDGE-001"
