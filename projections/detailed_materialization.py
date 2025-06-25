@@ -324,7 +324,22 @@ class DetailedMaterializer:
             else:
                 detailed.calculator_used = "iso_exercise_calculator"  # fallback
             detailed.exercise_cost = action.quantity * (lot.strike_price if lot else 0)
-            detailed.amt_adjustment = action.quantity * ((action.price if action.price else 0) - (lot.strike_price if lot else 0))
+
+            # AMT adjustment only applies to ISO exercises, not NSO
+            if lot and hasattr(lot, 'share_type'):
+                share_type_value = lot.share_type
+                if hasattr(share_type_value, 'value'):  # Handle enum
+                    share_type_str = share_type_value.value
+                else:
+                    share_type_str = str(share_type_value)
+
+                if share_type_str == 'ISO':
+                    detailed.amt_adjustment = action.quantity * ((action.price if action.price else 0) - (lot.strike_price if lot else 0))
+                else:
+                    detailed.amt_adjustment = 0.0  # NSOs don't create AMT adjustments
+            else:
+                detailed.amt_adjustment = 0.0  # Default to no AMT adjustment
+
             detailed.tax_impact = 0  # AMT impact tracked at year level
 
         elif action.action_type == ActionType.SELL:
