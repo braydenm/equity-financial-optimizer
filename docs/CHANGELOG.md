@@ -334,3 +334,61 @@
 - Fixed CSV generation logic to match annual tax calculator behavior for basis elections
 - Eliminated false carryforward creation by ensuring both calculation paths use identical logic
 - All charitable deduction tests now pass with 100% utilization rate instead of previous 73.6%
+
+## Comprehensive Output Improvements
+- Implemented comprehensive value tracking framework to enable fully informed scenario comparisons
+- Enhanced all CSV outputs with detailed metrics tracking personal wealth, charitable impact, and tax efficiency
+
+### Profile & Data Model Updates
+- Added `assumed_ipo` field to UserProfile dataclass with default "2033-03-24" for pledge expiration calculations
+- Added `grant_id` field to ShareLot dataclass for future grant-based charitable program tracking
+- Removed `market_assumptions` and `decision_parameters` sections from all profile JSON files (user_profile.json, demo_profile.json, user_profile_template.json)
+- Updated all UserProfile constructors across codebase (portfolio_manager.py, scenario_loader.py, natural_evolution_generator.py)
+- Implemented test-driven one-shot rewrite approach with no migration script required
+
+### Value Tracking Enhancements
+- Enhanced annual_summary.csv with 7 new tracking fields:
+  * `options_exercised_count` - quantity of options exercised this year
+  * `shares_sold_count` - quantity of shares sold this year
+  * `shares_donated_count` - quantity of shares donated this year
+  * `amt_credits_generated` - new AMT credits created this year
+  * `amt_credits_consumed` - AMT credits used this year
+  * `amt_credits_balance` - ending AMT credit balance
+  * `expired_option_count` - quantity of options that expired this year
+  * Renamed `opportunity_cost` to `expired_option_loss` for clarity
+  * Renamed `pledge_shares_expired_window` to `pledge_shares_expired` for consistency
+- Enhanced portfolio_comparison.csv with 8 new comprehensive metrics:
+  * `charitable_personal_value` - total personal donations across all years
+  * `charitable_match_value` - total company match received across all years
+  * `charitable_total_impact` - combined charitable value (personal + match)
+  * `pledge_fulfillment_rate` - percentage of pledged shares actually donated
+  * `outstanding_amt_credits` - ending unused AMT credit balance
+  * `expired_charitable_deduction` - charitable deductions that expired unused
+  * `expired_option_count` - total count of expired options
+  * `expired_option_loss` - total dollar value of expired in-the-money options
+- Updated ProjectionResult.summary_metrics to calculate all new comprehensive metrics
+- Improved pledge obligation deadline calculations to use min(sale_date + 3 years, assumed_ipo + 1 year)
+- Enhanced donation pricing logic to use tender prices when available in same calendar year
+- Enhanced comprehensive_cashflow.csv with clear field separation: `ending_investments` and `static_investments`
+
+### Warning System Implementation
+- Added AMT Credit consumption warnings that alert if credits will take >20 years to consume at current rate
+- Added Pledge Obligation warnings showing outstanding obligations and expired match opportunities with actionable guidance
+- Added Charitable Deduction expiration warnings tracking unused deductions after 5-year carryforward period
+- Enhanced option expiration warnings with detailed per-lot loss calculations and strategic guidance
+- All warnings integrated into run_scenario_analysis.py output with clear visual indicators and recommended actions
+
+### Pledge System Enhancements
+- Updated PledgeCalculator.calculate_obligation() to accept assumed_ipo parameter for deadline calculations
+- Modified pledge window calculation to enforce both 3-year post-sale AND IPO+1 year deadlines
+- Enhanced donation pricing in portfolio_manager._determine_action_price() to check tender prices for both SELL and DONATE actions
+- Separated tender price logic: SELL actions use 30-day window, DONATE actions use same calendar year
+- Ensured assumed_ipo flows from UserProfile through projection_calculator to pledge calculations
+
+### Implementation Results
+- All 22 existing tests continue to pass ensuring backward compatibility
+- Real-world scenario validation confirms new metrics populate correctly
+- Warning systems trigger appropriately for critical financial deadlines
+- Enhanced CSV outputs enable detailed portfolio analysis and strategic planning
+- System now tracks all forms of value: personal wealth, charitable impact, tax efficiency, and outstanding liabilities
+- Comprehensive framework supports informed decision-making across complex equity compensation scenarios

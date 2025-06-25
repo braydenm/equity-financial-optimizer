@@ -63,8 +63,7 @@ This document defines the canonical format for user profile data in the Equity F
         "charitable_program": {
           "pledge_percentage": 0.50,  // 0.50 = 50% pledge, 0.25 = 25% pledge, 0 = no program
           "company_match_ratio": 3.0,  // 3.0 = 3:1 match, 1.0 = 1:1 match
-          "program_type": "early_employee_program|newer_employee_program|none",
-          "notes": "50% pledge with 3:1 match for employees joining before 2021"
+          "notes": "50% pledge with 3:1 match for employees joining before 2024"
         }
       }
     ],

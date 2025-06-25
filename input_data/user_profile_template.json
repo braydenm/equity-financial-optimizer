@@ -42,7 +42,11 @@
         "strike_price": 2.5,
         "vesting_start_date": "2022-01-15",
         "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12
+        "cliff_months": 12,
+        "charitable_program": {
+          "pledge_percentage": 0.5,
+          "company_match_ratio": 3.0
+        }
       }
     ],
 
@@ -178,10 +182,5 @@
     "time_horizon_years": 10
   },
 
-  "charitable_giving": {
-    "pledge_percentage": 0.5,
-    "company_match_ratio": 3.0,
-    "donation_window_months": 36
-  },
   "assumed_ipo": "2033-03-24"
 }
