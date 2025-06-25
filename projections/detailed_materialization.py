@@ -322,7 +322,11 @@ class DetailedMaterializer:
                 else:
                     detailed.calculator_used = "iso_exercise_calculator"  # fallback
             else:
-                detailed.calculator_used = "iso_exercise_calculator"  # fallback
+                # If lot not found, try to infer share type from lot_id pattern
+                if action.lot_id == 'NSO' or action.lot_id.endswith('_NSO'):
+                    detailed.calculator_used = "nso_exercise_calculator"
+                else:
+                    detailed.calculator_used = "iso_exercise_calculator"  # default to ISO
             detailed.exercise_cost = action.quantity * (lot.strike_price if lot else 0)
 
             # AMT adjustment only applies to ISO exercises, not NSO
