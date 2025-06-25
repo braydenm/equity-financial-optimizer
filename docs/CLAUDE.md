@@ -144,6 +144,8 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 ### Known Issues
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
+- Need to add an E2E test validating that a large NSO exercise drives up income
+- Some details are only loaded from the first equity grant. If you have multiple grants, the first grant's charitable program is used may be used for all grants. A potential extension is to allow iterating through each grant and loading and processing all details separately.
 
 ### Inline TODOs in Code
 (Search for each of these TODOs when fixing, then remove them from the comments after being resolved)
@@ -327,7 +329,7 @@ Liability:
 
 **Add to user profile (and placeholders to template and demo)**:
 ```json
-"charitable_giving": {
+"equity_position": {
     "pledge_percentage": 0.5,
     "company_match_ratio": 3.0,
     "post_sale_donation_window_months": 36,
@@ -479,7 +481,51 @@ Liability:
 3. Validate all warning triggers
 4. Run comprehensive test suite before and after changes
 
-**Priority Order**: Start with Phase 1-2 for immediate value, then Phase 5 for bug fixes, followed by Phase 3-4 for enhanced functionality.
+**Priority Order**: ✅ Phases 1-4 COMPLETED. Next: Phase 5 (Bug Fixes), Phase 6 (Testing).
+
+### ✅ IMPLEMENTATION STATUS UPDATE
+
+**COMPLETED PHASES (2024-12-19)**:
+
+**✅ Phase 1: Profile & Data Model Updates** (COMPLETE)
+- Added `assumed_ipo` field to UserProfile with default "2033-03-24"
+- Added `grant_id` field to ShareLot for grant tracking  
+- Removed `market_assumptions` and `decision_parameters` from all profile JSON files
+- Updated all UserProfile constructors across the codebase
+- No migration script - implemented as test-driven one-shot rewrite
+
+**✅ Phase 2: Value Tracking Enhancements** (COMPLETE)
+- Enhanced annual_summary.csv with 7 new tracking fields:
+  * `options_exercised_count`, `shares_sold_count`, `shares_donated_count`
+  * `amt_credits_generated`, `amt_credits_consumed`, `amt_credits_balance`
+  * `expired_option_count`, renamed `expired_option_loss`
+- Enhanced portfolio_comparison.csv with 8 new comprehensive metrics:
+  * `charitable_personal_value`, `charitable_match_value`, `charitable_total_impact`
+  * `pledge_fulfillment_rate`, `outstanding_amt_credits`, `expired_charitable_deduction`
+  * `expired_option_count`, `expired_option_loss`
+- Updated ProjectionResult.summary_metrics with all new calculated metrics
+- Improved pledge obligation deadline calculations (IPO+1 year constraint)
+- Enhanced donation pricing to use tender prices when available (same calendar year)
+- Enhanced comprehensive_cashflow.csv with `ending_investments` + `static_investments`
+
+**✅ Phase 3: Warning System** (COMPLETE)
+- AMT Credit Warnings: Alerts if credits will take >20 years to consume
+- Pledge Obligation Warnings: Shows outstanding and expired obligations with actionable guidance
+- Charitable Deduction Warnings: Tracks expired deductions after 5-year carryforward
+- Enhanced option expiration warnings with detailed loss calculations
+
+**✅ Phase 4: Charitable System Refactor** (COMPLETE)
+- Updated all loaders to read charitable programs from per-grant structure instead of top-level
+- Added grant_id tracking throughout ShareLot creation and propagation in projection calculator
+- Implemented grant-specific pledge obligation creation using appropriate charitable programs
+- Added grants data to UserProfile for grant-specific charitable program lookups
+- Created comprehensive test suite with 7 test cases for per-grant charitable functionality
+- Maintained backward compatibility with fallback behavior for profiles without charitable programs
+- Full infrastructure for different charitable programs per grant (currently uses first grant globally)
+
+**🧪 Validation Results**: All 24 tests passing, real-world scenarios tested successfully
+
+**Priority Order**: Start with Phase 5 (Bug Fixes), then Phase 6 (Testing & Validation).
 
 ### CSV Generation Architecture Consolidation Plan
 

@@ -578,6 +578,9 @@ class UserProfile:
     # IPO timing for pledge expiration calculations
     assumed_ipo: Optional[date] = None
 
+    # Grant-specific charitable programs for per-grant pledge tracking
+    grants: List[Dict[str, Any]] = field(default_factory=list)
+
     def get_total_agi(self) -> float:
         """Calculate total AGI for charitable deduction limits."""
         return (self.annual_w2_income + self.spouse_w2_income + self.other_income +

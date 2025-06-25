@@ -198,11 +198,15 @@ class ProjectionCalculator:
                     sale_result = self._process_sale(action, current_lots, annual_components, yearly_state)
                     current_cash += sale_result['gross_proceeds']  # Tax will be calculated at year-end
 
-                    # Create pledge obligation using centralized calculator
+                    # Get grant-specific charitable program for pledge obligation
+                    sold_lot = sale_result['lot']
+                    grant_charitable_program = self._get_charitable_program_for_grant(sold_lot.grant_id)
+
+                    # Create pledge obligation using grant-specific settings
                     obligation = PledgeCalculator.calculate_obligation(
                         shares_sold=action.quantity,
                         sale_price=action.price if action.price else 0,
-                        pledge_percentage=self.pledge_percentage,
+                        pledge_percentage=grant_charitable_program['pledge_percentage'],
                         sale_date=action.action_date,
                         lot_id=action.lot_id,
                         assumed_ipo=self.profile.assumed_ipo
@@ -409,6 +413,38 @@ class ProjectionCalculator:
 
         return result
 
+    def _get_charitable_program_for_grant(self, grant_id: Optional[str]) -> Dict[str, float]:
+        """
+        Get charitable program settings for a specific grant.
+
+        Args:
+            grant_id: Grant identifier, may be None for legacy lots
+
+        Returns:
+            Dictionary with pledge_percentage and company_match_ratio
+        """
+        # If no grant_id provided, use profile-level defaults
+        if not grant_id:
+            return {
+                'pledge_percentage': self.profile.pledge_percentage,
+                'company_match_ratio': self.profile.company_match_ratio
+            }
+
+        # Look up grant-specific charitable program
+        for grant in self.profile.grants:
+            if grant.get('grant_id') == grant_id:
+                charitable_program = grant.get('charitable_program', {})
+                return {
+                    'pledge_percentage': charitable_program.get('pledge_percentage', self.profile.pledge_percentage),
+                    'company_match_ratio': charitable_program.get('company_match_ratio', self.profile.company_match_ratio)
+                }
+
+        # Fallback to profile-level settings if grant not found
+        return {
+            'pledge_percentage': self.profile.pledge_percentage,
+            'company_match_ratio': self.profile.company_match_ratio
+        }
+
 
 
     def _process_exercise(self, action: PlannedAction, current_lots: List[ShareLot],
@@ -477,7 +513,8 @@ class ProjectionCalculator:
             cost_basis=lot.strike_price,
             fmv_at_exercise=current_price,  # Critical for disqualifying disposition calculations
             taxes_paid=0.0,  # Tax will be calculated at year-end
-            expiration_date=lot.expiration_date  # Preserve expiration date from parent lot
+            expiration_date=lot.expiration_date,  # Preserve expiration date from parent lot
+            grant_id=lot.grant_id  # Preserve grant_id from parent lot
         )
 
         # Add the new exercised lot to current lots
@@ -496,7 +533,7 @@ class ProjectionCalculator:
         }
 
     def _process_sale(self, action: PlannedAction, current_lots: List[ShareLot],
-                     annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, float]:
+                     annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, Any]:
         """Process a sale action and extract tax components."""
         # Find the lot being sold
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
@@ -556,7 +593,8 @@ class ProjectionCalculator:
 
         return {
             'gross_proceeds': gross_proceeds,
-            'shares_sold': action.quantity
+            'shares_sold': action.quantity,
+            'lot': lot
         }
 
     def _process_donation(self, action: PlannedAction, current_lots: List[ShareLot],
