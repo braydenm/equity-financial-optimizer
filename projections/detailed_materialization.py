@@ -48,6 +48,8 @@ class DetailedAction:
     acquisition_date: Optional[date] = None
     tax_treatment: str = ""
     vest_expiration_date: Optional[date] = None
+    current_share_price: float = 0.0
+    action_value: float = 0.0
 
     # Financial calculations
     gross_proceeds: float = 0.0
@@ -81,6 +83,8 @@ class DetailedAction:
     post_lot_lifecycle: str = ""
     post_tax_treatment: str = ""
     net_cash_change: float = 0.0
+    lot_options_remaining: int = 0
+    lot_shares_remaining: int = 0
 
 
 @dataclass
@@ -306,6 +310,24 @@ class DetailedMaterializer:
         # Starting cash position
         detailed.pre_cash = yearly_state.starting_cash
 
+        # Populate new action summary fields
+        detailed.current_share_price = action.price if action.price else 0.0
+        detailed.action_value = action.quantity * detailed.current_share_price
+
+        # Calculate remaining options and shares after this action
+        if lot:
+            if lot.lifecycle_state.value in ['vested_not_exercised', 'granted_not_vested']:
+                # For unexercised options, calculate remaining options
+                detailed.lot_options_remaining = max(0, lot.quantity - action.quantity) if action.action_type == ActionType.EXERCISE else lot.quantity
+                detailed.lot_shares_remaining = 0  # No exercised shares yet
+            elif lot.lifecycle_state.value == 'exercised_not_disposed':
+                # For exercised shares, calculate remaining shares
+                detailed.lot_options_remaining = 0  # No options remaining
+                detailed.lot_shares_remaining = max(0, lot.quantity - action.quantity) if action.action_type in [ActionType.SELL, ActionType.DONATE] else lot.quantity
+            else:
+                detailed.lot_options_remaining = 0
+                detailed.lot_shares_remaining = 0
+
         # Calculator identification and calculations based on action type
         if action.action_type == ActionType.EXERCISE:
             if lot and hasattr(lot, 'share_type'):
@@ -513,7 +535,11 @@ class DetailedMaterializer:
                     'pledge_created': round(action.pledge_created, 2),
                     'net_cash_change': round(action.net_cash_change, 2),
                     'vest_expiration_date': action.vest_expiration_date.isoformat() if action.vest_expiration_date else '',
-                    'notes': action.notes
+                    'notes': action.notes,
+                    'current_share_price': round(action.current_share_price, 2),
+                    'action_value': round(action.action_value, 2),
+                    'lot_options_remaining': action.lot_options_remaining,
+                    'lot_shares_remaining': action.lot_shares_remaining
                 })
 
         # Always create the file, even if empty
@@ -522,7 +548,8 @@ class DetailedMaterializer:
             'acquisition_date', 'holding_period_days', 'tax_treatment',
             'calculator', 'gross_proceeds', 'exercise_cost', 'capital_gain',
             'amt_adjustment', 'tax', 'donation_value', 'company_match',
-            'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes'
+            'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes',
+            'current_share_price', 'action_value', 'lot_options_remaining', 'lot_shares_remaining'
         ]
 
         with open(output_path, 'w', newline='') as f:

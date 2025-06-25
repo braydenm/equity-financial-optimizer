@@ -83,6 +83,7 @@ class TimelineGenerator:
             rows.append({
                 'date': current_date.isoformat(),
                 'lot_id': lot['lot_id'],
+                'grant_id': self._get_grant_id(equity_pos, lot),
                 'share_type': lot['type'],
                 'quantity': lot['shares'],
                 'strike_price': lot['strike_price'],
@@ -99,6 +100,7 @@ class TimelineGenerator:
             rows.append({
                 'date': current_date.isoformat(),
                 'lot_id': 'ISO',
+                'grant_id': self._get_grant_id(equity_pos),
                 'share_type': 'ISO',
                 'quantity': vested['iso_shares'],
                 'strike_price': strike_price,
@@ -111,6 +113,7 @@ class TimelineGenerator:
             rows.append({
                 'date': current_date.isoformat(),
                 'lot_id': 'NSO',
+                'grant_id': self._get_grant_id(equity_pos),
                 'share_type': 'NSO',
                 'quantity': vested['nso_shares'],
                 'strike_price': strike_price,
@@ -133,6 +136,19 @@ class TimelineGenerator:
         if grants:
             return grants[0].get('strike_price', 0.0)
         return 0.0
+
+    def _get_grant_id(self, equity_pos: Dict[str, Any], lot_data: Dict[str, Any] = None) -> str:
+        """Extract grant_id from lot data or original grants."""
+        # First try to get grant_id from the lot data itself
+        if lot_data and 'grant_id' in lot_data:
+            return lot_data['grant_id']
+
+        # Fallback to first grant ID if available
+        grants = equity_pos.get('original_grants', [])
+        if grants and 'grant_id' in grants[0]:
+            return grants[0]['grant_id']
+
+        return 'UNKNOWN'
 
     def _generate_vesting_events(self, equity_pos: Dict[str, Any],
                                 current_date: date) -> List[Dict[str, Any]]:
@@ -158,6 +174,7 @@ class TimelineGenerator:
             vesting_events.append({
                 'date': vest_date.isoformat(),
                 'lot_id': lot_id,
+                'grant_id': self._get_grant_id(equity_pos),
                 'share_type': event['share_type'],
                 'quantity': event['shares'],
                 'strike_price': strike_price,
@@ -173,7 +190,7 @@ class TimelineGenerator:
             print("⚠️  No timeline data to save")
             return
 
-        fieldnames = ['date', 'lot_id', 'share_type', 'quantity',
+        fieldnames = ['date', 'lot_id', 'grant_id', 'share_type', 'quantity',
                      'strike_price', 'lifecycle_state', 'tax_treatment']
 
         with open(output_path, 'w', newline='') as f:
