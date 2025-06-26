@@ -96,7 +96,7 @@ class PortfolioManager:
     """
     Manages execution of scenario portfolios.
 
-    A portfolio is a collection of scenar\
+    A portfolio is a collection of scenarios.
     """
 
     def __init__(self):

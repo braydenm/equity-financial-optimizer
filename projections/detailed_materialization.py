@@ -612,6 +612,9 @@ class DetailedMaterializer:
 
         summaries = []
         for year in detailed_years:
+            # Find the corresponding YearlyState for this DetailedYear
+            yearly_state = next((s for s in result.yearly_states if s.year == year.year), None)
+            
             # Calculate pledge metrics based on actual progression through years
             pledge_metrics = self._calculate_pledge_metrics_through_year(result, year.year)
 
@@ -620,13 +623,26 @@ class DetailedMaterializer:
             shares_sold_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'sell')
             shares_donated_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'donate')
 
-            # AMT credit tracking (placeholder values for now - will be implemented in Phase 3)
-            amt_credits_generated = getattr(year, 'amt_credits_generated', 0)
-            amt_credits_consumed = getattr(year, 'amt_credits_consumed', 0)
-            amt_credits_balance = getattr(year, 'amt_credits_balance', 0)
-
-            # Option expiration tracking
-            expired_option_count = getattr(year, 'expired_option_count', 0)
+            # Get actual values from YearlyState instead of placeholders
+            company_match = 0.0
+            amt_credits_generated = 0.0
+            amt_credits_consumed = 0.0
+            amt_credits_balance = 0.0
+            expired_option_count = 0
+            
+            if yearly_state:
+                # Company match from yearly state
+                company_match = yearly_state.company_match_received
+                
+                # AMT credit tracking from tax state
+                if yearly_state.tax_state:
+                    amt_credits_generated = yearly_state.tax_state.amt_credits_generated
+                    amt_credits_consumed = yearly_state.tax_state.amt_credits_used
+                    amt_credits_balance = yearly_state.tax_state.amt_credits_remaining
+                
+                # Option expiration tracking from expiration events
+                if hasattr(yearly_state, 'expiration_events') and yearly_state.expiration_events:
+                    expired_option_count = sum(event.quantity for event in yearly_state.expiration_events)
 
             summaries.append({
                 'year': year.year,
@@ -636,8 +652,8 @@ class DetailedMaterializer:
                 'sale_proceeds': round(year.total_gross_proceeds, 2),
                 'capital_gains': round(year.total_capital_gains, 2),
                 'donations': round(sum(a.donation_value for a in year.actions), 2),
-                'company_match': round(sum(a.company_match for a in year.actions), 2),
-                'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + sum(a.company_match for a in year.actions), 2),
+                'company_match': round(company_match, 2),
+                'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + company_match, 2),
                 'pledge_shares_obligated': pledge_metrics['obligated'],
                 'pledge_shares_donated': pledge_metrics['donated'],
                 'pledge_shares_outstanding': pledge_metrics['outstanding'],

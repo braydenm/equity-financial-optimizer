@@ -162,6 +162,11 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
+- Fix broken CSV columns in annual_summary.csv (detailed_materialization.py lines 609-667):
+  - `company_match` (line 639): Currently sums from individual actions but should use `yearly_state.company_match_received` 
+  - `amt_credits_consumed` (line 649): Uses placeholder value but should use `yearly_state.tax_state.amt_credits_used`
+  - `amt_credits_balance` (line 650): Uses placeholder value but should use `yearly_state.tax_state.amt_credits_remaining`
+  - `expired_option_count` (line 651): Uses placeholder value but should sum quantities from `yearly_state.expiration_events`
 
 ### CSV Generation Architecture Consolidation Plan
 
