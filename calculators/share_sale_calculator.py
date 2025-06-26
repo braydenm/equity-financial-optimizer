@@ -32,11 +32,9 @@ class ShareSaleCalculator:
         shares_to_sell: int,
         sale_price: float,
         cost_basis: float,
-        acquisition_date: date,
-        acquisition_type: str,
+        exercise_date: date,
         is_iso: bool = False,
         grant_date: Optional[date] = None,
-        exercise_date: Optional[date] = None,
         fmv_at_exercise: Optional[float] = None
     ) -> ShareSaleComponents:
         """
@@ -52,11 +50,9 @@ class ShareSaleCalculator:
             shares_to_sell: Number of shares to sell
             sale_price: Price per share at sale
             cost_basis: Cost basis per share
-            acquisition_date: Date shares were acquired
-            acquisition_type: 'exercise', 'vest', or 'purchase'
+            exercise_date: Date shares were acquired
             is_iso: Whether these are ISO shares
             grant_date: Original grant date (for ISOs)
-            exercise_date: Exercise date (for ISOs)
             fmv_at_exercise: Fair market value at exercise (for ISOs)
 
         Returns:
@@ -67,7 +63,7 @@ class ShareSaleCalculator:
         total_gain = shares_to_sell * (sale_price - cost_basis)
 
         # Calculate holding period
-        holding_period_days = (sale_date - acquisition_date).days
+        holding_period_days = (sale_date - exercise_date).days
         is_long_term = holding_period_days > 365
 
         # Initialize component values
@@ -146,8 +142,7 @@ class ShareSaleCalculator:
             sale_price=sale_price,
             cost_basis=cost_basis,
             gross_proceeds=gross_proceeds,
-            acquisition_date=acquisition_date,
-            acquisition_type=acquisition_type,
+            exercise_date=exercise_date,
             holding_period_days=holding_period_days,
             short_term_gain=short_term_gain,
             long_term_gain=long_term_gain,

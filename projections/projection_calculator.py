@@ -137,6 +137,7 @@ class ProjectionCalculator:
             current_investments = current_investments * (1 + self.profile.investment_return_rate)
 
             year_exercise_costs = 0.0
+            year_sale_proceeds = 0.0  # Track total sale proceeds for the year
             year_tax_paid = 0.0
             year_donation_value = 0.0
             year_company_match = 0.0
@@ -188,23 +189,28 @@ class ProjectionCalculator:
             for action in sorted(year_actions, key=lambda a: a.action_date):
                 if action.action_type == ActionType.EXERCISE:
                     # Get the FMV for this year from price projections
-                    year_fmv = plan.price_projections.get(year,
-                        self.profile.current_cash)  # Fallback to a default if missing
+                    if year not in plan.price_projections:
+                        raise ValueError(f"Price projection for year {year} not found in plan")
+                    year_fmv = plan.price_projections[year]
                     exercise_result = self._process_exercise(action, current_lots, annual_components, year_fmv)
                     year_exercise_costs += exercise_result['exercise_cost']
-                    current_cash -= exercise_result['exercise_cost']
 
                 elif action.action_type == ActionType.SELL:
                     sale_result = self._process_sale(action, current_lots, annual_components, yearly_state)
-                    current_cash += sale_result['gross_proceeds']  # Tax will be calculated at year-end
+                    year_sale_proceeds += sale_result['gross_proceeds']  # Track total sale proceeds
 
-                    # Create pledge obligation using centralized calculator
+                    # Get grant-specific charitable program for pledge obligation
+                    sold_lot = sale_result['lot']
+                    grant_charitable_program = self._get_charitable_program_for_grant(sold_lot.grant_id)
+
+                    # Create pledge obligation using grant-specific settings
                     obligation = PledgeCalculator.calculate_obligation(
                         shares_sold=action.quantity,
                         sale_price=action.price if action.price else 0,
-                        pledge_percentage=self.pledge_percentage,
+                        pledge_percentage=grant_charitable_program['pledge_percentage'],
                         sale_date=action.action_date,
-                        lot_id=action.lot_id
+                        lot_id=action.lot_id,
+                        assumed_ipo=self.profile.assumed_ipo
                     )
                     pledge_state.add_obligation(obligation)
 
@@ -218,9 +224,12 @@ class ProjectionCalculator:
                         donation_date=action.action_date
                     )
 
-                    # Calculate company match based on eligible amount only
+                    # Calculate company match based on eligible amount using grant-specific ratio
                     eligible_amount = discharge_result.get('eligible_amount', 0.0)
-                    actual_company_match = eligible_amount * self.company_match_ratio
+                    # Get the company match ratio from the donation component that was just created
+                    latest_donation_component = annual_components.donation_components[-1]
+                    grant_company_match_ratio = latest_donation_component.company_match_ratio
+                    actual_company_match = eligible_amount * grant_company_match_ratio
                     year_company_match += actual_company_match
 
                     # Update the donation result with actual company match
@@ -284,10 +293,10 @@ class ProjectionCalculator:
             amt_credits_remaining = tax_result.federal_amt_credit_carryforward
             year_tax_state.amt_credits_remaining = amt_credits_remaining
 
-            # Calculate end of year cash including all income/expenses
+            # Calculate end of year cash including all income/expenses and sale proceeds
             # Note: Investment growth stays in investments, not added to liquid cash
             year_expenses = self.profile.get_annual_expenses()
-            year_end_cash = (year_start_cash + year_total_income
+            year_end_cash = (year_start_cash + year_total_income + year_sale_proceeds
                            - year_exercise_costs - year_tax_paid - year_expenses)
             current_cash = year_end_cash
 
@@ -408,6 +417,38 @@ class ProjectionCalculator:
 
         return result
 
+    def _get_charitable_program_for_grant(self, grant_id: Optional[str]) -> Dict[str, float]:
+        """
+        Get charitable program settings for a specific grant.
+
+        Args:
+            grant_id: Grant identifier, may be None for legacy lots
+
+        Returns:
+            Dictionary with pledge_percentage and company_match_ratio
+        """
+        # If no grant_id provided, use profile-level defaults
+        if not grant_id:
+            return {
+                'pledge_percentage': self.profile.pledge_percentage,
+                'company_match_ratio': self.profile.company_match_ratio
+            }
+
+        # Look up grant-specific charitable program
+        for grant in self.profile.grants:
+            if grant.get('grant_id') == grant_id:
+                charitable_program = grant.get('charitable_program', {})
+                return {
+                    'pledge_percentage': charitable_program.get('pledge_percentage', self.profile.pledge_percentage),
+                    'company_match_ratio': charitable_program.get('company_match_ratio', self.profile.company_match_ratio)
+                }
+
+        # Fallback to profile-level settings if grant not found
+        return {
+            'pledge_percentage': self.profile.pledge_percentage,
+            'company_match_ratio': self.profile.company_match_ratio
+        }
+
 
 
     def _process_exercise(self, action: PlannedAction, current_lots: List[ShareLot],
@@ -476,7 +517,8 @@ class ProjectionCalculator:
             cost_basis=lot.strike_price,
             fmv_at_exercise=current_price,  # Critical for disqualifying disposition calculations
             taxes_paid=0.0,  # Tax will be calculated at year-end
-            expiration_date=lot.expiration_date  # Preserve expiration date from parent lot
+            expiration_date=lot.expiration_date,  # Preserve expiration date from parent lot
+            grant_id=lot.grant_id  # Preserve grant_id from parent lot
         )
 
         # Add the new exercised lot to current lots
@@ -495,7 +537,7 @@ class ProjectionCalculator:
         }
 
     def _process_sale(self, action: PlannedAction, current_lots: List[ShareLot],
-                     annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, float]:
+                     annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, Any]:
         """Process a sale action and extract tax components."""
         # Find the lot being sold
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
@@ -512,13 +554,10 @@ class ProjectionCalculator:
         sale_price = action.price
 
         # Determine acquisition date and type based on lifecycle state
-        if lot.exercise_date:
-            acquisition_date = lot.exercise_date
-            acquisition_type = 'exercise'
-        else:
-            # For vested but not exercised shares, use grant date
-            acquisition_date = lot.grant_date
-            acquisition_type = 'vest'
+        exercise_date = lot.exercise_date
+        if not exercise_date:
+            # Fallback: use action date if lot doesn't have exercise date
+            exercise_date = action.action_date
 
         # Calculate sale components
         sale_components = self.sale_calculator.calculate_sale_components(
@@ -527,11 +566,9 @@ class ProjectionCalculator:
             shares_to_sell=action.quantity,
             sale_price=sale_price,
             cost_basis=lot.cost_basis,
-            acquisition_date=acquisition_date,
-            acquisition_type=acquisition_type,
+            exercise_date=exercise_date,
             is_iso=(lot.share_type == ShareType.ISO),
             grant_date=lot.grant_date,
-            exercise_date=lot.exercise_date,
             fmv_at_exercise=getattr(lot, 'fmv_at_exercise', None)
         )
 
@@ -555,7 +592,8 @@ class ProjectionCalculator:
 
         return {
             'gross_proceeds': gross_proceeds,
-            'shares_sold': action.quantity
+            'shares_sold': action.quantity,
+            'lot': lot
         }
 
     def _process_donation(self, action: PlannedAction, current_lots: List[ShareLot],
@@ -577,18 +615,20 @@ class ProjectionCalculator:
 
         # Determine acquisition date and holding period
         if lot.exercise_date:
-            acquisition_date = lot.exercise_date
-            holding_period_days = (action.action_date - acquisition_date).days
+            exercise_date = lot.exercise_date
+            holding_period_days = (action.action_date - exercise_date).days
         else:
-            # For vested but not exercised shares, use grant date
-            acquisition_date = lot.grant_date
-            holding_period_days = (action.action_date - acquisition_date).days
+            holding_period_days = 0
 
         # Calculate donation value (FMV for display purposes)
         donation_value = action.quantity * donation_price
 
         # Company match will be calculated after pledge discharge based on eligible amount
         company_match_amount = 0.0
+
+        # Get grant-specific charitable program for company match ratio
+        grant_charitable_program = self._get_charitable_program_for_grant(lot.grant_id)
+        grant_company_match_ratio = grant_charitable_program['company_match_ratio']
 
         # Create donation components
         donation_components = DonationComponents(
@@ -597,11 +637,11 @@ class ProjectionCalculator:
             shares_donated=action.quantity,
             fmv_at_donation=donation_price,
             cost_basis=lot.cost_basis,
-            acquisition_date=acquisition_date,
+            exercise_date=exercise_date,
             holding_period_days=holding_period_days,
             donation_value=donation_value,
             deduction_type='stock',
-            company_match_ratio=self.company_match_ratio,
+            company_match_ratio=grant_company_match_ratio,
             company_match_amount=company_match_amount
         )
 

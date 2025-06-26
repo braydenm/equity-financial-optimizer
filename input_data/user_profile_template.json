@@ -42,7 +42,11 @@
         "strike_price": 2.5,
         "vesting_start_date": "2022-01-15",
         "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12
+        "cliff_months": 12,
+        "charitable_program": {
+          "pledge_percentage": 0.5,
+          "company_match_ratio": 3.0
+        }
       }
     ],
 
@@ -178,50 +182,5 @@
     "time_horizon_years": 10
   },
 
-  "charitable_giving": {
-    "pledge_percentage": 0.5,
-    "company_match_ratio": 3.0,
-    "donation_window_months": 36
-  },
-
-  "market_assumptions": {
-    "scenarios": [
-      {
-        "name": "bear",
-        "probability": 0.2,
-        "price_change": -0.5,
-        "timeline_years": 2
-      },
-      {
-        "name": "base",
-        "probability": 0.6,
-        "price_change": 0.5,
-        "timeline_years": 2
-      },
-      {
-        "name": "bull",
-        "probability": 0.2,
-        "price_change": 2.0,
-        "timeline_years": 2
-      }
-    ],
-
-    "liquidity_timeline": {
-      "ipo_earliest": 2026,
-      "ipo_expected": 2028,
-      "acquisition_probability": 0.3,
-      "secondary_sales_frequency": "annual"
-    }
-  },
-
-  "decision_parameters": {
-    "tender_participation": {
-      "max_shares_allowed": 20000,
-      "target_proceeds": 500000,
-      "max_percentage": 0.2
-    },
-
-    "exercise_strategy": "amt_optimize",
-    "donation_strategy": "multi_year"
-  }
+  "assumed_ipo": "2033-03-24"
 }

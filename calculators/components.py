@@ -92,8 +92,7 @@ class ShareSaleComponents:
     gross_proceeds: float
 
     # Holding period
-    acquisition_date: date
-    acquisition_type: str  # 'exercise', 'vest', 'purchase'
+    exercise_date: date
     holding_period_days: int
 
     # Disposition classification
@@ -153,7 +152,7 @@ class DonationComponents:
 
     # Basis (for deduction calculation)
     cost_basis: float
-    acquisition_date: date
+    exercise_date: date
     holding_period_days: int
 
     # Deduction components

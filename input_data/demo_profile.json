@@ -36,7 +36,11 @@
         "vesting_start_date": "2022-01-01",
         "vesting_schedule": "4_year_monthly_with_cliff",
         "cliff_months": 12,
-        "expiration_date": "2032-01-01"
+        "expiration_date": "2032-01-01",
+        "charitable_program": {
+          "pledge_percentage": 0.25,
+          "company_match_ratio": 1.0
+        }
       }
     ],
     "exercised_lots": [
@@ -173,27 +177,6 @@
     "concentration_limit": 0.5,
     "time_horizon_years": 10
   },
-  "charitable_giving": {
-    "pledge_percentage": 0,
-    "company_match_ratio": 3.0,
-    "donation_window_months": 36
-  },
-  "market_assumptions": {
-    "scenarios": [],
-    "liquidity_timeline": {
-      "ipo_earliest": 2026,
-      "ipo_expected": 2028,
-      "acquisition_probability": 0.3,
-      "secondary_sales_frequency": "none"
-    }
-  },
-  "decision_parameters": {
-    "tender_participation": {
-      "max_shares_allowed": 20000,
-      "target_proceeds": 500000,
-      "max_percentage": 0.2
-    },
-    "exercise_strategy": "amt_optimize",
-    "donation_strategy": "immediate"
-  }
+
+  "assumed_ipo": "2033-03-24"
 }

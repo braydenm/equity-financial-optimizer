@@ -53,7 +53,7 @@ output/
 **Key Columns**:
 - `date`, `type`: When and what action (exercise, sell, donate)
 - `lot_id`, `quantity`, `price`: What was acted upon
-- `acquisition_date`, `holding_period_days`: For tax treatment
+- `exercise_date`, `holding_period_days`: For tax treatment
 - `tax_treatment`: STCG, LTCG, qualifying/disqualifying
 - `gross_proceeds`, `capital_gain`, `tax`: Financial impact
 - `amt_adjustment`: For ISO exercises
@@ -116,7 +116,7 @@ output/
 
 **Key Columns**:
 - `lot_id`: Specific share lot
-- `acquisition_date`, `acquisition_type`: When and how acquired
+- `exercise_date` When acquired
 - `days_held`, `holding_status`: Short-term vs long-term
 - `iso_qualifying_date`: For ISO qualifying disposition tracking
 - `notes`: Warnings about disqualifying dispositions

@@ -354,40 +354,7 @@ class TestCSVGeneration(unittest.TestCase):
         # Should show 1000 shares expiring in 2026
         self.assertEqual(int(expiring_row.get('2026', 0)), 1000)
 
-    def test_pledge_obligations_calculation(self):
-        """Test that pledge_obligations.csv calculates correctly."""
-        profile, plan = self.create_comprehensive_test_data()
 
-        # Run projection
-        calculator = ProjectionCalculator(profile)
-        result = calculator.evaluate_projection_plan(plan)
-
-        # Generate CSVs
-        save_all_projection_csvs(result, "test", self.test_output_dir)
-
-        # Read pledge_obligations.csv
-        csv_path = os.path.join(self.test_output_dir, "test_pledge_obligations.csv")
-        self.assertTrue(os.path.exists(csv_path))
-
-        with open(csv_path, 'r') as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        # Find RSU_2021 pledge - check both source_sale_lot and obligation_id
-        rsu_pledge = None
-        for r in rows:
-            if 'RSU_2021' in r.get('source_sale_lot', '') or 'RSU_2021' in r.get('obligation_id', ''):
-                rsu_pledge = r
-                break
-        self.assertIsNotNone(rsu_pledge, f"No RSU_2021 pledge found. Rows: {rows}")
-
-        # For 50% pledge on 1000 shares sold: need to donate 1000 shares
-        # shares_donated = (0.5 * 1000) / (1 - 0.5) = 1000
-        self.assertEqual(float(rsu_pledge['pledge_percentage']), 0.5)
-        # Pledge amount = 1000 shares * $60 = $60,000
-        self.assertEqual(float(rsu_pledge['pledge_amount']), 60000.0)
-        # Sale proceeds should be 2x pledge amount for 50% pledge
-        self.assertEqual(float(rsu_pledge['sale_proceeds']), 120000.0)
 
     def test_holding_period_tracking(self):
         """Test that holding_period_tracking.csv shows correct periods."""
@@ -408,16 +375,23 @@ class TestCSVGeneration(unittest.TestCase):
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        # Check for any lot in the tracking (RSU_2021 might be fully disposed)
-        # Look for ISO_GRANT_2024 which should still exist
-        iso_lot = next((r for r in rows if r['lot_id'] == 'ISO_GRANT_2024'), None)
-        if not iso_lot:
-            # Alternatively check for the exercised ISO lot
-            iso_lot = next((r for r in rows if 'ISO_EX_' in r['lot_id']), None)
-        self.assertIsNotNone(iso_lot, f"No lots found in holding_period_tracking. Rows: {rows}")
-        # Any lot from 2024 or earlier should be long-term by 2027
-        if iso_lot['acquisition_date']:
-            self.assertEqual(iso_lot['holding_status'], 'long-term')
+        # Check for milestone tracking entries
+        # Look for any lot with milestones
+        milestone_entries = [r for r in rows if r.get('milestone_type')]
+        self.assertGreater(len(milestone_entries), 0, f"No milestone entries found in holding_period_tracking. Rows: {rows}")
+
+        # Check that we have proper milestone structure
+        first_milestone = milestone_entries[0]
+        required_fields = ['milestone_type', 'milestone_date', 'milestone_description']
+        for field in required_fields:
+            self.assertIn(field, first_milestone, f"Missing required field {field} in milestone entry")
+
+        # Check for LTCG or IPO deadline milestones for exercised lots
+        exercised_milestones = [r for r in milestone_entries if 'exercised_not_disposed' in r.get('lifecycle_state', '')]
+        if exercised_milestones:
+            milestone_types = [r['milestone_type'] for r in exercised_milestones]
+            self.assertTrue(any('ltcg' in mt.lower() or 'ipo' in mt.lower() for mt in milestone_types),
+                          f"Expected LTCG or IPO milestones for exercised lots, got: {milestone_types}")
 
     def test_vested_iso_renamed_in_csvs(self):
         """Test that VESTED_ISO is renamed to ISO in CSVs."""

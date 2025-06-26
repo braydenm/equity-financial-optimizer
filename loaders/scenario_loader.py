@@ -95,11 +95,27 @@ class ScenarioLoader:
         income = data['income']
         financial = data['financial_position']
         goals = data['goals_and_constraints']
-        charitable = data['charitable_giving']
+        equity_position = data.get('equity_position', {})
         tax_situation = data.get('tax_situation', {})
         estimated_taxes = tax_situation.get('estimated_taxes', {})
         carryforwards = tax_situation.get('carryforwards', {})
         monthly_cash_flow = financial.get('monthly_cash_flow', {})
+
+        # Parse assumed_ipo date if present
+        assumed_ipo = None
+        if 'assumed_ipo' in data:
+            assumed_ipo = date.fromisoformat(data['assumed_ipo'])
+
+        # Extract charitable programs from grants (use first grant or defaults)
+        original_grants = equity_position.get('original_grants', [])
+        if original_grants and 'charitable_program' in original_grants[0]:
+            charitable_program = original_grants[0]['charitable_program']
+            pledge_percentage = charitable_program.get('pledge_percentage', 0.0)
+            company_match_ratio = charitable_program.get('company_match_ratio', 0.0)
+        else:
+            # Fallback for profiles without charitable programs
+            pledge_percentage = 0.0
+            company_match_ratio = 0.0
 
         return UserProfile(
             federal_tax_rate=personal['federal_tax_rate'],
@@ -117,8 +133,8 @@ class ScenarioLoader:
             bonus_expected=income.get('bonus_expected', 0),
             current_cash=financial['liquid_assets']['cash'],
             exercise_reserves=goals['liquidity_needs']['exercise_reserves'],
-            pledge_percentage=charitable['pledge_percentage'],
-            company_match_ratio=charitable['company_match_ratio'],
+            pledge_percentage=pledge_percentage,
+            company_match_ratio=company_match_ratio,
             filing_status=personal['tax_filing_status'],
             state_of_residence=personal['state_of_residence'],
             monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
@@ -126,7 +142,9 @@ class ScenarioLoader:
             supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
             quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
             taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
-            amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+            amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+            assumed_ipo=assumed_ipo,
+            grants=original_grants
         )
 
     def _load_initial_lots(self, equity_path: Path) -> List[ShareLot]:

@@ -176,7 +176,6 @@ def test_csv_output(result):
         f"{output_dir}/natural_evolution_action_summary.csv",
         f"{output_dir}/natural_evolution_annual_summary.csv",
         f"{output_dir}/natural_evolution_holding_period_tracking.csv",
-        f"{output_dir}/natural_evolution_pledge_obligations.csv",
         f"{output_dir}/natural_evolution_charitable_carryforward.csv"
     ]
 

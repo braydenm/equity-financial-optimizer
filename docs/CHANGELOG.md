@@ -334,3 +334,122 @@
 - Fixed CSV generation logic to match annual tax calculator behavior for basis elections
 - Eliminated false carryforward creation by ensuring both calculation paths use identical logic
 - All charitable deduction tests now pass with 100% utilization rate instead of previous 73.6%
+
+## Comprehensive Output Improvements
+- Implemented comprehensive value tracking framework to enable fully informed scenario comparisons
+- Enhanced all CSV outputs with detailed metrics tracking personal wealth, charitable impact, and tax efficiency
+
+### Profile & Data Model Updates
+- Added `assumed_ipo` field to UserProfile dataclass with default "2033-03-24" for pledge expiration calculations
+- Added `grant_id` field to ShareLot dataclass for future grant-based charitable program tracking
+- Removed `market_assumptions` and `decision_parameters` sections from all profile JSON files (user_profile.json, demo_profile.json, user_profile_template.json)
+- Updated all UserProfile constructors across codebase (portfolio_manager.py, scenario_loader.py, natural_evolution_generator.py)
+- Implemented test-driven one-shot rewrite approach with no migration script required
+
+### Value Tracking Enhancements
+- Enhanced annual_summary.csv with 7 new tracking fields:
+  * `options_exercised_count` - quantity of options exercised this year
+  * `shares_sold_count` - quantity of shares sold this year
+  * `shares_donated_count` - quantity of shares donated this year
+  * `amt_credits_generated` - new AMT credits created this year
+  * `amt_credits_consumed` - AMT credits used this year
+  * `amt_credits_balance` - ending AMT credit balance
+  * `expired_option_count` - quantity of options that expired this year
+  * Renamed `opportunity_cost` to `expired_option_loss` for clarity
+  * Renamed `pledge_shares_expired_window` to `pledge_shares_expired` for consistency
+- Enhanced portfolio_comparison.csv with 8 new comprehensive metrics:
+  * `charitable_personal_value` - total personal donations across all years
+  * `charitable_match_value` - total company match received across all years
+  * `charitable_total_impact` - combined charitable value (personal + match)
+  * `pledge_fulfillment_rate` - percentage of pledged shares actually donated
+  * `outstanding_amt_credits` - ending unused AMT credit balance
+  * `expired_charitable_deduction` - charitable deductions that expired unused
+  * `expired_option_count` - total count of expired options
+  * `expired_option_loss` - total dollar value of expired in-the-money options
+- Updated ProjectionResult.summary_metrics to calculate all new comprehensive metrics
+- Improved pledge obligation deadline calculations to use min(sale_date + 3 years, assumed_ipo + 1 year)
+- Enhanced donation pricing logic to use tender prices when available in same calendar year
+- Enhanced comprehensive_cashflow.csv with clear field separation: `ending_investments` and `static_investments`
+
+### Warning System Implementation
+- Added AMT Credit consumption warnings that alert if credits will take >20 years to consume at current rate
+- Added Pledge Obligation warnings showing outstanding obligations and expired match opportunities with actionable guidance
+- Added Charitable Deduction expiration warnings tracking unused deductions after 5-year carryforward period
+- Enhanced option expiration warnings with detailed per-lot loss calculations and strategic guidance
+- All warnings integrated into run_scenario_analysis.py output with clear visual indicators and recommended actions
+
+### Pledge System Enhancements
+- Updated PledgeCalculator.calculate_obligation() to accept assumed_ipo parameter for deadline calculations
+- Modified pledge window calculation to enforce both 3-year post-sale AND IPO+1 year deadlines
+- Enhanced donation pricing in portfolio_manager._determine_action_price() to check tender prices for both SELL and DONATE actions
+- Separated tender price logic: SELL actions use 30-day window, DONATE actions use same calendar year
+- Ensured assumed_ipo flows from UserProfile through projection_calculator to pledge calculations
+
+### Implementation Results
+- All 22 existing tests continue to pass ensuring backward compatibility
+- Real-world scenario validation confirms new metrics populate correctly
+- Warning systems trigger appropriately for critical financial deadlines
+- Enhanced CSV outputs enable detailed portfolio analysis and strategic planning
+- System now tracks all forms of value: personal wealth, charitable impact, tax efficiency, and outstanding liabilities
+- Comprehensive framework supports informed decision-making across complex equity compensation scenarios
+
+## Comprehensive Output Improvements Completion
+- Enhanced action_summary.csv with 4 new fields: `current_share_price`, `action_value`, `lot_options_remaining`, `lot_shares_remaining`
+- Added `other_investments` field to comprehensive_cashflow.csv consolidating crypto and real estate assets
+- Enhanced equity_position_timeline.csv with `grant_id` column for complete grant tracking and compliance
+- Full grant-specific charitable program system implemented with E2E validation covering multiple grant scenarios
+
+### Bug Fixes
+- Fixed transition timeline bug where exercised ISOs were incorrectly marked as expiring
+- Enhanced expiration detection logic to distinguish between actual expiration and exercise events
+- Completed comprehensive milestone-based holding_period_tracking.csv with state-specific countdown calculations
+
+### Milestone Tracking System
+- Implemented generate_holding_milestones_csv() with full CLAUDE.md specification compliance
+- Added milestone types: ltcg_eligible, ipo_pledge_deadline, iso_qualifying_disposition, option_expiration
+- Integrated assumed_ipo date for accurate pledge deadline calculations
+- Created countdown timers with both days_until_milestone and years_until_milestone fields
+
+### Enhanced CSV Architecture
+- Converted pledge_obligations.csv to share-based tracking with dollars as supporting context
+- Added grant_id tracking to pledge obligations for complete audit trail
+- Maintained backward compatibility while improving user experience
+
+### Comprehensive Testing & Validation
+- Achieved 28/28 test suite pass rate with comprehensive edge case coverage
+- Validated 15-year scenario lifecycle including full charitable deduction carryforward
+- Confirmed sub-second performance for complex multi-grant scenarios
+- Verified production readiness with robust error handling and data quality
+
+## IPO Pledge Obligation Feature Implementation
+
+### Core Feature Development
+- Implemented IPO pledge obligation milestone generation in holding period tracking CSV
+- Added automatic calculation of remaining total pledge obligations due 1 year after assumed IPO date
+- Integrated FIFO donation tracking across all years to accurately calculate outstanding pledge amounts
+- Created new milestone type `ipo_pledge_obligation` with special lot ID `TOTAL_PLEDGE` for easy identification
+
+### Data Pipeline Integration
+- Fixed critical grant loading bug in PortfolioManager where equity grants from JSON `equity_position.original_grants` were not being transferred to UserProfile.grants attribute
+- Enhanced IPO pledge calculation to handle both object-based and dictionary-based grant structures
+- Added support for both `total_shares` and `total_options` grant attributes for maximum compatibility
+- Implemented proper aggregation of pledge percentages across multiple grants with charitable programs
+
+### CSV Output Enhancements
+- Removed countdown columns (`days_until_milestone`, `years_until_milestone`) from holding period tracking for cleaner output
+- Implemented chronological sorting of all milestones by `milestone_date` for better timeline visualization
+- Fixed FIFO pledge tracking to eliminate duplicate pledge window expiry entries for discharged obligations
+- Enhanced charitable carryforward CSV to show proper creation year breakdown instead of expiration year formatting
+
+### Testing & Validation
+- Created comprehensive integration test suite covering user examples (10K shares, 50% pledge scenarios)
+- Validated end-to-end data flow from JSON profile loading through CSV output generation
+- Confirmed proper handling of leap year IPO dates with fallback logic
+- Verified chronological milestone sorting integrates seamlessly with existing milestone types
+- All existing tests continue to pass ensuring backward compatibility
+
+### Production Readiness
+- Feature works with both demo and user data automatically
+- Integrates with existing `copy_scenario_csvs.py` utility for easy data export
+- Handles edge cases: no pledges, fully satisfied pledges, multiple grants, and missing data
+- Clear descriptive milestone text showing calculation details for user validation

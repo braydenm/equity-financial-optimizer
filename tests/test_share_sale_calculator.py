@@ -22,7 +22,7 @@ def test_basic_stock_sale_ltcg():
     print("-" * 50)
 
     # Sale after 1+ year = LTCG
-    acquisition_date = date(2022, 1, 1)
+    exercise_date = date(2022, 1, 1)
     sale_date = date(2023, 6, 1)
 
     result = ShareSaleCalculator.calculate_sale_components(
@@ -31,8 +31,8 @@ def test_basic_stock_sale_ltcg():
         shares_to_sell=1000,
         sale_price=50.0,
         cost_basis=20.0,
-        acquisition_date=acquisition_date,
-        acquisition_type='purchase',
+        exercise_date=exercise_date,
+        # acquisition_type='purchase',
         is_iso=False
     )
 
@@ -60,7 +60,7 @@ def test_basic_stock_sale_stcg():
     print("-" * 50)
 
     # Sale within 1 year = STCG
-    acquisition_date = date(2023, 1, 1)
+    exercise_date = date(2023, 1, 1)
     sale_date = date(2023, 6, 1)
 
     result = ShareSaleCalculator.calculate_sale_components(
@@ -69,8 +69,8 @@ def test_basic_stock_sale_stcg():
         shares_to_sell=500,
         sale_price=30.0,
         cost_basis=25.0,
-        acquisition_date=acquisition_date,
-        acquisition_type='purchase',
+        exercise_date=exercise_date,
+        # acquisition_type='purchase',
         is_iso=False
     )
 
@@ -99,9 +99,7 @@ def test_stock_sale_at_loss():
         shares_to_sell=1000,
         sale_price=15.0,
         cost_basis=25.0,
-        acquisition_date=date(2022, 1, 1),
-        acquisition_type='purchase',
-        is_iso=False
+        exercise_date=date(2022, 1, 1)
     )
 
     # Verify loss calculation
@@ -131,11 +129,10 @@ def test_iso_qualifying_disposition():
         shares_to_sell=1000,
         sale_price=50.0,
         cost_basis=10.0,  # Strike price
-        acquisition_date=exercise_date,
-        acquisition_type='exercise',
+        exercise_date=exercise_date,
+        # acquisition_type='exercise',
         is_iso=True,
         grant_date=grant_date,
-        exercise_date=exercise_date,
         fmv_at_exercise=30.0
     )
 
@@ -169,11 +166,10 @@ def test_iso_disqualifying_disposition():
         shares_to_sell=1000,
         sale_price=50.0,
         cost_basis=10.0,  # Strike price
-        acquisition_date=exercise_date,
-        acquisition_type='exercise',
+        exercise_date=exercise_date,
+        # acquisition_type='exercise',
         is_iso=True,
         grant_date=grant_date,
-        exercise_date=exercise_date,
         fmv_at_exercise=30.0
     )
 
@@ -206,11 +202,10 @@ def test_iso_disqualifying_sale_below_fmv():
         shares_to_sell=500,
         sale_price=25.0,  # Below FMV at exercise
         cost_basis=10.0,
-        acquisition_date=date(2022, 6, 1),
-        acquisition_type='exercise',
+        exercise_date=date(2022, 6, 1),
+        # acquisition_type='exercise',
         is_iso=True,
         grant_date=date(2022, 1, 1),
-        exercise_date=date(2022, 6, 1),
         fmv_at_exercise=30.0
     )
 
@@ -235,8 +230,8 @@ def test_rsu_sale():
         shares_to_sell=1000,
         sale_price=40.0,
         cost_basis=0.0,  # RSUs typically have zero cost basis
-        acquisition_date=date(2022, 1, 1),
-        acquisition_type='release',
+        exercise_date=date(2022, 1, 1),
+        # acquisition_type='release',
         is_iso=False
     )
 
@@ -261,8 +256,8 @@ def test_zero_shares():
         shares_to_sell=0,
         sale_price=50.0,
         cost_basis=20.0,
-        acquisition_date=date(2022, 1, 1),
-        acquisition_type='purchase',
+        exercise_date=date(2022, 1, 1),
+        # acquisition_type='purchase',
         is_iso=False
     )
 
@@ -281,18 +276,18 @@ def test_holding_period_edge_cases():
     print("\nTest: Holding Period Edge Cases")
     print("-" * 50)
 
-    acquisition_date = date(2022, 1, 1)
+    exercise_date = date(2022, 1, 1)
 
     # Exactly 365 days = still STCG
-    sale_date_365 = acquisition_date + timedelta(days=365)
+    sale_date_365 = exercise_date + timedelta(days=365)
     result_365 = ShareSaleCalculator.calculate_sale_components(
         lot_id="EDGE-002",
         sale_date=sale_date_365,
         shares_to_sell=100,
         sale_price=30.0,
         cost_basis=20.0,
-        acquisition_date=acquisition_date,
-        acquisition_type='purchase',
+        exercise_date=exercise_date,
+        # acquisition_type='purchase',
         is_iso=False
     )
 
@@ -303,15 +298,15 @@ def test_holding_period_edge_cases():
     print(f"✓ 365 days: Still STCG (gain: ${result_365.short_term_gain:,.2f})")
 
     # 366 days = LTCG
-    sale_date_366 = acquisition_date + timedelta(days=366)
+    sale_date_366 = exercise_date + timedelta(days=366)
     result_366 = ShareSaleCalculator.calculate_sale_components(
         lot_id="EDGE-003",
         sale_date=sale_date_366,
         shares_to_sell=100,
         sale_price=30.0,
         cost_basis=20.0,
-        acquisition_date=acquisition_date,
-        acquisition_type='purchase',
+        exercise_date=exercise_date,
+        # acquisition_type='purchase',
         is_iso=False
     )
 

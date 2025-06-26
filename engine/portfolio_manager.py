@@ -96,7 +96,7 @@ class PortfolioManager:
     """
     Manages execution of scenario portfolios.
 
-    A portfolio is a collection of scenar\
+    A portfolio is a collection of scenarios.
     """
 
     def __init__(self):
@@ -136,6 +136,17 @@ class PortfolioManager:
         carryforwards = tax_situation.get('carryforwards', {})
         monthly_cash_flow = financial.get('monthly_cash_flow', {})
 
+        # Parse assumed_ipo date if present
+        assumed_ipo = None
+        if 'assumed_ipo' in profile_data:
+            assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
+
+        # Extract grants from equity_position.original_grants
+        grants = []
+        equity_position = profile_data.get('equity_position', {})
+        if 'original_grants' in equity_position:
+            grants = equity_position['original_grants']
+
         self._user_profile = UserProfile(
             federal_tax_rate=personal['federal_tax_rate'],
             federal_ltcg_rate=personal['federal_ltcg_rate'],
@@ -163,7 +174,9 @@ class PortfolioManager:
             taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
             crypto=financial['liquid_assets'].get('crypto', 0),
             real_estate_equity=financial['illiquid_assets'].get('real_estate_equity', 0),
-            amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+            amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+            assumed_ipo=assumed_ipo,
+            grants=grants
         )
 
         # Store additional data we might need
@@ -418,8 +431,8 @@ class PortfolioManager:
             else:
                 raise ValueError(f"Lot {lot_id} not found for exercise action")
 
-        # For sales, check if this matches a known tender offer date
-        if action_type == ActionType.SELL:
+        # Check tender price for SELL actions, snaps to any nearby tenders if exist
+        if action_type in [ActionType.SELL]:
             # Check tender offers in user profile
             tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
             tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
@@ -431,7 +444,20 @@ class PortfolioManager:
                 if abs((action_date - tender_date_obj).days) <= 30:
                     return tender_price
 
-        # For sales and donations, use projected price for the year
+        # Check tender price for DONATE actions, uses most recent tender as donation value if exists in same calendar year
+        if action_type in [ActionType.DONATE]:
+            # Check tender offers in user profile
+            tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
+            tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
+
+            if tender_date and tender_price:
+                # Parse tender date
+                tender_date_obj = date.fromisoformat(tender_date)
+                # Check if same calendar year
+                if action_date.year == tender_date_obj.year:
+                    return tender_price
+
+        # Otherwise, for both sales and donations, use projected price for the year
         if action_type in [ActionType.SELL, ActionType.DONATE]:
             year = action_date.year
             if year in price_projections:

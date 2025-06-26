@@ -43,13 +43,29 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
     personal_info = profile_data.get('personal_information', {})
     income = profile_data.get('income', {})
     financial_pos = profile_data.get('financial_position', {})
-    charitable = profile_data.get('charitable_giving', {})
+    equity_position = profile_data.get('equity_position', {})
     liquid_assets = financial_pos.get('liquid_assets', {})
     liquidity_needs = profile_data.get('goals_and_constraints', {}).get('liquidity_needs', {})
     tax_situation = profile_data.get('tax_situation', {})
     estimated_taxes = tax_situation.get('estimated_taxes', {})
     carryforwards = tax_situation.get('carryforwards', {})
     monthly_cash_flow = financial_pos.get('monthly_cash_flow', {})
+
+    # Parse assumed_ipo date if present
+    assumed_ipo = None
+    if 'assumed_ipo' in profile_data:
+        assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
+
+    # Extract charitable programs from grants (use first grant or defaults)
+    original_grants = equity_position.get('original_grants', [])
+    if original_grants and 'charitable_program' in original_grants[0]:
+        charitable_program = original_grants[0]['charitable_program']
+        pledge_percentage = charitable_program.get('pledge_percentage', 0.0)
+        company_match_ratio = charitable_program.get('company_match_ratio', 0.0)
+    else:
+        # Fallback for profiles without charitable programs
+        pledge_percentage = 0.0
+        company_match_ratio = 0.0
 
     return UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
@@ -67,16 +83,18 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
         bonus_expected=income.get('bonus_expected', 0),
         current_cash=liquid_assets.get('cash', 0),
         exercise_reserves=liquidity_needs.get('exercise_reserves', 0),
-        pledge_percentage=charitable.get('pledge_percentage', 0.5),
-        company_match_ratio=charitable.get('company_match_ratio', 3.0),
+        pledge_percentage=pledge_percentage,
+        company_match_ratio=company_match_ratio,
         filing_status=personal_info.get('tax_filing_status', 'single'),
         state_of_residence=personal_info.get('state_of_residence', 'California'),
         monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
         regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
         supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        taxable_investments=liquid_assets.get('taxable_investments', 0),
-        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+        taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+        assumed_ipo=assumed_ipo,
+        grants=original_grants
     )
 
 
@@ -217,6 +235,11 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     carryforwards = tax_situation.get('carryforwards', {})
     monthly_cash_flow = financial.get('monthly_cash_flow', {})
 
+    # Parse assumed_ipo date if present
+    assumed_ipo = None
+    if 'assumed_ipo' in profile_data:
+        assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
+
     profile = UserProfile(
         federal_tax_rate=personal_info['federal_tax_rate'],
         federal_ltcg_rate=personal_info['federal_ltcg_rate'],
@@ -241,8 +264,10 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
         supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
         quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
-        taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
-        amt_credit_carryforward=carryforwards.get('amt_credit', 0)
+        taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
+        amt_credit_carryforward=carryforwards.get('amt_credit', 0),
+        assumed_ipo=assumed_ipo,
+        grants=original_grants
     )
 
     # Set up projection period

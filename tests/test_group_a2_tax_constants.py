@@ -70,7 +70,7 @@ def test_basis_election_uses_constants():
             shares_donated=2000,  # Large enough to hit AGI limits
             fmv_at_donation=100.0,
             cost_basis=20.0,  # $20 per share cost basis (2000 shares * $20 = $40K total)
-            acquisition_date=date(2020, 1, 1),
+            exercise_date=date(2020, 1, 1),
             holding_period_days=1887,
             donation_value=200000,  # $200K FMV donation
             deduction_type='stock',

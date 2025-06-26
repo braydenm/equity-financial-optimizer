@@ -49,6 +49,7 @@ input_data/user_background_info.txt
 input_data/user_backgound_info.txt
 docs/reference/equity-donation-matching-faq.md
 docs/reference/tender-offer-may-2025.md
+portfolios/brayden_*.json
 scenario_config.json
 *.csv
 *.xlsx

@@ -64,6 +64,7 @@ class ShareLot:
     amt_adjustment: float = 0.0
     fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
     expiration_date: Optional[date] = None  # Expiration date for options
+    grant_id: Optional[str] = None  # ID of the original grant this lot came from
 
     def __post_init__(self):
         """Validate ShareLot constraints after initialization."""
@@ -486,19 +487,33 @@ class ProjectionResult:
                                 'notes': event.notes if hasattr(event, 'notes') else ''
                             })
 
+        # Calculate pledge fulfillment rate
+        pledge_fulfillment_rate = 0.0
+        if pledge_shares_obligated > 0:
+            pledge_fulfillment_rate = pledge_shares_donated / pledge_shares_obligated
+
+        # Get AMT credits from final state (placeholder for now)
+        amt_credits_final = getattr(final_state, 'amt_credits_balance', 0) if final_state else 0
+
         self.summary_metrics = {
             'total_cash_final': final_state.ending_cash if final_state else 0,
             'total_taxes_all_years': total_taxes,
             'total_donations_all_years': total_donations,
             'total_company_match_all_years': total_company_match,
             'total_charitable_impact': total_charitable_impact,
+            'total_charitable_impact_all_years': total_charitable_impact,
             'total_lost_match_value': total_lost_match_value,
             'total_equity_value_final': final_state.total_equity_value if final_state else 0,
             'pledge_shares_obligated': pledge_shares_obligated,
             'pledge_shares_donated': pledge_shares_donated,
             'pledge_shares_outstanding': pledge_shares_outstanding,
             'pledge_shares_expired_window': pledge_shares_expired_window,
+            'pledge_fulfillment_rate': pledge_fulfillment_rate,
             'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,
+            'amt_credits_final': amt_credits_final,
+            'expired_charitable_deduction': 0,  # Placeholder - will be implemented in Phase 3
+            'expired_option_count': total_expired_shares,
+            'expired_option_loss': total_opportunity_cost,
             'total_opportunity_cost': total_opportunity_cost,
             'total_expired_shares': total_expired_shares,
             'expiration_details': expiration_details
@@ -559,6 +574,12 @@ class UserProfile:
 
     # Tax carryforwards
     amt_credit_carryforward: float = 0.0
+
+    # IPO timing for pledge expiration calculations
+    assumed_ipo: Optional[date] = None
+
+    # Grant-specific charitable programs for per-grant pledge tracking
+    grants: List[Dict[str, Any]] = field(default_factory=list)
 
     def get_total_agi(self) -> float:
         """Calculate total AGI for charitable deduction limits."""

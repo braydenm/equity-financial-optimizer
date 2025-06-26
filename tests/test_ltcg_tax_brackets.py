@@ -44,8 +44,8 @@ def load_demo_profile():
         current_cash=data['financial_position']['liquid_assets']['cash'],
         exercise_reserves=data['goals_and_constraints']['liquidity_needs']['exercise_reserves'],
         # Add other fields with defaults
-        company_match_ratio=data['charitable_giving']['company_match_ratio'],
-        pledge_percentage=data['charitable_giving']['pledge_percentage']
+        company_match_ratio=data['equity_position']['original_grants'][0]['charitable_program']['company_match_ratio'],
+        pledge_percentage=data['equity_position']['original_grants'][0]['charitable_program']['pledge_percentage']
     )
 
     return profile
@@ -89,10 +89,10 @@ def test_ltcg_bracket_calculation():
         }
     ]
 
-    print("\nFederal LTCG Tax Brackets (2024 - Single):")
-    print("  0% bracket: $0 - $44,625")
-    print("  15% bracket: $44,625 - $492,300")
-    print("  20% bracket: $492,300+")
+    print("\nFederal LTCG Tax Brackets (2025 - Single):")
+    print("  0% bracket: $0 - $48,350")
+    print("  15% bracket: $48,351 - $533,400")
+    print("  20% bracket: $533,401+")
     print("\nNote: LTCG stacks on top of ordinary income for bracket determination")
 
     for scenario in test_scenarios:
@@ -113,8 +113,8 @@ def test_ltcg_bracket_calculation():
             sale_price=sale_price,
             gross_proceeds=shares_sold * sale_price,
             cost_basis=50.0,
-            acquisition_date=date(2024, 1, 1),
-            acquisition_type='exercise',
+            exercise_date=date(2024, 1, 1),
+            # acquisition_type='exercise',
             holding_period_days=520,
             disposition_type=DispositionType.REGULAR_SALE,
             long_term_gain=ltcg_gain,
@@ -223,8 +223,8 @@ def test_ltcg_bracket_calculation():
         sale_price=sale_price,
         gross_proceeds=shares_sold * sale_price,
         cost_basis=50.0,
-        acquisition_date=date(2024, 1, 1),
-        acquisition_type='exercise',
+        exercise_date=date(2024, 1, 1),
+        # acquisition_type='exercise',
         holding_period_days=520,
         disposition_type=DispositionType.REGULAR_SALE,
         long_term_gain=large_ltcg,

@@ -200,7 +200,7 @@ class TestCharitableComprehensiveScenario(unittest.TestCase):
                     shares_donated=int(expected['stock_donated'] / 100),
                     fmv_at_donation=100.0,
                     cost_basis=0.0,
-                    acquisition_date=date(year - 2, 1, 1),
+                    exercise_date=date(year - 2, 1, 1),
                     holding_period_days=365 * 2,
                     donation_value=float(expected['stock_donated']),
                     deduction_type="stock"

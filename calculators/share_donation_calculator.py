@@ -32,7 +32,7 @@ class ShareDonationCalculator:
         shares_donated: int,
         fmv_at_donation: float,
         cost_basis: float,
-        acquisition_date: date,
+        exercise_date: date,
         holding_period_days: int,
         company_match_ratio: float = 0.0,
         pledge_id: Optional[str] = None,
@@ -51,7 +51,7 @@ class ShareDonationCalculator:
             shares_donated: Number of shares to donate
             fmv_at_donation: Fair market value per share at donation
             cost_basis: Cost basis per share
-            acquisition_date: Date shares were acquired
+            exercise_date: Date shares were acquired
             holding_period_days: Days held (for deduction calculation)
             company_match_ratio: Company match ratio (e.g., 3.0 for 3:1)
             pledge_id: Optional reference to pledge being satisfied
@@ -82,7 +82,7 @@ class ShareDonationCalculator:
             shares_donated=shares_donated,
             fmv_at_donation=fmv_at_donation,
             cost_basis=cost_basis,
-            acquisition_date=acquisition_date,
+            exercise_date=exercise_date,
             holding_period_days=holding_period_days,
             donation_value=donation_value,
             deduction_type=deduction_type,

@@ -45,9 +45,11 @@ class DetailedAction:
     strike_price: float = 0.0
     cost_basis: float = 0.0
     holding_period_days: int = 0
-    acquisition_date: Optional[date] = None
+    exercise_date: Optional[date] = None
     tax_treatment: str = ""
     vest_expiration_date: Optional[date] = None
+    current_share_price: float = 0.0
+    action_value: float = 0.0
 
     # Financial calculations
     gross_proceeds: float = 0.0
@@ -81,6 +83,8 @@ class DetailedAction:
     post_lot_lifecycle: str = ""
     post_tax_treatment: str = ""
     net_cash_change: float = 0.0
+    lot_options_remaining: int = 0
+    lot_shares_remaining: int = 0
 
 
 @dataclass
@@ -267,44 +271,49 @@ class DetailedMaterializer:
             detailed.tax_treatment = lot.tax_treatment.value
             detailed.strike_price = lot.strike_price
 
-            # Extract acquisition date and expiration date from lot
-            # Determine acquisition date based on action type and lot characteristics
-            acquisition_date = None
-
+            # Extract exercise date and expiration date from lot
+            # Determine exercise date based on action type and lot characteristics
             if action.action_type == ActionType.EXERCISE:
-                # For exercise actions, acquisition date is always grant date (when option was granted)
-                acquisition_date = lot.grant_date
-            elif lot.share_type == ShareType.RSU:
-                # For RSUs, acquisition date is when they vested (exercise_date)
-                acquisition_date = lot.exercise_date
-            elif lot.share_type in [ShareType.ISO, ShareType.NSO]:
-                if lot.exercise_date:
-                    # For exercised options, acquisition date is exercise date
-                    acquisition_date = lot.exercise_date
-                else:
-                    # For unexercised options, acquisition date is grant date
-                    acquisition_date = lot.grant_date
+                # For exercise actions, the exercise date is the action date
+                detailed.exercise_date = action.action_date
             else:
-                # Fallback to grant_date for other types
-                acquisition_date = lot.grant_date
+                # For other actions, use the lot's exercise date
+                exercise_date = lot.exercise_date
+                if exercise_date:
+                    detailed.exercise_date = exercise_date
+                    # Calculate holding period for sales and donations
+                    if action.action_type in [ActionType.SELL, ActionType.DONATE]:
+                        detailed.holding_period_days = (action.action_date - exercise_date).days
 
-            if acquisition_date:
-                detailed.acquisition_date = acquisition_date
-                # Calculate holding period for sales and donations
-                if action.action_type in [ActionType.SELL, ActionType.DONATE]:
-                    detailed.holding_period_days = (action.action_date - acquisition_date).days
-
-                    # Update tax treatment based on actual holding period
-                    if detailed.holding_period_days >= 365:
-                        detailed.tax_treatment = "LTCG"
-                    else:
-                        detailed.tax_treatment = "STCG"
+                        # Update tax treatment based on actual holding period
+                        if detailed.holding_period_days >= 365:
+                            detailed.tax_treatment = "LTCG"
+                        else:
+                            detailed.tax_treatment = "STCG"
 
             if hasattr(lot, 'expiration_date'):
                 detailed.vest_expiration_date = lot.expiration_date
 
         # Starting cash position
         detailed.pre_cash = yearly_state.starting_cash
+
+        # Populate new action summary fields
+        detailed.current_share_price = action.price if action.price else 0.0
+        detailed.action_value = action.quantity * detailed.current_share_price
+
+        # Calculate remaining options and shares after this action
+        if lot:
+            if lot.lifecycle_state.value in ['vested_not_exercised', 'granted_not_vested']:
+                # For unexercised options, calculate remaining options
+                detailed.lot_options_remaining = max(0, lot.quantity - action.quantity) if action.action_type == ActionType.EXERCISE else lot.quantity
+                detailed.lot_shares_remaining = 0  # No exercised shares yet
+            elif lot.lifecycle_state.value == 'exercised_not_disposed':
+                # For exercised shares, calculate remaining shares
+                detailed.lot_options_remaining = 0  # No options remaining
+                detailed.lot_shares_remaining = max(0, lot.quantity - action.quantity) if action.action_type in [ActionType.SELL, ActionType.DONATE] else lot.quantity
+            else:
+                detailed.lot_options_remaining = 0
+                detailed.lot_shares_remaining = 0
 
         # Calculator identification and calculations based on action type
         if action.action_type == ActionType.EXERCISE:
@@ -322,9 +331,28 @@ class DetailedMaterializer:
                 else:
                     detailed.calculator_used = "iso_exercise_calculator"  # fallback
             else:
-                detailed.calculator_used = "iso_exercise_calculator"  # fallback
+                # If lot not found, try to infer share type from lot_id pattern
+                if action.lot_id == 'NSO' or action.lot_id.endswith('_NSO'):
+                    detailed.calculator_used = "nso_exercise_calculator"
+                else:
+                    detailed.calculator_used = "iso_exercise_calculator"  # default to ISO
             detailed.exercise_cost = action.quantity * (lot.strike_price if lot else 0)
-            detailed.amt_adjustment = action.quantity * ((action.price if action.price else 0) - (lot.strike_price if lot else 0))
+
+            # AMT adjustment only applies to ISO exercises, not NSO
+            if lot and hasattr(lot, 'share_type'):
+                share_type_value = lot.share_type
+                if hasattr(share_type_value, 'value'):  # Handle enum
+                    share_type_str = share_type_value.value
+                else:
+                    share_type_str = str(share_type_value)
+
+                if share_type_str == 'ISO':
+                    detailed.amt_adjustment = action.quantity * ((action.price if action.price else 0) - (lot.strike_price if lot else 0))
+                else:
+                    detailed.amt_adjustment = 0.0  # NSOs don't create AMT adjustments
+            else:
+                detailed.amt_adjustment = 0.0  # Default to no AMT adjustment
+
             detailed.tax_impact = 0  # AMT impact tracked at year level
 
         elif action.action_type == ActionType.SELL:
@@ -480,7 +508,7 @@ class DetailedMaterializer:
                     'lot_id': action.lot_id,
                     'quantity': action.quantity,
                     'price': round(action.price, 2),
-                    'acquisition_date': action.acquisition_date.isoformat() if action.acquisition_date else '',
+                    'exercise_date': action.exercise_date.isoformat() if action.exercise_date else '',
                     'holding_period_days': action.holding_period_days,
                     'tax_treatment': action.tax_treatment,
                     'calculator': action.calculator_used,
@@ -494,16 +522,21 @@ class DetailedMaterializer:
                     'pledge_created': round(action.pledge_created, 2),
                     'net_cash_change': round(action.net_cash_change, 2),
                     'vest_expiration_date': action.vest_expiration_date.isoformat() if action.vest_expiration_date else '',
-                    'notes': action.notes
+                    'notes': action.notes,
+                    'current_share_price': round(action.current_share_price, 2),
+                    'action_value': round(action.action_value, 2),
+                    'lot_options_remaining': action.lot_options_remaining,
+                    'lot_shares_remaining': action.lot_shares_remaining
                 })
 
         # Always create the file, even if empty
         fieldnames = [
             'year', 'date', 'type', 'lot_id', 'quantity', 'price',
-            'acquisition_date', 'holding_period_days', 'tax_treatment',
+            'exercise_date', 'holding_period_days', 'tax_treatment',
             'calculator', 'gross_proceeds', 'exercise_cost', 'capital_gain',
             'amt_adjustment', 'tax', 'donation_value', 'company_match',
-            'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes'
+            'pledge_created', 'net_cash_change', 'vest_expiration_date', 'notes',
+            'current_share_price', 'action_value', 'lot_options_remaining', 'lot_shares_remaining'
         ]
 
         with open(output_path, 'w', newline='') as f:
@@ -579,8 +612,37 @@ class DetailedMaterializer:
 
         summaries = []
         for year in detailed_years:
+            # Find the corresponding YearlyState for this DetailedYear
+            yearly_state = next((s for s in result.yearly_states if s.year == year.year), None)
+            
             # Calculate pledge metrics based on actual progression through years
             pledge_metrics = self._calculate_pledge_metrics_through_year(result, year.year)
+
+            # Calculate action counts for new tracking fields
+            options_exercised_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'exercise')
+            shares_sold_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'sell')
+            shares_donated_count = sum(a.quantity for a in year.actions if hasattr(a, 'action_type') and a.action_type == 'donate')
+
+            # Get actual values from YearlyState instead of placeholders
+            company_match = 0.0
+            amt_credits_generated = 0.0
+            amt_credits_consumed = 0.0
+            amt_credits_balance = 0.0
+            expired_option_count = 0
+            
+            if yearly_state:
+                # Company match from yearly state
+                company_match = yearly_state.company_match_received
+                
+                # AMT credit tracking from tax state
+                if yearly_state.tax_state:
+                    amt_credits_generated = yearly_state.tax_state.amt_credits_generated
+                    amt_credits_consumed = yearly_state.tax_state.amt_credits_used
+                    amt_credits_balance = yearly_state.tax_state.amt_credits_remaining
+                
+                # Option expiration tracking from expiration events
+                if hasattr(yearly_state, 'expiration_events') and yearly_state.expiration_events:
+                    expired_option_count = sum(event.quantity for event in yearly_state.expiration_events)
 
             summaries.append({
                 'year': year.year,
@@ -590,19 +652,26 @@ class DetailedMaterializer:
                 'sale_proceeds': round(year.total_gross_proceeds, 2),
                 'capital_gains': round(year.total_capital_gains, 2),
                 'donations': round(sum(a.donation_value for a in year.actions), 2),
-                'company_match': round(sum(a.company_match for a in year.actions), 2),
-                'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + sum(a.company_match for a in year.actions), 2),
+                'company_match': round(company_match, 2),
+                'total_charitable_impact': round(sum(a.donation_value for a in year.actions) + company_match, 2),
                 'pledge_shares_obligated': pledge_metrics['obligated'],
                 'pledge_shares_donated': pledge_metrics['donated'],
                 'pledge_shares_outstanding': pledge_metrics['outstanding'],
-                'pledge_shares_expired_window': pledge_metrics['expired_window'],
+                'pledge_shares_expired': pledge_metrics['expired_window'],
+                'options_exercised_count': options_exercised_count,
+                'shares_sold_count': shares_sold_count,
+                'shares_donated_count': shares_donated_count,
+                'amt_credits_generated': round(amt_credits_generated, 2),
+                'amt_credits_consumed': round(amt_credits_consumed, 2),
+                'amt_credits_balance': round(amt_credits_balance, 2),
+                'expired_option_count': expired_option_count,
                 'regular_tax': round(year.regular_tax_before_credits, 2),
                 'amt_tax': round(year.amt_tax, 2),
                 'total_tax': round(year.total_tax_liability, 2),
                 'ending_cash': round(year.ending_cash, 2),
                 'equity_value': round(year.total_equity_value, 2),
                 'net_worth': round(year.ending_cash + year.total_equity_value, 2),
-                'opportunity_cost': round(year.opportunity_cost, 2)
+                'expired_option_loss': round(year.opportunity_cost, 2)
             })
 
         if summaries:

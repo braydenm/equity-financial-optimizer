@@ -306,7 +306,7 @@ def test_missing_fmv_at_exercise():
             shares_to_sell=1000,
             sale_price=40.0,
             cost_basis=10.0,
-            acquisition_date=exercise_date,
+            exercise_date=exercise_date,
             acquisition_type='exercise',
             is_iso=True,
             grant_date=grant_date,

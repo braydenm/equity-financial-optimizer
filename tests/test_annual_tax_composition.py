@@ -98,8 +98,8 @@ def test_multiple_actions_in_year():
         shares_to_sell=2000,
         sale_price=35.0,
         cost_basis=10.0,
-        acquisition_date=date(2021, 9, 15),
-        acquisition_type='vest',
+        exercise_date=date(2021, 9, 15),
+        # acquisition_type='vest',
         is_iso=False
     )
     annual_components.sale_components.append(sale)
@@ -112,7 +112,7 @@ def test_multiple_actions_in_year():
         shares_donated=100,
         fmv_at_donation=40.0,
         cost_basis=12.0,
-        acquisition_date=date(2022, 9, 15),
+        exercise_date=date(2022, 9, 15),
         holding_period_days=1081,  # ~3 years
         company_match_ratio=profile.company_match_ratio
     )
@@ -184,8 +184,8 @@ def test_ltcg_bracket_application():
             sale_price=ltcg_amount/1000 + 10,
             cost_basis=10.0,
             gross_proceeds=ltcg_amount + 10000,
-            acquisition_date=date(2020, 1, 1),
-            acquisition_type='purchase',
+            exercise_date=date(2020, 1, 1),
+            # acquisition_type='purchase',
             holding_period_days=1887,
             disposition_type=DispositionType.REGULAR_SALE,
             short_term_gain=0,
@@ -296,7 +296,7 @@ def test_charitable_deduction_limits():
         shares_donated=2000,
         fmv_at_donation=50.0,
         cost_basis=10.0,
-        acquisition_date=date(2020, 1, 1),
+        exercise_date=date(2020, 1, 1),
         holding_period_days=1887,
         company_match_ratio=0  # No match for simplicity
     )
@@ -363,8 +363,8 @@ def compare_old_vs_new_approach():
         sale_price=100.0,
         cost_basis=25.0,
         gross_proceeds=100000,
-        acquisition_date=date(2020, 1, 1),
-        acquisition_type='purchase',
+        exercise_date=date(2020, 1, 1),
+        # acquisition_type='purchase',
         holding_period_days=1979,
         disposition_type=DispositionType.REGULAR_SALE,
         short_term_gain=0,

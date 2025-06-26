@@ -35,21 +35,21 @@ graph TD
     A[User Profile] --> B[Projection Calculator]
     C[Scenarios JSON] --> B
     D[Market Data] --> B
-    
+
     B --> E[Action Processing]
     E --> F[Component Extraction]
     F --> G[Annual Tax Components]
-    
+
     G --> H[Annual Tax Calculator]
     H --> I[Tax Results]
-    
+
     G --> J[Yearly State Builder]
     I --> J
     J --> K[Yearly State]
-    
+
     K --> L[Projection Result]
     L --> M[CSV Generators]
-    
+
     M --> N1[annual_tax_detail.csv]
     M --> N2[state_timeline.csv]
     M --> N3[transition_timeline.csv]
@@ -67,7 +67,7 @@ graph TD
 
 #### 1. AnnualTaxComponents
 - **Purpose**: Aggregate all tax-relevant events for a year
-- **Contains**: 
+- **Contains**:
   - ISO/NSO exercise components
   - Sale components (STCG, LTCG, ordinary income)
   - Donation components
@@ -80,32 +80,32 @@ graph TD
   ```python
   class YearlyState:
       year: int
-      
+
       # Income tracking
       income: float  # W2 income
       spouse_income: float
       other_income: float
-      
+
       # Cash flow
       starting_cash: float
       exercise_costs: float
       tax_paid: float
       donation_value: float
       ending_cash: float
-      
+
       # Tax state
       tax_state: TaxState
-      
+
       # Charitable state
       charitable_state: CharitableDeductionState
-      
+
       # Equity tracking
       equity_holdings: List[ShareLot]
-      
+
       # Disposal tracking
       shares_sold: Dict[str, int]
       shares_donated: Dict[str, int]
-      
+
       # Component data for CSV generation
       annual_tax_components: AnnualTaxComponents
   ```
@@ -120,8 +120,8 @@ GRANTED_NOT_VESTED → VESTED_NOT_EXERCISED → EXERCISED_NOT_DISPOSED → DISPO
 ## CSV File Specifications
 
 ### 1. annual_tax_detail.csv
-**Purpose**: Complete tax breakdown by component  
-**Source**: YearlyState.annual_tax_components  
+**Purpose**: Complete tax breakdown by component
+**Source**: YearlyState.annual_tax_components
 **Key Logic**:
 ```python
 # Extract from annual_tax_components
@@ -133,7 +133,7 @@ iso_bargain = sum(e.bargain_element for e in components.iso_exercise_components)
 ```
 
 ### 2. state_timeline.csv
-**Purpose**: Track share quantities in each lifecycle state  
+**Purpose**: Track share quantities in each lifecycle state
 **Features**:
 - Rename VESTED_ISO → ISO, VESTED_NSO → NSO
 - Group related lots (ISO + ISO_EX_*)
@@ -151,7 +151,7 @@ if 'VEST_' in lot_id and date_from_lot_id <= current_year_end:
 ```
 
 ### 3. transition_timeline.csv
-**Purpose**: Show movement between lifecycle states  
+**Purpose**: Show movement between lifecycle states
 **Must Track**:
 - Granting: New shares granted
 - Vesting: GRANTED → VESTED (including automatic date-based)
@@ -168,9 +168,9 @@ if 'VEST_' in lot_id:
 ```
 
 ### 4. action_summary.csv
-**Purpose**: Detailed record of every user action  
+**Purpose**: Detailed record of every user action
 **Enhanced Fields**:
-- acquisition_date
+- exercise_date
 - holding_period_days
 - tax_treatment
 - amt_adjustment
@@ -178,7 +178,7 @@ if 'VEST_' in lot_id:
 - vest_expiration_date
 
 ### 5. annual_summary.csv
-**Purpose**: Year-by-year financial summary  
+**Purpose**: Year-by-year financial summary
 **Must Include**:
 - exercise_costs (from YearlyState.exercise_costs)
 - All donation values
@@ -186,14 +186,14 @@ if 'VEST_' in lot_id:
 - Correct tax totals
 
 ### 6. holding_period_tracking.csv
-**Purpose**: Track tax treatment eligibility  
+**Purpose**: Track tax treatment eligibility
 **Key Features**:
 - ISO qualifying disposition dates
 - Days until qualifying
 - Current holding status
 
 ### 7. pledge_obligations.csv
-**Purpose**: Track donation commitments from sales  
+**Purpose**: Track donation commitments from sales
 **Calculation**:
 ```python
 # Maximalist interpretation formula
@@ -202,14 +202,14 @@ obligation_amount = shares_required * current_price
 ```
 
 ### 8. charitable_carryforward.csv
-**Purpose**: Track unused charitable deductions  
+**Purpose**: Track unused charitable deductions
 **Data Sources**:
 - Donations: YearlyState.annual_tax_components.donation_components
 - Deductions used: YearlyState.charitable_state.current_year_deduction
 - AGI calculation: Include all income sources + capital gains
 
 ### 9. tax_component_breakdown.csv
-**Purpose**: Show tax by income type and lot  
+**Purpose**: Show tax by income type and lot
 **Categories**:
 - W2_income
 - ISO_exercise (AMT adjustments)
@@ -232,7 +232,7 @@ class VestingDetector:
                 if vest_date and vest_date <= current_date:
                     vesting_events.append(VestingEvent(lot, vest_date))
         return vesting_events
-    
+
     @staticmethod
     def extract_vest_date(lot_id: str) -> Optional[date]:
         """Extract vesting date from lot_id like VEST_20250524_ISO."""
@@ -249,7 +249,7 @@ class VestingDetector:
 ```python
 class ExpirationDetector:
     @staticmethod
-    def detect_expirations(lots: List[ShareLot], current_date: date, 
+    def detect_expirations(lots: List[ShareLot], current_date: date,
                           option_term_years: int = 10) -> List[ExpirationEvent]:
         """Detect options that have expired."""
         expirations = []
@@ -266,18 +266,18 @@ class ExpirationDetector:
 class ProjectionCalculator:
     def evaluate_projection_plan(self, plan: ProjectionPlan) -> ProjectionResult:
         # ... existing code ...
-        
+
         # CRITICAL: Attach components to YearlyState
         yearly_state.annual_tax_components = annual_components
         yearly_state.spouse_income = self.profile.spouse_w2_income
         yearly_state.other_income = self.profile.other_income
-        
+
         # Process automatic events
         vesting_events = VestingDetector.process_automatic_vesting(
             current_lots, date(year, 12, 31))
         expiration_events = ExpirationDetector.detect_expirations(
             current_lots, date(year, 12, 31))
-        
+
         # Apply state changes
         for event in vesting_events:
             self._apply_vesting(event, current_lots, annual_components)
@@ -289,15 +289,15 @@ class ProjectionCalculator:
 ```python
 class PledgeCalculator:
     @staticmethod
-    def calculate_obligation(shares_sold: int, sale_price: float, 
+    def calculate_obligation(shares_sold: int, sale_price: float,
                            pledge_percentage: float) -> PledgeObligation:
         """Single source of truth for pledge calculations."""
         if pledge_percentage >= 1:
             raise ValueError("Pledge percentage must be less than 100%")
-        
+
         shares_required = int((pledge_percentage * shares_sold) / (1 - pledge_percentage))
         obligation_amount = shares_required * sale_price
-        
+
         return PledgeObligation(
             shares_sold=shares_sold,
             pledge_percentage=pledge_percentage,
@@ -315,7 +315,7 @@ class TestAnnualTaxDetailCSV:
         state = create_test_yearly_state(spouse_income=150000)
         csv_data = extract_annual_tax_detail(state)
         assert csv_data['spouse_income'] == 150000
-    
+
     def test_aggregates_capital_gains(self):
         components = create_test_components(
             sales=[
@@ -334,14 +334,14 @@ class TestCSVGeneration:
         # Create scenario with all action types
         profile = create_test_profile()
         plan = create_comprehensive_plan()
-        
+
         # Run projection
         calculator = ProjectionCalculator(profile)
         result = calculator.evaluate_projection_plan(plan)
-        
+
         # Generate CSVs
         save_all_projection_csvs(result, "test", "output/test")
-        
+
         # Validate each CSV
         validate_annual_tax_detail("output/test/test_annual_tax_detail.csv")
         validate_state_timeline("output/test/test_state_timeline.csv")
@@ -354,16 +354,16 @@ class TestDataFlow:
     def test_donation_data_flows_to_csv(self):
         # Create donation action
         donation = create_donation_action(shares=500, price=60)
-        
+
         # Process through system
         components = process_donation(donation)
         yearly_state = aggregate_to_yearly_state(components)
-        
+
         # Verify data at each stage
         assert components.donation_components[0].donation_value == 30000
         assert yearly_state.donation_value == 30000
         assert yearly_state.annual_tax_components.donation_components[0].donation_value == 30000
-        
+
         # Verify in CSV
         csv_data = generate_charitable_carryforward_csv(yearly_state)
         assert csv_data['stock_donations'] == 30000
