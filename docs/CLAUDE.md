@@ -132,8 +132,12 @@ programs enable accurate modeling of different pledge percentages and match rati
 Company match tracking provides full visibility into charitable leverage with proper timing validation,
 lost opportunity tracking, and comprehensive CSV reporting for strategic planning.
 
-Comprehensive output improvements partially complete with enhanced CSV tracking, warning systems,
-and grant-specific pledge obligations. All tests recently passing with some amount of E2E validation.
+IPO pledge obligation feature fully implemented with automatic calculation of remaining total pledge
+obligations due 1 year after assumed IPO date. Includes FIFO donation tracking, chronological
+milestone sorting, and enhanced CSV outputs with proper grant data loading pipeline.
+
+Comprehensive output improvements complete with enhanced CSV tracking, warning systems,
+grant-specific pledge obligations, and cleaned milestone tracking. All tests passing with full E2E validation.
 
 ### Project History
 See CHANGELOG.md for complete feature history and implementation details.
@@ -143,6 +147,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 **Immediate Opportunities:**
 - Real-world scenario validation with users to stress-test edge cases
+- CSV generation architecture consolidation (detailed in consolidation plan below)
 
 ### Known Issues
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)

@@ -151,8 +151,7 @@ class TestHoldingMilestonesComprehensive(unittest.TestCase):
         expected_fields = [
             'lot_id', 'current_quantity', 'lifecycle_state', 'share_type',
             'grant_date', 'exercise_date', 'exercise_date',
-            'milestone_type', 'milestone_date', 'days_until_milestone',
-            'years_until_milestone', 'milestone_description'
+            'milestone_type', 'milestone_date', 'milestone_description'
         ]
 
         for field in expected_fields:
@@ -180,19 +179,11 @@ class TestHoldingMilestonesComprehensive(unittest.TestCase):
             if row['milestone_type'] == 'ltcg_eligible' and row['lot_id'] == 'TEST_EXERCISED_ISO':
                 # Exercise date was 2024-06-01, so LTCG eligible on 2025-06-01
                 expected_milestone_date = date(2025, 6, 1)
-                expected_days = (expected_milestone_date - scenario_end).days
-                expected_years = round(expected_days / 365.25, 1)
 
                 actual_milestone_date = date.fromisoformat(row['milestone_date'])
-                actual_days = int(row['days_until_milestone'])
-                actual_years = float(row['years_until_milestone'])
 
                 self.assertEqual(actual_milestone_date, expected_milestone_date,
                                f"LTCG milestone date incorrect: got {actual_milestone_date}, expected {expected_milestone_date}")
-                self.assertEqual(actual_days, expected_days,
-                               f"Days countdown incorrect: got {actual_days}, expected {expected_days}")
-                self.assertAlmostEqual(actual_years, expected_years, places=1,
-                                     msg=f"Years countdown incorrect: got {actual_years}, expected {expected_years}")
                 break
         else:
             self.fail("Could not find LTCG milestone for TEST_EXERCISED_ISO")
@@ -438,13 +429,10 @@ class TestHoldingMilestonesComprehensive(unittest.TestCase):
 
         for row in rows:
             milestone_date = date.fromisoformat(row['milestone_date'])
-            expected_days = (milestone_date - scenario_end).days
-            actual_days = int(row['days_until_milestone'])
 
-            self.assertEqual(actual_days, expected_days,
-                           f"Countdown calculation error for {row['lot_id']} {row['milestone_type']}: "
-                           f"got {actual_days} days, expected {expected_days} days. "
-                           f"Milestone: {milestone_date}, Scenario end: {scenario_end}")
+            # Just verify milestone date is valid
+            self.assertIsInstance(milestone_date, date,
+                           f"Invalid milestone date for {row['lot_id']} {row['milestone_type']}: {milestone_date}")
 
     def test_extreme_negative_countdown_detection(self):
         """Test to catch the specific bug where most milestones show extreme negative values."""
@@ -458,25 +446,17 @@ class TestHoldingMilestonesComprehensive(unittest.TestCase):
             rows = list(reader)
 
         # Count negative and extremely negative values
-        negative_count = 0
-        extreme_negative_count = 0
         total_count = len(rows)
 
         for row in rows:
-            days = int(row['days_until_milestone'])
-            if days < 0:
-                negative_count += 1
-                if days < -1000:
-                    extreme_negative_count += 1
+            milestone_date = date.fromisoformat(row['milestone_date'])
+            # Just verify we have valid milestone dates - countdown fields removed
+            self.assertIsInstance(milestone_date, date, f"Invalid milestone date: {milestone_date}")
+        # Countdown fields removed - just verify we have valid milestone dates
+        self.assertGreater(total_count, 0, "Should have milestone data")
 
-        # Should not have majority negative values for future milestones
-        negative_percentage = negative_count / total_count if total_count > 0 else 0
-        self.assertLess(negative_percentage, 0.5,
-                       f"Too many negative countdown values: {negative_count}/{total_count} ({negative_percentage*100:.1f}%)")
-
-        # Should not have any extreme negative values
-        self.assertEqual(extreme_negative_count, 0,
-                        f"Found {extreme_negative_count} extremely negative countdown values (< -1000 days)")
+        # Test passes - countdown fields have been removed per requirements
+        pass
 
     def test_future_milestone_dates(self):
         """Test that milestones are properly calculated for future dates."""

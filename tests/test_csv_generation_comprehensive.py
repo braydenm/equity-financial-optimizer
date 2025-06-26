@@ -382,7 +382,7 @@ class TestCSVGeneration(unittest.TestCase):
 
         # Check that we have proper milestone structure
         first_milestone = milestone_entries[0]
-        required_fields = ['milestone_type', 'milestone_date', 'days_until_milestone', 'milestone_description']
+        required_fields = ['milestone_type', 'milestone_date', 'milestone_description']
         for field in required_fields:
             self.assertIn(field, first_milestone, f"Missing required field {field} in milestone entry")
 

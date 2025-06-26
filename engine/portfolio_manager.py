@@ -141,6 +141,12 @@ class PortfolioManager:
         if 'assumed_ipo' in profile_data:
             assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
 
+        # Extract grants from equity_position.original_grants
+        grants = []
+        equity_position = profile_data.get('equity_position', {})
+        if 'original_grants' in equity_position:
+            grants = equity_position['original_grants']
+
         self._user_profile = UserProfile(
             federal_tax_rate=personal['federal_tax_rate'],
             federal_ltcg_rate=personal['federal_ltcg_rate'],
@@ -169,7 +175,8 @@ class PortfolioManager:
             crypto=financial['liquid_assets'].get('crypto', 0),
             real_estate_equity=financial['illiquid_assets'].get('real_estate_equity', 0),
             amt_credit_carryforward=carryforwards.get('amt_credit', 0),
-            assumed_ipo=assumed_ipo
+            assumed_ipo=assumed_ipo,
+            grants=grants
         )
 
         # Store additional data we might need

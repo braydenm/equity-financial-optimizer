@@ -257,18 +257,19 @@ def generate_holding_milestones_csv(result: ProjectionResult, output_path: str) 
     if not assumed_ipo:
         assumed_ipo = date(2040, 1, 1)  # Default fallback
 
-    # Calculate scenario end date for countdown
-    scenario_end_date = date(final_state.year, 12, 31)
+
 
     with open(output_path, 'w', newline='') as f:
         fieldnames = [
             'lot_id', 'current_quantity', 'lifecycle_state', 'share_type',
             'grant_date', 'exercise_date', 'exercise_date',
-            'milestone_type', 'milestone_date', 'days_until_milestone', 'years_until_milestone',
-            'milestone_description'
+            'milestone_type', 'milestone_date', 'milestone_description'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
+
+        # Collect all milestone entries for sorting
+        all_milestones = []
 
         # Process all current holdings
         for lot in final_state.equity_holdings:
@@ -358,23 +359,17 @@ def generate_holding_milestones_csv(result: ProjectionResult, output_path: str) 
             if hasattr(lot, 'exercise_date') and lot.exercise_date:
                 exercise_date = lot.exercise_date
 
-            # Write a row for each milestone
+            # Collect milestones for this lot
             for milestone in milestones:
-                days_until = (milestone['date'] - scenario_end_date).days
-                years_until = round(days_until / 365.25, 1)
-
-                writer.writerow({
+                all_milestones.append({
                     'lot_id': lot.lot_id,
                     'current_quantity': lot.quantity,
                     'lifecycle_state': lot.lifecycle_state.value,
                     'share_type': lot.share_type.value,
                     'grant_date': lot.grant_date.isoformat() if hasattr(lot, 'grant_date') and lot.grant_date else '',
-                    'exercise_date': lot.exercise_date.isoformat() if hasattr(lot, 'exercise_date') and lot.exercise_date else '',
                     'exercise_date': exercise_date.isoformat() if exercise_date else '',
                     'milestone_type': milestone['type'],
                     'milestone_date': milestone['date'].isoformat(),
-                    'days_until_milestone': days_until,
-                    'years_until_milestone': years_until,
                     'milestone_description': milestone['description']
                 })
 
@@ -386,70 +381,190 @@ def generate_holding_milestones_csv(result: ProjectionResult, output_path: str) 
                 if action.action_type.value == 'SELL':
                     sale_dates[action.lot_id] = action.action_date
 
+        # Track pledge obligations with FIFO donation application
+        # Build chronological list of sales and donations
+        pledge_events = []
+
         for year_state in result.yearly_states:
-            # Track sold lots for pledge window expiry
+            # Add sales (create pledge obligations)
             for lot_id, shares_sold in year_state.shares_sold.items():
                 if shares_sold > 0:
-                    # Use actual sale date from planned actions, fallback to mid-year
                     sale_date = sale_dates.get(lot_id, date(year_state.year, 3, 1))
+                    pledge_events.append({
+                        'type': 'sale',
+                        'date': sale_date,
+                        'lot_id': lot_id,
+                        'shares': shares_sold,
+                        'year': year_state.year
+                    })
 
-                    # Calculate pledge window expiry (sale_date + 36 months, but max IPO + 12 months)
-                    try:
-                        sale_plus_36_months = date(sale_date.year + 3, sale_date.month, sale_date.day)
-                    except ValueError:
-                        sale_plus_36_months = date(sale_date.year + 3, sale_date.month, 28)
+            # Add donations (reduce pledge obligations)
+            for lot_id, shares_donated in year_state.shares_donated.items():
+                if shares_donated > 0:
+                    # Use actual donation date from planned actions, fallback to mid-year
+                    donation_date = date(year_state.year, 6, 15)  # Mid-year fallback
+                    if result.plan and hasattr(result.plan, 'planned_actions'):
+                        for action in result.plan.planned_actions:
+                            if (action.action_type.value == 'DONATE' and
+                                action.lot_id == lot_id and
+                                action.action_date.year == year_state.year):
+                                donation_date = action.action_date
+                                break
 
-                    try:
-                        ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
-                    except ValueError:
-                        ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
-                    pledge_window_expiry = min(sale_plus_36_months, ipo_plus_12_months)
+                    pledge_events.append({
+                        'type': 'donation',
+                        'date': donation_date,
+                        'lot_id': lot_id,
+                        'shares': shares_donated,
+                        'year': year_state.year
+                    })
 
-                    days_until = (pledge_window_expiry - scenario_end_date).days
-                    years_until = round(days_until / 365.25, 1)
+        # Sort events chronologically
+        pledge_events.sort(key=lambda x: x['date'])
 
-                    # Only include if the window hasn't expired yet
-                    if days_until > -365:  # Include if expired within last year for context
-                        writer.writerow({
-                            'lot_id': lot_id,
-                            'current_quantity': 0,
-                            'lifecycle_state': 'DISPOSED_SOLD',
-                            'share_type': '',
-                            'grant_date': '',
-                            'exercise_date': '',
-                            'exercise_date': '',
-                            'milestone_type': 'pledge_window_expiry',
-                            'milestone_date': pledge_window_expiry.isoformat(),
-                            'days_until_milestone': days_until,
-                            'years_until_milestone': years_until,
-                            'milestone_description': f'Pledge window expires for {shares_sold} shares sold'
+        # Apply FIFO logic: donations discharge earliest sales first
+        outstanding_sales = []  # List of {'lot_id': str, 'shares': int, 'date': date, 'year': int}
+
+        for event in pledge_events:
+            if event['type'] == 'sale':
+                outstanding_sales.append({
+                    'lot_id': event['lot_id'],
+                    'shares': event['shares'],
+                    'date': event['date'],
+                    'year': event['year']
+                })
+            elif event['type'] == 'donation':
+                # Apply donation to outstanding sales FIFO
+                shares_to_apply = event['shares']
+                remaining_sales = []
+
+                for sale in outstanding_sales:
+                    if shares_to_apply <= 0:
+                        remaining_sales.append(sale)
+                    elif sale['shares'] <= shares_to_apply:
+                        # This sale is fully discharged
+                        shares_to_apply -= sale['shares']
+                    else:
+                        # This sale is partially discharged
+                        remaining_sales.append({
+                            'lot_id': sale['lot_id'],
+                            'shares': sale['shares'] - shares_to_apply,
+                            'date': sale['date'],
+                            'year': sale['year']
                         })
+                        shares_to_apply = 0
 
-            # Track donated lots for deduction expiry
+                outstanding_sales = remaining_sales
+
+        # Generate pledge window expiry entries only for outstanding sales
+        for sale in outstanding_sales:
+            # Calculate pledge window expiry (sale_date + 36 months, but max IPO + 12 months)
+            try:
+                sale_plus_36_months = date(sale['date'].year + 3, sale['date'].month, sale['date'].day)
+            except ValueError:
+                sale_plus_36_months = date(sale['date'].year + 3, sale['date'].month, 28)
+
+            try:
+                ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
+            except ValueError:
+                ipo_plus_12_months = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
+            pledge_window_expiry = min(sale_plus_36_months, ipo_plus_12_months)
+
+            all_milestones.append({
+                'lot_id': sale['lot_id'],
+                'current_quantity': 0,
+                'lifecycle_state': 'DISPOSED_SOLD',
+                'share_type': '',
+                'grant_date': '',
+                'exercise_date': '',
+                'exercise_date': '',
+                'milestone_type': 'pledge_window_expiry',
+                'milestone_date': pledge_window_expiry.isoformat(),
+                'milestone_description': f'Pledge window expires for {sale["shares"]} outstanding shares from sale on {sale["date"].isoformat()}'
+            })
+
+        # Generate IPO pledge obligation for remaining total pledge amount
+        if assumed_ipo and result.user_profile:
+
+            # Calculate total pledge amount from grants' charitable programs
+            total_shares = 0
+            total_pledge_shares = 0
+
+            # Get pledge amounts from all grants with charitable programs
+
+            if hasattr(result.user_profile, 'grants') and result.user_profile.grants:
+                for grant in result.user_profile.grants:
+                    # Handle both total_shares and total_options attributes (from dict)
+                    grant_shares = 0
+                    if 'total_shares' in grant:
+                        grant_shares = grant['total_shares']
+                    elif 'total_options' in grant:
+                        grant_shares = grant['total_options']
+
+                    if grant_shares > 0 and 'charitable_program' in grant:
+                        pledge_percentage = grant['charitable_program'].get('pledge_percentage', 0.0)
+
+                        total_shares += grant_shares
+                        total_pledge_shares += int(grant_shares * pledge_percentage)
+
+            if total_pledge_shares > 0:
+
+                # Calculate total donations made across all years
+                total_donated_shares = 0
+                for year_state in result.yearly_states:
+                    for lot_id, shares_donated in year_state.shares_donated.items():
+                        total_donated_shares += shares_donated
+
+                # Calculate remaining pledge obligation
+                remaining_pledge_shares = total_pledge_shares - total_donated_shares
+
+                if remaining_pledge_shares > 0:
+                    # IPO pledge deadline is 1 year after assumed IPO date
+                    try:
+                        ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, assumed_ipo.day)
+                    except ValueError:
+                        ipo_pledge_deadline = date(assumed_ipo.year + 1, assumed_ipo.month, 28)
+
+                    # Calculate overall pledge percentage for display
+                    overall_pledge_percentage = (total_pledge_shares / total_shares) * 100 if total_shares > 0 else 0
+
+                    all_milestones.append({
+                        'lot_id': 'TOTAL_PLEDGE',
+                        'current_quantity': remaining_pledge_shares,
+                        'lifecycle_state': 'PLEDGE_OBLIGATION',
+                        'share_type': '',
+                        'grant_date': '',
+                        'exercise_date': '',
+                        'exercise_date': '',
+                        'milestone_type': 'ipo_pledge_obligation',
+                        'milestone_date': ipo_pledge_deadline.isoformat(),
+                        'milestone_description': f'Total pledge obligation due: {remaining_pledge_shares} shares ({overall_pledge_percentage:.0f}% of {total_shares} total shares, {total_donated_shares} already donated)'
+                    })
+
+        # Track donated lots for deduction expiry
+        for year_state in result.yearly_states:
             for lot_id, shares_donated in year_state.shares_donated.items():
                 if shares_donated > 0:
                     # Deduction expires 5 years after donation year
                     deduction_expiry = date(year_state.year + 5, 12, 31)
 
-                    days_until = (deduction_expiry - scenario_end_date).days
-                    years_until = round(days_until / 365.25, 1)
+                    all_milestones.append({
+                        'lot_id': lot_id,
+                        'current_quantity': 0,
+                        'lifecycle_state': 'DISPOSED_DONATED',
+                        'share_type': '',
+                        'grant_date': '',
+                        'exercise_date': '',
+                        'exercise_date': '',
+                        'milestone_type': 'deduction_expiry',
+                        'milestone_date': deduction_expiry.isoformat(),
+                        'milestone_description': f'Charitable deduction expires for {shares_donated} shares donated in {year_state.year}'
+                    })
 
-                    # Only include if the deduction hasn't expired yet
-                    if days_until > -365:  # Include if expired within last year for context
-                        writer.writerow({
-                            'lot_id': lot_id,
-                            'current_quantity': 0,
-                            'lifecycle_state': 'DISPOSED_DONATED',
-                            'share_type': '',
-                            'grant_date': '',
-                            'exercise_date': '',
-                            'exercise_date': '',
-                            'milestone_type': 'deduction_expiry',
-                            'milestone_date': deduction_expiry.isoformat(),
-                            'days_until_milestone': days_until,
-                            'years_until_milestone': years_until,
-                            'milestone_description': f'Charitable deduction expires for {shares_donated} shares donated in {year_state.year}'
-                        })
+        # Sort all milestones by milestone_date and write to CSV
+        all_milestones.sort(key=lambda x: x['milestone_date'])
+        for milestone_entry in all_milestones:
+            writer.writerow(milestone_entry)
 
 
 def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str) -> None:
@@ -621,7 +736,13 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
             # Create remaining carryforward dictionary for federal stock carryforward
             federal_stock_remaining_dict = {}
             if hasattr(state, 'charitable_state') and state.charitable_state:
-                federal_stock_remaining_dict = dict(state.charitable_state.federal_carryforward_remaining)
+                # Format as readable FIFO breakdown by original deduction creation year
+                # Note: federal_carryforward_remaining is keyed by expiration year
+                # Carryforward expires 5 years after creation, so creation_year = expiration_year - 5
+                for expiration_year, remaining_amount in state.charitable_state.federal_carryforward_remaining.items():
+                    if remaining_amount > 0:
+                        creation_year = expiration_year - 5
+                        federal_stock_remaining_dict[f"{creation_year}_deduction"] = round(remaining_amount, 2)
 
             # Calculate pledge obligation tracking
             pledge_obligations_unmet = 0.0

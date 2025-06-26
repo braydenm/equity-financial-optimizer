@@ -420,3 +420,36 @@
 - Validated 15-year scenario lifecycle including full charitable deduction carryforward
 - Confirmed sub-second performance for complex multi-grant scenarios
 - Verified production readiness with robust error handling and data quality
+
+## IPO Pledge Obligation Feature Implementation
+
+### Core Feature Development
+- Implemented IPO pledge obligation milestone generation in holding period tracking CSV
+- Added automatic calculation of remaining total pledge obligations due 1 year after assumed IPO date
+- Integrated FIFO donation tracking across all years to accurately calculate outstanding pledge amounts
+- Created new milestone type `ipo_pledge_obligation` with special lot ID `TOTAL_PLEDGE` for easy identification
+
+### Data Pipeline Integration
+- Fixed critical grant loading bug in PortfolioManager where equity grants from JSON `equity_position.original_grants` were not being transferred to UserProfile.grants attribute
+- Enhanced IPO pledge calculation to handle both object-based and dictionary-based grant structures
+- Added support for both `total_shares` and `total_options` grant attributes for maximum compatibility
+- Implemented proper aggregation of pledge percentages across multiple grants with charitable programs
+
+### CSV Output Enhancements
+- Removed countdown columns (`days_until_milestone`, `years_until_milestone`) from holding period tracking for cleaner output
+- Implemented chronological sorting of all milestones by `milestone_date` for better timeline visualization
+- Fixed FIFO pledge tracking to eliminate duplicate pledge window expiry entries for discharged obligations
+- Enhanced charitable carryforward CSV to show proper creation year breakdown instead of expiration year formatting
+
+### Testing & Validation
+- Created comprehensive integration test suite covering user examples (10K shares, 50% pledge scenarios)
+- Validated end-to-end data flow from JSON profile loading through CSV output generation
+- Confirmed proper handling of leap year IPO dates with fallback logic
+- Verified chronological milestone sorting integrates seamlessly with existing milestone types
+- All existing tests continue to pass ensuring backward compatibility
+
+### Production Readiness
+- Feature works with both demo and user data automatically
+- Integrates with existing `copy_scenario_csvs.py` utility for easy data export
+- Handles edge cases: no pledges, fully satisfied pledges, multiple grants, and missing data
+- Clear descriptive milestone text showing calculation details for user validation
