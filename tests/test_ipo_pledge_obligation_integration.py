@@ -12,8 +12,12 @@ import unittest
 import tempfile
 import csv
 import os
+import sys
 from datetime import date
 from typing import Dict, List
+
+# Add project root to path for imports (needed for run_all_tests.py)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine.portfolio_manager import PortfolioManager
 from projections.projection_state import (
