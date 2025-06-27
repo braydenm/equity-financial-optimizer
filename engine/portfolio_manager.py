@@ -74,7 +74,7 @@ class Portfolio:
         self.description = description
         self.scenario_paths: List[str] = []
         self.price_scenario = "moderate"  # Default price growth scenario
-        self.projection_years = 8  # Minimum 5 years
+        self.projection_years = 8  # Default projection period
 
     def add_scenario(self, scenario_path: str) -> None:
         """Add a scenario to the portfolio."""
@@ -88,8 +88,8 @@ class Portfolio:
         self.price_scenario = scenario
 
     def set_projection_years(self, years: int) -> None:
-        """Set projection period (minimum 5 years)."""
-        self.projection_years = max(5, years)
+        """Set projection period in years."""
+        self.projection_years = years
 
 
 class PortfolioManager:
@@ -207,7 +207,7 @@ class PortfolioManager:
         Args:
             scenario_path: Path to scenario directory containing actions.csv
             price_scenario: Name of price growth scenario to use
-            projection_years: Years to project (minimum 5)
+            projection_years: Years to project
             output_dir: Directory for output files (optional, auto-generated if not provided)
 
         Returns:

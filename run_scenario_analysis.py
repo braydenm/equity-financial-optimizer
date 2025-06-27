@@ -572,6 +572,12 @@ def execute_scenario(scenario_input, price_scenario="moderate", projection_years
     print(f"\nExecuting scenario: {scenario_path}")
     print(f"Price assumption: {price_scenario} ({projection_years} years)")
 
+    # Warn users about short projection implications
+    if projection_years < 5:
+        print(f"⚠️  Short projection period ({projection_years} years):")
+        print(f"   • Charitable carryforward expiration effects not visible (need 5+ years)")
+        print(f"   • Long-term tax optimization opportunities may be missed")
+
     result = manager.execute_single_scenario(
         scenario_path=scenario_path,
         price_scenario=price_scenario,
@@ -648,6 +654,11 @@ Examples:
 
 Note: You can use just the 3-digit identifier (e.g., '001') instead of the full scenario name
 Use --verbose to show detailed financial tables and raw data analysis
+
+Projection Period Guidelines:
+  • Years 1-4: Basic analysis, no carryforward expiration tracking
+  • Years 5+: Full analysis including 5-year carryforward expiration effects
+  • Years 10+: Complete long-term planning with all tax implications
         """
     )
 
@@ -655,7 +666,8 @@ Use --verbose to show detailed financial tables and raw data analysis
     parser.add_argument('--price', default='moderate',
                        choices=['conservative', 'moderate', 'aggressive', 'flat', 'historical_tech'],
                        help='Price growth scenario (default: moderate)')
-    parser.add_argument('--years', type=int, default=5, help='Projection years (default: 5)')
+    parser.add_argument('--years', type=int, default=5,
+                       help='Projection years (default: 5). Use 5+ for carryforward expiration tracking.')
     parser.add_argument('--demo', action='store_true',
                        help='Force use of demo data (safe example data)')
     parser.add_argument('--verbose', action='store_true',
