@@ -492,6 +492,12 @@ class ProjectionResult:
         if pledge_shares_obligated > 0:
             pledge_fulfillment_rate = pledge_shares_donated / pledge_shares_obligated
 
+        # Calculate total expired charitable deductions (federal only)
+        total_expired_charitable = 0.0
+        for state in self.yearly_states:
+            if hasattr(state, 'charitable_state') and state.charitable_state:
+                total_expired_charitable += state.charitable_state.federal_expired_this_year
+
         # Get AMT credits from final state (placeholder for now)
         amt_credits_final = getattr(final_state, 'amt_credits_balance', 0) if final_state else 0
 
@@ -511,7 +517,7 @@ class ProjectionResult:
             'pledge_fulfillment_rate': pledge_fulfillment_rate,
             'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,
             'amt_credits_final': amt_credits_final,
-            'expired_charitable_deduction': 0,  # Placeholder - will be implemented in Phase 3
+            'expired_charitable_deduction': total_expired_charitable,
             'expired_option_count': total_expired_shares,
             'expired_option_loss': total_opportunity_cost,
             'total_opportunity_cost': total_opportunity_cost,

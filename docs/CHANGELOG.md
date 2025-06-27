@@ -453,3 +453,48 @@
 - Integrates with existing `copy_scenario_csvs.py` utility for easy data export
 - Handles edge cases: no pledges, fully satisfied pledges, multiple grants, and missing data
 - Clear descriptive milestone text showing calculation details for user validation
+
+## Charitable Carryforward FIFO Logic and IRS Ordering Implementation
+
+### IRS-Compliant Charitable Deduction Ordering
+- Implemented correct IRS charitable deduction waterfall ordering in `projection_output.py`:
+  1. Current Year Cash Contributions (60% AGI limit)
+  2. Current Year Stock Contributions (30% AGI limit)
+  3. Cash Carryforward from Prior Years (remaining 60% limit)
+  4. Stock Carryforward from Prior Years (remaining 30% limit)
+- Replaced incorrect ratio-based splitting logic with proper step-by-step AGI limits
+- Added comprehensive test validation covering all ordering scenarios and edge cases
+
+### Complete FIFO Carryforward Tracking
+- Implemented creation year-based FIFO tracking for all four carryforward types:
+  - Federal Stock Carryforward (`federal_stock_carryforward_remaining_by_year`)
+  - Federal Cash Carryforward (`federal_cash_carryforward_remaining_by_year`)
+  - California Stock Carryforward (`ca_stock_carryforward_remaining_by_year`)
+  - California Cash Carryforward (`ca_cash_carryforward_remaining_by_year`)
+- Added total columns for each type (e.g., `total_federal_stock_carryforward_remaining`)
+- Proper 5-year expiration handling with FIFO burndown (oldest carryforward consumed first)
+- Accurate creation year labeling
+
+### Smart Code Architecture
+- Created reusable `update_fifo_carryforward()` function eliminating 4x code duplication
+- Verified Federal = CA charitable limits optimization (reuses calculations where identical)
+- Clean dictionary display with zero-entry removal and proper formatting
+- Extensible design ready for additional carryforward types
+
+### Enhanced CSV Column Organization
+- Reordered charitable carryforward CSV for intuitive flow:
+  - Basic info → Current donations → Federal section → CA section → Other tracking
+- Logical grouping with Federal and CA sections clearly separated
+- Consistent naming: `_by_year` for dictionaries, plain names for totals
+
+### Expired Charitable Deduction Warning System
+- Implemented total expired charitable deduction calculation in summary metrics
+- Added prominent warning display for lost carryforward (uses ❗️ emoji for visibility)
+- Proper aggregation across all projected years
+- Actionable guidance about timing donations to maximize deduction utilization
+
+### Production Validation
+- Verified multi-year FIFO tracking
+- Confirmed proper carryforward accumulation and expiration across 15-year projections
+- Federal and CA calculations produce identical results (as expected for current tax law)
+- All carryforward logic works seamlessly with existing projection and CSV generation systems

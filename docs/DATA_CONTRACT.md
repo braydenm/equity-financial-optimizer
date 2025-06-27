@@ -145,7 +145,7 @@ This document defines the canonical format for user profile data in the Equity F
     "illiquid_assets": {
       "real_estate_equity": 250000,
       "private_investments": 0,
-      "unvested_equity_value": 800000  // At current 409A
+      "unvested_equity_value": 800000  // At current 409A. Not used.
     },
 
     "liabilities": {
