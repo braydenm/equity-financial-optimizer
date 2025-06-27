@@ -100,6 +100,8 @@ def print_scenario_results(result, detailed=True, verbose=False):
     # Total expired charitable carryforward (not remaining)
     expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
     print(f"  📝 Total Expired Charitable Carryforward: ${expired_charitable_deduction:,.0f}")
+    if expired_charitable_deduction > 1000:
+        print(f"    ❗️ WARNING: These deductions expired after 5-year carryforward period. Consider timing donations to maximize deduction utilization")
 
     # Enhanced equity position with all lifecycle states
     print(f"\nEQUITY POSITION BY STATE:")
@@ -219,13 +221,7 @@ def print_scenario_results(result, detailed=True, verbose=False):
             print(f"  🔥 These pledges expired without being fulfilled - company match no longer available")
             print(f"  📝 Consider replanning future strategies to avoid missed deadlines")
 
-        # Charitable deduction expiration warnings
-        expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
-        if expired_charitable_deduction > 0:
-            print(f"\n❗️  CHARITABLE DEDUCTION EXPIRATION WARNING:")
-            print(f"  📋 Expired deductions: ${expired_charitable_deduction:,.0f}")
-            print(f"  ⏰ These deductions expired after 5-year carryforward period")
-            print(f"  📈 Consider timing donations to maximize deduction utilization")
+
 
         # Comprehensive financial summary
         print(f"\nFINANCIAL SUMMARY:")
