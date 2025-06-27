@@ -5,7 +5,7 @@
     {
       "action_date": "2025-07-01",
       "action_type": "exercise",
-      "lot_id": "VESTED_ISO",
+      "lot_id": "ISO",
       "quantity": 12000,
       "price": null,
       "notes": "Exercise all vested ISOs at start of projection"
