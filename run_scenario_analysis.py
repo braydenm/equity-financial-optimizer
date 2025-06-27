@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from engine.portfolio_manager import PortfolioManager
 
 
-def print_scenario_results(result, detailed=True):
+def print_scenario_results(result, detailed=True, verbose=False):
     """Print formatted results for a scenario."""
     metrics = result.summary_metrics
     final_state = result.get_final_state()
@@ -24,39 +24,136 @@ def print_scenario_results(result, detailed=True):
     print(f"SCENARIO: {result.plan.name}")
     print(f"{'='*80}")
 
-    # Financial outcomes
-    print(f"\nFINAL STATE ({final_state.year}):")
-    print(f"  💰 Cash Position: ${metrics['total_cash_final']:,.0f}")
-    print(f"  📈 Investment Balance: ${final_state.investment_balance:,.0f}")
-    print(f"  📊 Equity Value: ${metrics['total_equity_value_final']:,.0f}")
-    print(f"  💎 Total Net Worth: ${final_state.total_net_worth:,.0f}")
+    # Financial outcomes - Accounting table format
+    print(f"\nFINAL BALANCE SHEET ({final_state.year}):")
+    print(f"  {'ASSETS':<25} {'AMOUNT':<15}")
+    print(f"  {'-'*40}")
+    print(f"  {'Cash Position':<25} ${metrics['total_cash_final']:>13,.0f}")
+    print(f"  {'Investment Balance':<25} ${final_state.investment_balance:>13,.0f}")
+    print(f"  {'Equity Holdings':<25} ${metrics['total_equity_value_final']:>13,.0f}")
 
-    # Cumulative metrics
+    # Add other assets if they exist
+    crypto = getattr(result.user_profile, 'crypto', 0) if hasattr(result, 'user_profile') else 0
+    real_estate = getattr(result.user_profile, 'real_estate_equity', 0) if hasattr(result, 'user_profile') else 0
+    if crypto > 0:
+        print(f"  {'Crypto Assets':<25} ${crypto:>13,.0f}")
+    if real_estate > 0:
+        print(f"  {'Real Estate Equity':<25} ${real_estate:>13,.0f}")
+
+    print(f"  {'-'*40}")
+    total_assets = metrics['total_cash_final'] + final_state.investment_balance + metrics['total_equity_value_final'] + crypto + real_estate
+    print(f"  {'TOTAL ASSETS':<25} ${total_assets:>13,.0f}")
+
+    # Liabilities
+    outstanding_pledge = metrics['outstanding_obligation']
+    if outstanding_pledge > 0:
+        print(f"\n  {'LIABILITIES':<25} {'AMOUNT':<15}")
+        print(f"  {'-'*40}")
+        print(f"  {'Outstanding Pledges':<25} ${outstanding_pledge:>13,.0f}")
+        print(f"  {'-'*40}")
+        print(f"  {'TOTAL LIABILITIES':<25} ${outstanding_pledge:>13,.0f}")
+        net_worth = total_assets - outstanding_pledge
+    else:
+        net_worth = total_assets
+
+    print(f"\n  {'='*40}")
+    print(f"  {'NET WORTH':<25} ${net_worth:>13,.0f}")
+    print(f"  {'='*40}")
+
+    # Cumulative metrics - Enhanced with charitable impact breakdown
     print(f"\nCUMULATIVE METRICS:")
     print(f"  💸 Total Taxes Paid: ${metrics['total_taxes_all_years']:,.0f}")
-    print(f"  🎁 Total Donations: ${metrics['total_donations_all_years']:,.0f}")
-    print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
-    print(f"  ✅ Pledge Status: {metrics.get('pledge_shares_donated', 0)}/{metrics.get('pledge_shares_obligated', 0)} shares donated")
-    if metrics.get('pledge_shares_expired_window', 0) > 0:
-        print(f"  ⚠️  Expired Window: {metrics['pledge_shares_expired_window']} shares lost match opportunity")
 
-    # Calculate total federal charitable carryforward
-    total_federal_carryforward = 0
-    if final_state and hasattr(final_state, 'charitable_state') and final_state.charitable_state:
-        total_federal_carryforward = sum(final_state.charitable_state.federal_carryforward_remaining.values())
-    print(f"  📝 Charitable Carryforward (Federal): ${total_federal_carryforward:,.0f}")
+    # Charitable impact breakdown
+    total_donations = metrics['total_donations_all_years']
+    total_company_match = metrics.get('total_company_match_all_years', 0)
+    total_charitable_impact = total_donations + total_company_match
+    print(f"  🎁 Total Charitable Impact: ${total_charitable_impact:,.0f}")
+    print(f"    ├─ Personal Donations: ${total_donations:,.0f}")
+    print(f"    └─ Company Match Earned: ${total_company_match:,.0f}")
 
-    if detailed and final_state:
-        # Equity position details
-        vested_unexercised = sum(lot.quantity for lot in final_state.equity_holdings
-                                if lot.lifecycle_state.value == 'vested_not_exercised')
-        exercised_shares = sum(lot.quantity for lot in final_state.equity_holdings
-                              if lot.lifecycle_state.value == 'exercised_not_disposed')
+    # Pledge tracking
+    print(f"  📋 Outstanding Pledge Liability: ${metrics['outstanding_obligation']:,.0f}")
 
-        print(f"\nEQUITY POSITION:")
-        print(f"  🎯 Vested Unexercised: {vested_unexercised:,} shares")
-        print(f"  ✅ Exercised Shares: {exercised_shares:,} shares")
+    # Calculate outstanding company match opportunity
+    pledge_shares_outstanding = metrics.get('pledge_shares_outstanding', 0)
+    if hasattr(result, 'user_profile') and hasattr(result.user_profile, 'company_match_ratio'):
+        match_ratio = result.user_profile.company_match_ratio
+        # Estimate outstanding match based on current equity value and outstanding pledge shares
+        if pledge_shares_outstanding > 0 and final_state:
+            avg_share_price = metrics['total_equity_value_final'] / max(1, sum(lot.quantity for lot in final_state.equity_holdings))
+            outstanding_match_opportunity = pledge_shares_outstanding * avg_share_price * match_ratio
+            print(f"  🤝 Outstanding Company Match Opportunity: ${outstanding_match_opportunity:,.0f}")
 
+    print(f"  ✅ Pledge Status: {metrics.get('pledge_shares_donated', 0):,}/{metrics.get('pledge_shares_obligated', 0):,} shares")
+
+    # Expired opportunities
+    pledge_shares_expired = metrics.get('pledge_shares_expired_window', 0)
+    if pledge_shares_expired > 0:
+        print(f"  ⚠️  Expired Match Window: {pledge_shares_expired:,} shares (match opportunity lost)")
+        # Calculate expired match value
+        if hasattr(result, 'user_profile') and hasattr(result.user_profile, 'company_match_ratio') and final_state:
+            avg_share_price = metrics['total_equity_value_final'] / max(1, sum(lot.quantity for lot in final_state.equity_holdings))
+            expired_match_value = pledge_shares_expired * avg_share_price * result.user_profile.company_match_ratio
+            print(f"  💸 Expired Match Value: ${expired_match_value:,.0f}")
+
+    # Total expired charitable carryforward (not remaining)
+    expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
+    print(f"  📝 Total Expired Charitable Carryforward: ${expired_charitable_deduction:,.0f}")
+
+    # Enhanced equity position with all lifecycle states
+    print(f"\nEQUITY POSITION BY STATE:")
+
+    # Initialize counters for all states
+    granted_unvested = 0
+    vested_unexercised = 0
+    exercised_held = 0
+    disposed_sold = 0
+    disposed_donated = 0
+    expired_shares = 0
+
+    # Count shares in current holdings
+    for lot in final_state.equity_holdings:
+        if lot.lifecycle_state.value == 'granted_not_vested':
+            granted_unvested += lot.quantity
+        elif lot.lifecycle_state.value == 'vested_not_exercised':
+            vested_unexercised += lot.quantity
+        elif lot.lifecycle_state.value == 'exercised_not_disposed':
+            exercised_held += lot.quantity
+
+    # Count disposed shares from all yearly states (sold/donated)
+    for state in result.yearly_states:
+        for action in result.plan.planned_actions:
+            if action.action_date.year == state.year:
+                if action.action_type.value == 'sell':
+                    disposed_sold += action.quantity
+                elif action.action_type.value == 'donate':
+                    disposed_donated += action.quantity
+
+    # Count expired shares from metrics
+    expired_shares = metrics.get('total_expired_shares', 0)
+
+    total_shares = granted_unvested + vested_unexercised + exercised_held + disposed_sold + disposed_donated + expired_shares
+
+    print(f"  {'State':<20} {'Shares':<10} {'% of Total':<10}")
+    print(f"  {'-'*40}")
+    if granted_unvested > 0:
+        print(f"  {'Granted (Unvested)':<20} {granted_unvested:>9,} {granted_unvested/max(1,total_shares)*100:>8.1f}%")
+    if vested_unexercised > 0:
+        print(f"  {'Vested (Unexercised)':<20} {vested_unexercised:>9,} {vested_unexercised/max(1,total_shares)*100:>8.1f}%")
+    if exercised_held > 0:
+        print(f"  {'Exercised (Held)':<20} {exercised_held:>9,} {exercised_held/max(1,total_shares)*100:>8.1f}%")
+    if disposed_sold > 0:
+        print(f"  {'Disposed (Sold)':<20} {disposed_sold:>9,} {disposed_sold/max(1,total_shares)*100:>8.1f}%")
+    if disposed_donated > 0:
+        print(f"  {'Disposed (Donated)':<20} {disposed_donated:>9,} {disposed_donated/max(1,total_shares)*100:>8.1f}%")
+    if expired_shares > 0:
+        print(f"  {'Expired (Lost)':<20} {expired_shares:>9,} {expired_shares/max(1,total_shares)*100:>8.1f}%")
+
+    print(f"  {'-'*40}")
+    print(f"  {'TOTAL':<20} {total_shares:>9,} {'100.0%':>8}")
+
+    if detailed and final_state and verbose:
         # Display opportunity cost warnings if any exist
         total_opportunity_cost = metrics.get('total_opportunity_cost', 0)
         total_expired_shares = metrics.get('total_expired_shares', 0)
@@ -457,7 +554,7 @@ def resolve_scenario_path(scenario_input, use_demo=False):
     return scenario_input
 
 
-def execute_scenario(scenario_input, price_scenario="moderate", projection_years=5, use_demo=False):
+def execute_scenario(scenario_input, price_scenario="moderate", projection_years=5, use_demo=False, verbose=False):
     """Execute and display a single scenario.
 
     Args:
@@ -485,8 +582,9 @@ def execute_scenario(scenario_input, price_scenario="moderate", projection_years
         projection_years=projection_years
     )
 
-    print_scenario_results(result, detailed=True)
-    print_raw_data_tables(result)
+    print_scenario_results(result, detailed=True, verbose=verbose)
+    if verbose:
+        print_raw_data_tables(result)
     return result
 
 
@@ -550,8 +648,10 @@ Examples:
   %(prog)s 001_exercise_all_vested
   %(prog)s 000 --demo
   %(prog)s 002 --price aggressive --years 7
+  %(prog)s 206 --verbose --years 15
 
 Note: You can use just the 3-digit identifier (e.g., '001') instead of the full scenario name
+Use --verbose to show detailed financial tables and raw data analysis
         """
     )
 
@@ -562,11 +662,13 @@ Note: You can use just the 3-digit identifier (e.g., '001') instead of the full 
     parser.add_argument('--years', type=int, default=5, help='Projection years (default: 5)')
     parser.add_argument('--demo', action='store_true',
                        help='Force use of demo data (safe example data)')
+    parser.add_argument('--verbose', action='store_true',
+                       help='Show detailed tables and analysis (default: show summary only)')
 
     args = parser.parse_args()
 
     if args.scenario:
-        execute_scenario(args.scenario, args.price, args.years, args.demo)
+        execute_scenario(args.scenario, args.price, args.years, args.demo, args.verbose)
     else:
         list_available_scenarios()
 

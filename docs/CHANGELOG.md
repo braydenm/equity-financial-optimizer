@@ -494,7 +494,46 @@
 - Actionable guidance about timing donations to maximize deduction utilization
 
 ### Production Validation
-- Verified multi-year FIFO tracking
+- Verified multi-year FIFO tracking (e.g., 2026 uses $178K current + $10K carryforward = $188K total)
 - Confirmed proper carryforward accumulation and expiration across 15-year projections
 - Federal and CA calculations produce identical results (as expected for current tax law)
 - All carryforward logic works seamlessly with existing projection and CSV generation systems
+
+## Enhanced Scenario Summary Format and Verbose Control
+
+### Accounting-Style Balance Sheet
+- Redesigned final state display as professional balance sheet format
+- Added structured ASSETS section with aligned amounts and subtotals
+- Included LIABILITIES section for outstanding pledge obligations
+- Clear NET WORTH calculation showing total assets minus liabilities
+- Automatic inclusion of crypto and real estate assets from user profile
+
+### Enhanced Cumulative Metrics  
+- Restructured charitable impact with hierarchical breakdown:
+  - Total Charitable Impact (top-level)
+  - Personal Donations (sub-item)
+  - Company Match Earned (sub-item)
+- Added Outstanding Company Match Opportunity calculation based on remaining pledge shares
+- Enhanced pledge tracking with expired match window value calculation
+- Fixed expired charitable carryforward to show total expired (not remaining balance)
+
+### Comprehensive Equity Position Analysis
+- Complete lifecycle state breakdown showing all share dispositions:
+  - Granted (Unvested), Vested (Unexercised), Exercised (Held)
+  - Disposed (Sold), Disposed (Donated), Expired (Lost)
+- Percentage allocation showing portfolio composition
+- Automatic calculation across all years and action types
+- Professional tabular format with clear totals
+
+### Verbose Mode Implementation
+- Added `--verbose` flag to control detailed table display
+- Default mode shows clean, executive summary format
+- Verbose mode includes comprehensive financial tables and raw data analysis
+- Maintains backward compatibility while improving user experience
+- Updated help documentation with verbose flag examples
+
+### User Experience Improvements
+- Cleaner default output focused on key financial outcomes
+- Professional formatting suitable for financial planning discussions
+- Optional detailed analysis available on demand
+- Reduced output clutter while preserving analytical depth
