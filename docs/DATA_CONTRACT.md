@@ -22,11 +22,11 @@ This document defines the canonical format for user profile data in the Equity F
   },
 
   "personal_information": {
-    "tax_filing_status": "single|married_filing_jointly|married_filing_separately|head_of_household",
-    "state_of_residence": "California",
-    "age": 35,
+    "tax_filing_status": "single|married_filing_jointly|married_filing_separately|head_of_household", // Extensive testing for married_filing_separately. No testing or implementation for married_filing_separately or head_of_household.
+    "state_of_residence": "California", // Other states not yet supported / tested
+    "age": 35, // currently used
     "spouse_age": 32,  // optional
-    "dependents_count": 2,  // optional
+    "dependents_count": 2,  // Not currently used
 
     // Tax rates (as decimals)
     "federal_tax_rate": 0.37,
@@ -91,10 +91,7 @@ This document defines the canonical format for user profile data in the Equity F
     },
 
     "unvested": {
-      "total_shares": 45000,
-      "monthly_vesting_rate": 2083,
-      "next_vest_date": "2024-06-15",
-      "final_vest_date": "2026-01-15"
+      "total_shares": 45000
     },
 
     "current_prices": {

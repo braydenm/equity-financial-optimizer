@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "description": "Annual price growth scenarios for equity projections",
+    "note": "Base prices come from profile file, these are only growth assumptions"
+  },
+  "scenarios": {
+    "conservative": {
+      "name": "Conservative Growth",
+      "description": "Modest appreciation assuming slower growth",
+      "annual_growth_rate": 0.15
+    },
+    "moderate": {
+      "name": "Moderate Growth",
+      "description": "Base case assuming steady growth trajectory",
+      "annual_growth_rate": 0.25
+    },
+    "aggressive": {
+      "name": "Aggressive Growth",
+      "description": "Optimistic scenario with rapid appreciation",
+      "annual_growth_rate": 0.4
+    },
+    "flat": {
+      "name": "No Growth",
+      "description": "Assumes no price appreciation",
+      "annual_growth_rate": 0.0
+    },
+    "crash": {
+      "name": "Crash",
+      "description": "Assume stock will lose value rapidly",
+      "annual_growth_rate": -0.5
+    }
+  },
+  "default_scenario": "moderate"
+}

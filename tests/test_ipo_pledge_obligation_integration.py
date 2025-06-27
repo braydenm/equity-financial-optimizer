@@ -114,7 +114,6 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
                 },
                 "unvested": {
                     "total_shares": 0,
-                    "monthly_vesting_rate": 0,
                     "vesting_calendar": []
                 }
             },
