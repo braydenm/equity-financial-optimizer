@@ -498,7 +498,7 @@ def print_raw_data_tables(result):
 
     # 4. ACTION SUMMARY TABLE
     print(f"\n{'-'*80}")
-    print("ACTION SUMMARY (→ action_summary.csv)")
+    print("ACTION SUMMARY (→ components.csv)")
     print(f"{'-'*80}")
     print(f"{'Date':<12} {'Action_Type':<12} {'Lot_ID':<20} {'Quantity':<12}")
     print(f"{'-'*80}")

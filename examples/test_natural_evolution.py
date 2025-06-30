@@ -173,10 +173,11 @@ def test_csv_output(result):
         f"{output_dir}/natural_evolution_annual_tax_detail.csv",
         f"{output_dir}/natural_evolution_state_timeline.csv",
         f"{output_dir}/natural_evolution_transition_timeline.csv",
-        f"{output_dir}/natural_evolution_action_summary.csv",
+        f"{output_dir}/natural_evolution_components.csv",
         f"{output_dir}/natural_evolution_annual_summary.csv",
         f"{output_dir}/natural_evolution_holding_period_tracking.csv",
-        f"{output_dir}/natural_evolution_charitable_carryforward.csv"
+        f"{output_dir}/natural_evolution_charitable_carryforward.csv",
+        f"{output_dir}/natural_evolution_comprehensive_cashflow.csv"
     ]
 
     all_files_exist = True

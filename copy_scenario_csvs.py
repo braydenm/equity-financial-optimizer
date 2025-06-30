@@ -41,15 +41,14 @@ def get_file_priority() -> Dict[str, int]:
     """Define the order in which CSV files should appear."""
     return {
         'annual_summary.csv': 1,
-        'action_summary.csv': 2,
+        'components.csv': 2,
         'annual_tax_detail.csv': 3,
         'comprehensive_cashflow.csv': 4,
         'pledge_obligations.csv': 5,
         'charitable_carryforward.csv': 6,
-        'charitable_carryforward_direct.csv': 7,
-        'holding_period_tracking.csv': 8,
-        'state_timeline.csv': 9,
-        'transition_timeline.csv': 10,
+        'holding_period_tracking.csv': 7,
+        'state_timeline.csv': 8,
+        'transition_timeline.csv': 9,
     }
 
 def format_filename_for_header(filename: str) -> str:

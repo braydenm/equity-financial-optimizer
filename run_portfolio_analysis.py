@@ -35,10 +35,46 @@ def print_scenario_results(result, detailed=False):
     print(f"\nCUMULATIVE METRICS:")
     print(f"  💸 Total Taxes Paid: ${metrics['total_taxes_all_years']:,.0f}")
     print(f"  🎁 Total Donations: ${metrics['total_donations_all_years']:,.0f}")
-    if 'outstanding_obligation' in metrics:
-        print(f"  📋 Outstanding Pledge: ${metrics['outstanding_obligation']:,.0f}")
-    if 'pledge_fulfillment_maximalist' in metrics:
-        print(f"  ✅ Pledge Fulfillment: {metrics['pledge_fulfillment_maximalist']:.1%}")
+
+    # Charitable impact details
+    if 'total_charitable_impact_all_years' in metrics:
+        print(f"  🤝 Total Charitable Impact: ${metrics['total_charitable_impact_all_years']:,.0f}")
+        if 'total_company_match_all_years' in metrics:
+            personal_value = metrics.get('total_donations_all_years', 0)
+            match_value = metrics.get('total_company_match_all_years', 0)
+            print(f"     (Personal: ${personal_value:,.0f} + Company Match: ${match_value:,.0f})")
+
+    # Pledge status
+    if 'pledge_shares_obligated' in metrics and metrics['pledge_shares_obligated'] > 0:
+        obligated = metrics['pledge_shares_obligated']
+        donated = metrics.get('pledge_shares_donated', 0)
+        outstanding = metrics.get('pledge_shares_outstanding', 0)
+        expired = metrics.get('pledge_shares_expired_window', 0)
+        fulfillment_rate = donated / obligated if obligated > 0 else 0
+
+        print(f"  📊 Pledge Status:")
+        print(f"     Obligated: {obligated:,.0f} shares")
+        print(f"     Donated: {donated:,.0f} shares ({fulfillment_rate:.1%})")
+        print(f"     Outstanding: {outstanding:,.0f} shares")
+        if expired > 0:
+            print(f"     ⚠️  Expired Window: {expired:,.0f} shares (lost match opportunity)")
+        if 'outstanding_obligation' in metrics and metrics['outstanding_obligation'] > 0:
+            print(f"     💵 Outstanding Value: ${metrics['outstanding_obligation']:,.0f}")
+
+    # Option expiration
+    if 'expired_option_count' in metrics and metrics['expired_option_count'] > 0:
+        print(f"  ⏰ Expired Options: {metrics['expired_option_count']:,.0f} shares")
+        if 'expired_option_loss' in metrics:
+            print(f"     💸 Lost Value: ${metrics['expired_option_loss']:,.0f}")
+
+    # Tax efficiency
+    if 'amt_credits_final' in metrics and metrics['amt_credits_final'] > 0:
+        print(f"  💳 AMT Credits Remaining: ${metrics['amt_credits_final']:,.0f}")
+
+    # Expired charitable deductions
+    if 'expired_charitable_deduction' in metrics and metrics['expired_charitable_deduction'] > 0:
+        print(f"  📝 Expired Charitable Carryforward: ${metrics['expired_charitable_deduction']:,.0f}")
+        print(f"     ❗️ These deductions expired after 5-year carryforward period")
 
     if detailed and final_state:
         # Equity position details
@@ -46,10 +82,24 @@ def print_scenario_results(result, detailed=False):
                                 if lot.lifecycle_state.value == 'vested_not_exercised')
         exercised_shares = sum(lot.quantity for lot in final_state.equity_holdings
                               if lot.lifecycle_state.value == 'exercised_not_disposed')
+        unvested_shares = sum(lot.quantity for lot in final_state.equity_holdings
+                             if lot.lifecycle_state.value == 'granted_not_vested')
+
+        total_shares = vested_unexercised + exercised_shares + unvested_shares
 
         print(f"\nEQUITY POSITION:")
+        print(f"  📈 Total Shares: {total_shares:,}")
         print(f"  🎯 Vested Unexercised: {vested_unexercised:,} shares")
         print(f"  ✅ Exercised Shares: {exercised_shares:,} shares")
+        print(f"  🔒 Unvested Shares: {unvested_shares:,} shares")
+
+        # Share type breakdown if available
+        iso_shares = sum(lot.quantity for lot in final_state.equity_holdings
+                        if lot.share_type == 'ISO' and lot.lifecycle_state.value == 'exercised_not_disposed')
+        nso_shares = sum(lot.quantity for lot in final_state.equity_holdings
+                        if lot.share_type == 'NSO' and lot.lifecycle_state.value == 'exercised_not_disposed')
+        if iso_shares > 0 or nso_shares > 0:
+            print(f"  📊 Exercised by Type: ISO: {iso_shares:,}, NSO: {nso_shares:,}")
 
         # Year-by-year cash flow
         print(f"\nCASH FLOW SUMMARY:")
@@ -95,8 +145,21 @@ def compare_scenarios(results):
             print(f"\n{result.plan.name}:")
             print(f"  • Net Worth Impact: ${nw_diff:+,.0f} ({nw_diff/baseline_nw:+.1%})")
             print(f"  • Additional Taxes: ${tax_diff:+,.0f}")
-            if metrics['total_donations_all_years'] > 0:
-                print(f"  • Charitable Impact: ${metrics['total_donations_all_years']:,.0f}")
+
+            # Charitable comparison
+            if metrics.get('total_charitable_impact_all_years', 0) > 0:
+                charitable_diff = metrics.get('total_charitable_impact_all_years', 0) - baseline.get('total_charitable_impact_all_years', 0)
+                print(f"  • Charitable Impact: ${metrics['total_charitable_impact_all_years']:,.0f} ({charitable_diff:+,.0f} vs baseline)")
+
+            # Option expiration comparison
+            expired_diff = metrics.get('expired_option_count', 0) - baseline.get('expired_option_count', 0)
+            if expired_diff != 0:
+                print(f"  • Expired Options: {metrics.get('expired_option_count', 0):,.0f} shares ({expired_diff:+,.0f} vs baseline)")
+
+            # AMT credit comparison
+            amt_credit_diff = metrics.get('amt_credits_final', 0) - baseline.get('amt_credits_final', 0)
+            if amt_credit_diff != 0:
+                print(f"  • AMT Credits: ${metrics.get('amt_credits_final', 0):,.0f} ({amt_credit_diff:+,.0f} vs baseline)")
 
 
 def execute_portfolio(portfolio_path, output_dir=None, use_demo=False):
