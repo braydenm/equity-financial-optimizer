@@ -130,7 +130,19 @@ class PortfolioManager:
         income = profile_data['income']
         financial = profile_data['financial_position']
         goals = profile_data['goals_and_constraints']
-        charitable = profile_data['charitable_giving']
+
+        # Extract grants from equity_position.original_grants
+        grants = []
+        equity_position = profile_data.get('equity_position', {})
+        if 'original_grants' in equity_position:
+            grants = equity_position['original_grants']
+
+        # Get charitable info from first grant (v2.0 format)
+        default_pledge_percentage = 0.0
+        default_company_match_ratio = 0.0
+        if grants and len(grants) > 0 and 'charitable_program' in grants[0]:
+            default_pledge_percentage = grants[0]['charitable_program'].get('pledge_percentage', 0.0)
+            default_company_match_ratio = grants[0]['charitable_program'].get('company_match_ratio', 0.0)
         tax_situation = profile_data.get('tax_situation', {})
         estimated_taxes = tax_situation.get('estimated_taxes', {})
         carryforwards = tax_situation.get('carryforwards', {})
@@ -140,12 +152,6 @@ class PortfolioManager:
         assumed_ipo = None
         if 'assumed_ipo' in profile_data:
             assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
-
-        # Extract grants from equity_position.original_grants
-        grants = []
-        equity_position = profile_data.get('equity_position', {})
-        if 'original_grants' in equity_position:
-            grants = equity_position['original_grants']
 
         self._user_profile = UserProfile(
             federal_tax_rate=personal['federal_tax_rate'],
@@ -163,8 +169,8 @@ class PortfolioManager:
             bonus_expected=income.get('bonus_expected', 0),
             current_cash=financial['liquid_assets']['cash'],
             exercise_reserves=goals['liquidity_needs']['exercise_reserves'],
-            pledge_percentage=charitable['pledge_percentage'],
-            company_match_ratio=charitable['company_match_ratio'],
+            pledge_percentage=default_pledge_percentage,
+            company_match_ratio=default_company_match_ratio,
             filing_status=personal['tax_filing_status'],
             state_of_residence=personal['state_of_residence'],
             monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
@@ -429,18 +435,18 @@ class PortfolioManager:
             lot = next((lot for lot in self._initial_lots if lot.lot_id == lot_id), None)
             if not lot:
                 raise ValueError(f"Lot {lot_id} not found for exercise action")
-            
+
             # For NSOs, check if there's a tender offer near the exercise date
             if lot.share_type == ShareType.NSO:
                 tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
                 tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
-                
+
                 if tender_date and tender_price:
                     tender_date_obj = date.fromisoformat(tender_date)
                     # If exercising within 30 days of tender, use tender price as FMV
                     if abs((action_date - tender_date_obj).days) <= 30:
                         return tender_price
-            
+
             # Otherwise return None to use default price projections
             return None
 

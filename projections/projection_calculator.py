@@ -7,7 +7,7 @@ share donation) to evaluate complete projection plans across multiple years.
 
 import sys
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 from copy import deepcopy
@@ -216,17 +216,17 @@ class ProjectionCalculator:
                         assumed_ipo=self.profile.assumed_ipo
                     )
                     pledge_state.add_obligation(obligation)
-                    
+
                     # Track year-specific obligated shares
                     yearly_state.pledge_shares_obligated_this_year += obligation.maximalist_shares_required
 
                 elif action.action_type == ActionType.DONATE:
                     donation_result = self._process_donation(action, current_lots, annual_components, yearly_state)
                     year_donation_value += donation_result['donation_value']
-                    
+
                     # Track year-specific donated shares
                     yearly_state.pledge_shares_donated_this_year += action.quantity
-                    
+
                     # Apply donation to pledge obligations using FIFO discharge
                     discharge_result = pledge_state.discharge_donation(
                         donation_amount=donation_result['donation_value'],
@@ -247,6 +247,70 @@ class ProjectionCalculator:
 
             # Calculate annual tax using aggregated components
             annual_components.aggregate_components()
+
+            # Check for IPO-triggered pledge obligation
+            if (self.profile.assumed_ipo and
+                year == self.profile.assumed_ipo.year and
+                not hasattr(yearly_state, '_ipo_obligation_created')):
+
+                # Calculate total grant pledge requirement
+                total_grant_shares = 0
+                total_pledge_required = 0
+
+                if hasattr(self.profile, 'grants') and self.profile.grants:
+                    for grant in self.profile.grants:
+                        grant_shares = grant.get('total_shares', grant.get('total_options', 0))
+                        if 'charitable_program' in grant:
+                            pledge_pct = grant['charitable_program'].get('pledge_percentage', 0)
+                            total_grant_shares += grant_shares
+                            total_pledge_required += int(grant_shares * pledge_pct)
+
+                if total_pledge_required > 0:
+                    # Calculate shares already obligated through sales
+                    already_obligated = sum(
+                        o.maximalist_shares_required
+                        for o in pledge_state.obligations
+                    )
+
+                    # Only create obligation for remaining shares
+                    remaining_pledge = total_pledge_required - already_obligated
+
+                    if remaining_pledge > 0:
+                        # Create a special obligation for the overall grant pledge
+                        from datetime import timedelta
+                        ipo_deadline = self.profile.assumed_ipo + timedelta(days=365)
+
+                        # For IPO obligations, we use a simple approach:
+                        # Set shares_sold = remaining_pledge when pledge is 50%
+                        # This works because: (0.5 * X) / (1 - 0.5) = X
+                        # For other percentages, we could do the math, but 50% is the common case
+
+                        overall_pledge_pct = total_pledge_required / total_grant_shares if total_grant_shares > 0 else 0.5
+
+                        # Simple approach: for 50% pledge, shares_sold = shares_required
+                        if abs(overall_pledge_pct - 0.5) < 0.001:  # Close to 50%
+                            shares_sold_for_obligation = remaining_pledge
+                        else:
+                            # For other percentages, use the formula
+                            shares_sold_for_obligation = int(remaining_pledge * (1 - overall_pledge_pct) / overall_pledge_pct)
+
+                        ipo_obligation = PledgeObligation(
+                            parent_transaction_id=f"IPO_TRIGGER_{year}",
+                            commencement_date=self.profile.assumed_ipo,
+                            match_window_closes=ipo_deadline,
+                            total_pledge_obligation=0.0,  # Not dollar-based
+                            donations_made=0.0,
+                            shares_sold=shares_sold_for_obligation,
+                            pledge_percentage=overall_pledge_pct,
+                            maximalist_shares_donated=0,
+                            outstanding_obligation=0.0
+                        )
+
+                        pledge_state.add_obligation(ipo_obligation)
+                        yearly_state.ipo_pledge_triggered = remaining_pledge
+
+                # Mark that we've created IPO obligation
+                yearly_state._ipo_obligation_created = True
 
             # Check if basis election applies for this year #Claude TODO: Improve docs here.
             elect_basis = False
@@ -389,7 +453,7 @@ class ProjectionCalculator:
                     unfulfilled = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
                     if unfulfilled > 0:
                         yearly_state.pledge_shares_expired_this_year += unfulfilled
-            
+
             # Process match window closures and calculate lost opportunities
             lost_match_value = pledge_state.process_window_closures(
                 current_year=year,

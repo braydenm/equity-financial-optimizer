@@ -115,51 +115,41 @@ def compare_scenarios(results):
     if len(results) < 2:
         return
 
-    print(f"\n{'='*80}")
+    print(f"\n{'='*140}")
     print("SCENARIO COMPARISON")
-    print(f"{'='*80}")
+    print(f"{'='*140}")
 
     # Header
-    print(f"\n{'Scenario':<30} {'Net Worth':>12} {'Cash':>12} {'Taxes':>12} {'Donations':>12}")
-    print(f"{'-'*80}")
+    print(f"\n{'Scenario':<20} {'Net Worth':>12} {'Equity':>12} {'Cash':>12} {'Taxes':>12} {'Charity':>12} {'Exp Ded':>10} {'Plg Exp':>9}")
+    print(f"{'-'*140}")
 
     # Results
     for result in results:
         metrics = result.summary_metrics
         net_worth = metrics['total_cash_final'] + metrics['total_equity_value_final']
-        print(f"{result.plan.name:<30} ${net_worth:>11,.0f} ${metrics['total_cash_final']:>11,.0f} "
-              f"${metrics['total_taxes_all_years']:>11,.0f} ${metrics['total_donations_all_years']:>11,.0f}")
+        charity_impact = metrics.get('total_charitable_impact_all_years', metrics.get('total_donations_all_years', 0))
+        expired_ded = metrics.get('expired_charitable_deduction', 0)
+        pledge_exp = metrics.get('pledge_shares_expired_window', 0)
 
-    # Key insights vs baseline
-    if len(results) >= 2:
-        baseline = results[0].summary_metrics
-        baseline_nw = baseline['total_cash_final'] + baseline['total_equity_value_final']
+        # Create short name: if starts with number, use "XXX: " + first few words
+        name_parts = result.plan.name.split()
+        if name_parts and name_parts[0].replace('_', '').isdigit():
+            # Take scenario number and next 2 words
+            short_name = f"{name_parts[0]}: {' '.join(name_parts[1:3])}"
+        else:
+            # Just truncate to 20 chars
+            short_name = result.plan.name[:20]
 
-        print(f"\nKEY INSIGHTS vs {results[0].plan.name}:")
-        for result in results[1:]:
-            metrics = result.summary_metrics
-            net_worth = metrics['total_cash_final'] + metrics['total_equity_value_final']
-            nw_diff = net_worth - baseline_nw
-            tax_diff = metrics['total_taxes_all_years'] - baseline['total_taxes_all_years']
+        # Ensure it fits in 20 chars
+        if len(short_name) > 20:
+            short_name = short_name[:17] + "..."
 
-            print(f"\n{result.plan.name}:")
-            print(f"  • Net Worth Impact: ${nw_diff:+,.0f} ({nw_diff/baseline_nw:+.1%})")
-            print(f"  • Additional Taxes: ${tax_diff:+,.0f}")
+        print(f"{short_name:<20} ${net_worth:>11,.0f} ${metrics['total_equity_value_final']:>11,.0f} "
+              f"${metrics['total_cash_final']:>11,.0f} ${metrics['total_taxes_all_years']:>11,.0f} "
+              f"${charity_impact:>11,.0f} ${expired_ded:>9,.0f} "
+              f"{pledge_exp:>8,}")
 
-            # Charitable comparison
-            if metrics.get('total_charitable_impact_all_years', 0) > 0:
-                charitable_diff = metrics.get('total_charitable_impact_all_years', 0) - baseline.get('total_charitable_impact_all_years', 0)
-                print(f"  • Charitable Impact: ${metrics['total_charitable_impact_all_years']:,.0f} ({charitable_diff:+,.0f} vs baseline)")
 
-            # Option expiration comparison
-            expired_diff = metrics.get('expired_option_count', 0) - baseline.get('expired_option_count', 0)
-            if expired_diff != 0:
-                print(f"  • Expired Options: {metrics.get('expired_option_count', 0):,.0f} shares ({expired_diff:+,.0f} vs baseline)")
-
-            # AMT credit comparison
-            amt_credit_diff = metrics.get('amt_credits_final', 0) - baseline.get('amt_credits_final', 0)
-            if amt_credit_diff != 0:
-                print(f"  • AMT Credits: ${metrics.get('amt_credits_final', 0):,.0f} ({amt_credit_diff:+,.0f} vs baseline)")
 
 
 def execute_portfolio(portfolio_path, output_dir=None, use_demo=False):
