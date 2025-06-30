@@ -89,7 +89,8 @@ class ShareDonationCalculator:
             company_match_ratio=company_match_ratio,
             company_match_amount=company_match_amount,
             pledge_amount_satisfied=pledge_amount_satisfied,
-            pledge_id=pledge_id
+            pledge_id=pledge_id,
+            action_date=donation_date
         )
 
     @staticmethod
@@ -121,5 +122,6 @@ class ShareDonationCalculator:
             company_match_ratio=company_match_ratio,
             company_match_amount=company_match_amount,
             pledge_amount_satisfied=pledge_amount_satisfied,
-            pledge_id=pledge_id
+            pledge_id=pledge_id,
+            action_date=donation_date
         )

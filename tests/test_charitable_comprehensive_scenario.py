@@ -227,15 +227,33 @@ class TestCharitableComprehensiveScenario(unittest.TestCase):
                 w2_income=profile.annual_w2_income,
                 donation_components=donation_components,
                 cash_donation_components=cash_donation_components,
-                carryforward_cash_deduction=federal_cash_carryforward,
+                carryforward_cash_by_creation_year=federal_cash_carryforward_by_creation_year.copy(),
                 carryforward_stock_by_creation_year=federal_stock_carryforward_by_creation_year.copy(),
-                ca_carryforward_cash_deduction=ca_cash_carryforward,
+                ca_carryforward_cash_by_creation_year=ca_cash_carryforward_by_creation_year.copy(),
                 ca_carryforward_stock_by_creation_year=ca_stock_carryforward_by_creation_year.copy()
             )
 
             # Get expiration amounts from calculator results
             federal_expired = result.charitable_deduction_result.expired_carryforward
             ca_expired = result.ca_charitable_deduction_result.expired_carryforward
+
+            # Debug output for failing years
+            print(f"\n=== Year {year} ===")
+            print(f"AGI: ${expected['agi']:,}")
+            print(f"Cash donated: ${expected['cash_donated']:,}")
+            print(f"Stock donated: ${expected['stock_donated']:,}")
+            print(f"\nFederal Results:")
+            print(f"  Cash deducted: expected ${expected['federal_cash_deducted']:,}, got ${result.charitable_deduction_result.cash_deduction_used:,.0f}")
+            print(f"  Stock deducted: expected ${expected['federal_stock_deducted']:,}, got ${result.charitable_deduction_result.stock_deduction_used:,.0f}")
+            print(f"  Cash carryover: expected ${expected['federal_cash_carryover']:,}, got ${result.charitable_deduction_result.cash_carryforward:,.0f}")
+            print(f"  Stock carryover: expected ${expected['federal_stock_carryover']:,}, got ${result.charitable_deduction_result.stock_carryforward:,.0f}")
+            print(f"  Stock carryforward by year: {result.charitable_deduction_result.carryforward_remaining_by_creation_year}")
+            print(f"\nCA Results:")
+            print(f"  Cash deducted: expected ${expected['ca_cash_deducted']:,}, got ${result.ca_charitable_deduction_result.cash_deduction_used:,.0f}")
+            print(f"  Stock deducted: expected ${expected['ca_stock_deducted']:,}, got ${result.ca_charitable_deduction_result.stock_deduction_used:,.0f}")
+            print(f"  Cash carryover: expected ${expected['ca_cash_carryover']:,}, got ${result.ca_charitable_deduction_result.cash_carryforward:,.0f}")
+            print(f"  Stock carryover: expected ${expected['ca_stock_carryover']:,}, got ${result.ca_charitable_deduction_result.stock_carryforward:,.0f}")
+            print(f"  Stock carryforward by year: {result.ca_charitable_deduction_result.carryforward_remaining_by_creation_year}")
 
             # Verify results
             federal_cash_match = abs(result.charitable_deduction_result.cash_deduction_used - expected['federal_cash_deducted']) < 1
@@ -270,92 +288,67 @@ class TestCharitableComprehensiveScenario(unittest.TestCase):
                     failure_messages.append(f"Year {year} CA expiration: expected ${expected['ca_expired']:,}, got ${ca_expired:,.0f}")
 
             # Update carryforwards for next year
-            # Stock carryforwards are tracked by creation year
+            # Both cash and stock carryforwards are tracked by creation year
+            federal_cash_carryforward_by_creation_year = result.charitable_deduction_result.cash_carryforward_remaining_by_creation_year.copy()
             federal_stock_carryforward_by_creation_year = result.charitable_deduction_result.carryforward_remaining_by_creation_year.copy()
+            ca_cash_carryforward_by_creation_year = result.ca_charitable_deduction_result.cash_carryforward_remaining_by_creation_year.copy()
             ca_stock_carryforward_by_creation_year = result.ca_charitable_deduction_result.carryforward_remaining_by_creation_year.copy()
 
-            # Update cash carryforwards using FIFO
-            total_cash_carryforward = result.charitable_deduction_result.cash_carryforward
-            if total_cash_carryforward > 0:
-                current_year_cash_donated = sum(d.amount for d in cash_donation_components)
-                current_year_cash_used = min(current_year_cash_donated, result.charitable_deduction_result.cash_deduction_used)
-                new_cash_carryforward = current_year_cash_donated - current_year_cash_used
+            # The calculator now handles all cash carryforward tracking internally
+            # This reference implementation is kept for documentation purposes
+            
+            # # Update cash carryforwards using FIFO
+            # total_cash_carryforward = result.charitable_deduction_result.cash_carryforward
+            # if total_cash_carryforward > 0:
+            #     current_year_cash_donated = sum(d.amount for d in cash_donation_components)
+            #     current_year_cash_used = min(current_year_cash_donated, result.charitable_deduction_result.cash_deduction_used)
+            #     new_cash_carryforward = current_year_cash_donated - current_year_cash_used
 
-                # Reduce existing carryforwards by amount used (FIFO)
-                cash_used_from_carryforward = max(0, result.charitable_deduction_result.cash_deduction_used - current_year_cash_used)
-                remaining_to_reduce = cash_used_from_carryforward
+            #     # Reduce existing carryforwards by amount used (FIFO)
+            #     cash_used_from_carryforward = max(0, result.charitable_deduction_result.cash_deduction_used - current_year_cash_used)
+            #     remaining_to_reduce = cash_used_from_carryforward
 
-                for creation_year in sorted(federal_cash_carryforward_by_creation_year.keys()):
-                    if remaining_to_reduce <= 0:
-                        break
-                    available = federal_cash_carryforward_by_creation_year[creation_year]
-                    used = min(available, remaining_to_reduce)
-                    federal_cash_carryforward_by_creation_year[creation_year] -= used
-                    if federal_cash_carryforward_by_creation_year[creation_year] <= 0:
-                        del federal_cash_carryforward_by_creation_year[creation_year]
-                    remaining_to_reduce -= used
+            #     for creation_year in sorted(federal_cash_carryforward_by_creation_year.keys()):
+            #         if remaining_to_reduce <= 0:
+            #             break
+            #         available = federal_cash_carryforward_by_creation_year[creation_year]
+            #         used = min(available, remaining_to_reduce)
+            #         federal_cash_carryforward_by_creation_year[creation_year] -= used
+            #         if federal_cash_carryforward_by_creation_year[creation_year] <= 0:
+            #             del federal_cash_carryforward_by_creation_year[creation_year]
+            #         remaining_to_reduce -= used
 
-                if new_cash_carryforward > 0:
-                    federal_cash_carryforward_by_creation_year[year] = new_cash_carryforward
-            else:
-                federal_cash_carryforward_by_creation_year.clear()
+            #     if new_cash_carryforward > 0:
+            #         federal_cash_carryforward_by_creation_year[year] = new_cash_carryforward
+            # else:
+            #     federal_cash_carryforward_by_creation_year.clear()
 
-            # Same for CA cash
-            total_ca_cash_carryforward = result.ca_charitable_deduction_result.cash_carryforward
-            if total_ca_cash_carryforward > 0:
-                current_year_cash_donated = sum(d.amount for d in cash_donation_components)
-                current_year_cash_used = min(current_year_cash_donated, result.ca_charitable_deduction_result.cash_deduction_used)
-                new_cash_carryforward = current_year_cash_donated - current_year_cash_used
+            # # Same for CA cash
+            # total_ca_cash_carryforward = result.ca_charitable_deduction_result.cash_carryforward
+            # if total_ca_cash_carryforward > 0:
+            #     current_year_cash_donated = sum(d.amount for d in cash_donation_components)
+            #     current_year_cash_used = min(current_year_cash_donated, result.ca_charitable_deduction_result.cash_deduction_used)
+            #     new_cash_carryforward = current_year_cash_donated - current_year_cash_used
 
-                cash_used_from_carryforward = max(0, result.ca_charitable_deduction_result.cash_deduction_used - current_year_cash_used)
-                remaining_to_reduce = cash_used_from_carryforward
+            #     cash_used_from_carryforward = max(0, result.ca_charitable_deduction_result.cash_deduction_used - current_year_cash_used)
+            #     remaining_to_reduce = cash_used_from_carryforward
 
-                for creation_year in sorted(ca_cash_carryforward_by_creation_year.keys()):
-                    if remaining_to_reduce <= 0:
-                        break
-                    available = ca_cash_carryforward_by_creation_year[creation_year]
-                    used = min(available, remaining_to_reduce)
-                    ca_cash_carryforward_by_creation_year[creation_year] -= used
-                    if ca_cash_carryforward_by_creation_year[creation_year] <= 0:
-                        del ca_cash_carryforward_by_creation_year[creation_year]
-                    remaining_to_reduce -= used
+            #     for creation_year in sorted(ca_cash_carryforward_by_creation_year.keys()):
+            #         if remaining_to_reduce <= 0:
+            #             break
+            #         available = ca_cash_carryforward_by_creation_year[creation_year]
+            #         used = min(available, remaining_to_reduce)
+            #         ca_cash_carryforward_by_creation_year[creation_year] -= used
+            #         if ca_cash_carryforward_by_creation_year[creation_year] <= 0:
+            #             del ca_cash_carryforward_by_creation_year[creation_year]
+            #         remaining_to_reduce -= used
 
-                if new_cash_carryforward > 0:
-                    ca_cash_carryforward_by_creation_year[year] = new_cash_carryforward
-            else:
-                ca_cash_carryforward_by_creation_year.clear()
+            #     if new_cash_carryforward > 0:
+            #         ca_cash_carryforward_by_creation_year[year] = new_cash_carryforward
+            # else:
+            #     ca_cash_carryforward_by_creation_year.clear()
 
-            # Add new stock carryforwards from current year
-            if result.charitable_deduction_result.stock_carryforward > sum(federal_stock_carryforward_by_creation_year.values()):
-                current_year_stock_donated = sum(d.donation_value for d in donation_components)
-                current_year_stock_used = min(current_year_stock_donated, result.charitable_deduction_result.stock_deduction_used)
-                new_stock = current_year_stock_donated - current_year_stock_used
-                if new_stock > 0:
-                    federal_stock_carryforward_by_creation_year[year] = new_stock
-
-            if result.ca_charitable_deduction_result.stock_carryforward > sum(ca_stock_carryforward_by_creation_year.values()):
-                current_year_stock_donated = sum(d.donation_value for d in donation_components)
-                current_year_stock_used = min(current_year_stock_donated, result.ca_charitable_deduction_result.stock_deduction_used)
-                new_stock = current_year_stock_donated - current_year_stock_used
-                if new_stock > 0:
-                    ca_stock_carryforward_by_creation_year[year] = new_stock
-
-            # Remove expired carryforwards after they could be used in their 5th year
-            for creation_year in list(federal_cash_carryforward_by_creation_year.keys()):
-                if year - creation_year >= 5:
-                    del federal_cash_carryforward_by_creation_year[creation_year]
-
-            for creation_year in list(federal_stock_carryforward_by_creation_year.keys()):
-                if year - creation_year >= 5:
-                    del federal_stock_carryforward_by_creation_year[creation_year]
-
-            for creation_year in list(ca_cash_carryforward_by_creation_year.keys()):
-                if year - creation_year >= 5:
-                    del ca_cash_carryforward_by_creation_year[creation_year]
-
-            for creation_year in list(ca_stock_carryforward_by_creation_year.keys()):
-                if year - creation_year >= 5:
-                    del ca_stock_carryforward_by_creation_year[creation_year]
+            # The calculator now handles all carryforward tracking and expiration internally
 
         # Assert all tests passed
         if not all_passed:

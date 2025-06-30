@@ -10,7 +10,7 @@ import os
 from datetime import date
 from typing import List, Dict, Any
 from projections.projection_state import ProjectionResult, YearlyState, LifecycleState, ShareType
-from projections.detailed_materialization import materialize_detailed_projection
+from projections.csv_generators import save_components_csv, save_annual_summary_csv, save_charitable_carryforward_csv
 
 # Import tax constants for charitable deduction limits
 from calculators.tax_constants import (
@@ -32,7 +32,7 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
             'year', 'w2_income', 'spouse_income', 'nso_ordinary_income',
             'short_term_gains', 'long_term_gains', 'iso_bargain_element',
             'federal_regular_tax', 'federal_amt_tax', 'ca_regular_tax', 'ca_amt_tax', 'total_tax_combined',
-            'federal_amt_credits_generated', 'federal_amt_credits_used', 'amt_credits_remaining',
+            'federal_tax_regime', 'federal_amt_credits_generated', 'federal_amt_credits_used', 'amt_credits_remaining',
             'charitable_deduction_cash', 'charitable_deduction_stock'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -64,6 +64,9 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
                 charitable_cash = getattr(state.annual_tax_components, 'charitable_deductions_cash', 0)
                 charitable_stock = getattr(state.annual_tax_components, 'charitable_deductions_stock', 0)
 
+            # Determine which tax regime applies
+            federal_tax_regime = 'AMT' if state.tax_state.federal_amt_tax > state.tax_state.federal_regular_tax else 'Regular'
+            
             writer.writerow({
                 'year': state.year,
                 'w2_income': round(result.user_profile.annual_w2_income if result.user_profile else state.income, 2),
@@ -77,6 +80,7 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
                 'ca_regular_tax': round(state.tax_state.ca_regular_tax, 2),
                 'ca_amt_tax': round(state.tax_state.ca_amt_tax, 2),
                 'total_tax_combined': round(state.tax_state.total_tax, 2),
+                'federal_tax_regime': federal_tax_regime,
                 'federal_amt_credits_generated': round(state.tax_state.amt_credits_generated, 2),
                 'federal_amt_credits_used': round(state.tax_state.amt_credits_used, 2),
                 'amt_credits_remaining': round(state.tax_state.amt_credits_remaining, 2),
@@ -574,375 +578,6 @@ def save_holding_period_tracking_csv(result: ProjectionResult, output_path: str)
 
 
 
-def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str) -> None:
-    """Save charitable deduction carryforward tracking."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, 'w', newline='') as f:
-        fieldnames = [
-            'year', 'agi', 'basis_election', 'stock_deduction_type',
-            'cash_donations', 'stock_donations',
-            'federal_cash_limit', 'federal_stock_limit', 'federal_cash_used', 'federal_stock_used',
-            'federal_cash_carryforward', 'federal_stock_carryforward', 'federal_expired_this_year',
-            'total_federal_deduction', 'federal_stock_carryforward_remaining_by_year',
-            'total_federal_stock_carryforward_remaining',
-            'federal_cash_carryforward_remaining_by_year',
-            'total_federal_cash_carryforward_remaining',
-            'ca_cash_limit', 'ca_stock_limit', 'ca_cash_used', 'ca_stock_used',
-            'ca_cash_carryforward', 'ca_stock_carryforward', 'ca_expired_this_year',
-            'ca_stock_carryforward_remaining_by_year',
-            'total_ca_stock_carryforward_remaining',
-            'ca_cash_carryforward_remaining_by_year',
-            'total_ca_cash_carryforward_remaining',
-            'carryforward_expiration_year',
-            'pledge_obligations_unmet', 'cumulative_match_expiries', 'match_earned',
-            'unmatched_donations'
-        ]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        # Track carryforward across years for both federal and CA
-        cumulative_federal_cash_carryforward = {}  # year -> amount
-        cumulative_federal_stock_carryforward = {}  # year -> amount
-        cumulative_ca_cash_carryforward = {}  # year -> amount
-        cumulative_ca_stock_carryforward = {}  # year -> amount
-
-        # Track all carryforward types by creation year for FIFO logic
-        federal_stock_carryforward_by_creation_year = {}  # "YYYY_deduction" -> amount
-        federal_cash_carryforward_by_creation_year = {}  # "YYYY_deduction" -> amount
-        ca_stock_carryforward_by_creation_year = {}  # "YYYY_deduction" -> amount
-        ca_cash_carryforward_by_creation_year = {}  # "YYYY_deduction" -> amount
-
-        # Track cumulative match expiries
-        cumulative_match_expiries = 0.0
-
-        def update_fifo_carryforward(carryforward_dict, new_carryforward, used_amount, current_year, charitable_state_remaining):
-            """
-            Generic FIFO carryforward tracking function.
-
-            Args:
-                carryforward_dict: Dict tracking carryforward by creation year
-                new_carryforward: New carryforward created this year
-                used_amount: Amount of carryforward used this year
-                current_year: Current year
-                charitable_state_remaining: Remaining amounts from charitable state
-
-            Returns:
-                (display_dict, total_amount)
-            """
-            # Add new carryforward created this year
-            if new_carryforward > 0:
-                carryforward_dict[f"{current_year}_deduction"] = new_carryforward
-
-            # Apply FIFO burndown if carryforward was used
-            if used_amount > 0:
-                remaining_to_burn = used_amount
-                for creation_key in sorted(carryforward_dict.keys()):
-                    if remaining_to_burn <= 0:
-                        break
-                    available = carryforward_dict[creation_key]
-                    burned = min(available, remaining_to_burn)
-                    carryforward_dict[creation_key] -= burned
-                    remaining_to_burn -= burned
-
-                # Remove empty entries
-                carryforward_dict = {
-                    k: v for k, v in carryforward_dict.items() if v > 0
-                }
-
-            # Handle expiration (carryforwards expire after 5 years)
-            expired_keys = []
-            for creation_key in list(carryforward_dict.keys()):
-                creation_year = int(creation_key.split('_')[0])
-                if current_year > creation_year + 5:  # Expires after 5 years
-                    expired_keys.append(creation_key)
-
-            for key in expired_keys:
-                del carryforward_dict[key]
-
-            # Create display dictionary with rounded values (exclude zero entries)
-            display_dict = {
-                k: round(v, 2) for k, v in carryforward_dict.items() if v > 0.01
-            }
-
-            # Calculate total carryforward
-            total_amount = sum(display_dict.values())
-
-            return display_dict, total_amount
-
-        for state in result.yearly_states:
-            # Get AGI for this year
-            agi = 0
-            cash_donations = 0
-            stock_donations = 0
-
-            # Check if basis election applies this year
-            basis_election = False
-            if hasattr(result, 'plan') and result.plan and 'charitable_basis_election_years' in result.plan.tax_elections:
-                basis_election = state.year in result.plan.tax_elections['charitable_basis_election_years']
-
-            # Extract donation data from state
-            if state.donation_value > 0:
-                # State tracks total donation value
-                stock_donations = state.donation_value
-
-            # Extract detailed data from annual tax components if available
-            if state.annual_tax_components:
-                # Calculate AGI from all income sources
-                w2_income = state.income
-                spouse_income = state.spouse_income
-                other_income = state.other_income
-
-                # Extract capital gains
-                stcg = 0
-                ltcg = 0
-                for sale in getattr(state.annual_tax_components, 'sale_components', []):
-                    stcg += getattr(sale, 'short_term_gain', 0)
-                    ltcg += getattr(sale, 'long_term_gain', 0)
-
-                # NSO exercise creates ordinary income
-                nso_ordinary = 0
-                for nso in getattr(state.annual_tax_components, 'nso_exercise_components', []):
-                    nso_ordinary += getattr(nso, 'bargain_element', 0)
-
-                agi = w2_income + spouse_income + other_income + stcg + ltcg + nso_ordinary
-
-                # Get detailed donation breakdown if available
-                donation_components = getattr(state.annual_tax_components, 'donation_components', [])
-                if donation_components:
-                    # Reset if we have detailed data
-                    stock_donations = 0
-                    cash_donations = 0
-
-                    # Calculate stock donations respecting basis election
-                    if basis_election:
-                        # When electing basis, use cost basis for deduction amount (matches annual_tax_calculator.py logic)
-                        for donation in donation_components:
-                            deduction_type = getattr(donation, 'deduction_type', 'stock')
-                            if deduction_type == 'stock':
-                                cost_basis = getattr(donation, 'cost_basis', 0)
-                                shares_donated = getattr(donation, 'shares_donated', 0)
-                                stock_donations += cost_basis * shares_donated
-                            else:
-                                donation_value = getattr(donation, 'donation_value', 0)
-                                cash_donations += donation_value
-                    else:
-                        # Default: use FMV (donation_value)
-                        for donation in donation_components:
-                            donation_value = getattr(donation, 'donation_value', 0)
-                            deduction_type = getattr(donation, 'deduction_type', 'stock')
-                            if deduction_type == 'stock':
-                                stock_donations += donation_value
-                            else:
-                                cash_donations += donation_value
-
-                # Add cash donations
-                for cash_donation in getattr(state.annual_tax_components, 'cash_donation_components', []):
-                    cash_donations += getattr(cash_donation, 'amount', 0)
-            else:
-                # Fallback AGI calculation #Claude TODO: Just throw an error here.
-                agi = state.income + state.spouse_income + state.other_income
-
-            # AGI limits for charitable deductions - differentiate federal vs state
-            # Use federal limits as primary (most scenarios), but could be enhanced for state-specific analysis
-            federal_cash_limit = agi * FEDERAL_CHARITABLE_AGI_LIMITS['cash']
-            federal_stock_limit = agi * (FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock'] if basis_election else FEDERAL_CHARITABLE_AGI_LIMITS['stock'])
-
-            ca_cash_limit = agi * CALIFORNIA_CHARITABLE_AGI_LIMITS['cash']
-            ca_stock_limit = agi * (CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS['stock'] if basis_election else CALIFORNIA_CHARITABLE_AGI_LIMITS['stock'])
-
-            # Apply IRS charitable deduction ordering (both federal and CA)
-            # 1. Current Year Cash Contributions (60% AGI limit)
-            # 2. Current Year Stock Contributions (30% AGI limit)
-            # 3. Cash Carryforward from Prior Years (remaining 60% limit)
-            # 4. Stock Carryforward from Prior Years (remaining 30% limit)
-
-            def apply_irs_charitable_ordering(cash_current, stock_current, cash_cf_available, stock_cf_available,
-                                            cash_limit, stock_limit):
-                """Apply IRS charitable deduction ordering and return usage amounts."""
-
-                # Step 1: Current year cash (up to 60% AGI limit)
-                cash_current_used = min(cash_current, cash_limit)
-                remaining_cash_limit = cash_limit - cash_current_used
-
-                # Step 2: Current year stock (up to 30% AGI limit)
-                stock_current_used = min(stock_current, stock_limit)
-                remaining_stock_limit = stock_limit - stock_current_used
-
-                # Step 3: Cash carryforward (up to remaining 60% AGI limit)
-                cash_cf_used = min(cash_cf_available, remaining_cash_limit)
-
-                # Step 4: Stock carryforward (up to remaining 30% AGI limit)
-                stock_cf_used = min(stock_cf_available, remaining_stock_limit)
-
-                return {
-                    'cash_current_used': cash_current_used,
-                    'stock_current_used': stock_current_used,
-                    'cash_cf_used': cash_cf_used,
-                    'stock_cf_used': stock_cf_used,
-                    'total_cash_used': cash_current_used + cash_cf_used,
-                    'total_stock_used': stock_current_used + stock_cf_used
-                }
-
-            # Get available carryforward amounts from tracking
-            federal_cash_cf_available = sum(federal_cash_carryforward_by_creation_year.values())
-            federal_stock_cf_available = sum(federal_stock_carryforward_by_creation_year.values())
-            ca_cash_cf_available = sum(ca_cash_carryforward_by_creation_year.values())
-            ca_stock_cf_available = sum(ca_stock_carryforward_by_creation_year.values())
-
-            # Apply IRS ordering for federal
-            federal_usage = apply_irs_charitable_ordering(
-                cash_donations, stock_donations,
-                federal_cash_cf_available, federal_stock_cf_available,
-                federal_cash_limit, federal_stock_limit
-            )
-
-            # Apply IRS ordering for CA (same logic)
-            ca_usage = apply_irs_charitable_ordering(
-                cash_donations, stock_donations,
-                ca_cash_cf_available, ca_stock_cf_available,
-                ca_cash_limit, ca_stock_limit
-            )
-
-            # Extract usage amounts
-            federal_cash_used = federal_usage['total_cash_used']
-            federal_stock_used = federal_usage['total_stock_used']
-            ca_cash_used = ca_usage['total_cash_used']
-            ca_stock_used = ca_usage['total_stock_used']
-
-            # Calculate NEW carryforwards created this year (current donations not deducted)
-            federal_cash_carryforward = max(0, cash_donations - federal_usage['cash_current_used'])
-            federal_stock_carryforward = max(0, stock_donations - federal_usage['stock_current_used'])
-            ca_cash_carryforward = max(0, cash_donations - ca_usage['cash_current_used'])
-            ca_stock_carryforward = max(0, stock_donations - ca_usage['stock_current_used'])
-
-            # Track cumulative carryforward separately for federal and state
-            if federal_cash_carryforward > 0:
-                cumulative_federal_cash_carryforward[state.year] = federal_cash_carryforward
-            if federal_stock_carryforward > 0:
-                cumulative_federal_stock_carryforward[state.year] = federal_stock_carryforward
-            if ca_cash_carryforward > 0:
-                cumulative_ca_cash_carryforward[state.year] = ca_cash_carryforward
-            if ca_stock_carryforward > 0:
-                cumulative_ca_stock_carryforward[state.year] = ca_stock_carryforward
-
-            # Carryforward expires after 5 years (same for both federal and CA)
-            has_any_carryforward = (federal_cash_carryforward > 0 or federal_stock_carryforward > 0 or
-                                  ca_cash_carryforward > 0 or ca_stock_carryforward > 0)
-            carryforward_expiration = state.year + 5 if has_any_carryforward else ''
-
-            # Calculate total federal deduction for the year
-            total_federal_deduction = federal_cash_used + federal_stock_used
-
-            # Get carryforward usage amounts from IRS ordering calculation
-            federal_stock_used_carryforward = federal_usage['stock_cf_used']
-            federal_cash_used_carryforward = federal_usage['cash_cf_used']
-            ca_stock_used_carryforward = ca_usage['stock_cf_used']
-            ca_cash_used_carryforward = ca_usage['cash_cf_used']
-
-            # Update all carryforward tracking using the reusable function
-            federal_stock_remaining_dict, total_federal_stock_carryforward = update_fifo_carryforward(
-                federal_stock_carryforward_by_creation_year,
-                federal_stock_carryforward,
-                federal_stock_used_carryforward,
-                state.year,
-                state.charitable_state.federal_carryforward_remaining if hasattr(state, 'charitable_state') and state.charitable_state else {}
-            )
-
-            federal_cash_remaining_dict, total_federal_cash_carryforward = update_fifo_carryforward(
-                federal_cash_carryforward_by_creation_year,
-                federal_cash_carryforward,
-                federal_cash_used_carryforward,
-                state.year,
-                {}  # Cash carryforward tracking may not be in charitable_state yet
-            )
-
-            # CA stock = federal stock since limits are identical
-            ca_stock_remaining_dict, total_ca_stock_carryforward = update_fifo_carryforward(
-                ca_stock_carryforward_by_creation_year,
-                ca_stock_carryforward,
-                ca_stock_used_carryforward,
-                state.year,
-                state.charitable_state.ca_carryforward_remaining if hasattr(state, 'charitable_state') and state.charitable_state else {}
-            )
-
-            ca_cash_remaining_dict, total_ca_cash_carryforward = update_fifo_carryforward(
-                ca_cash_carryforward_by_creation_year,
-                ca_cash_carryforward,
-                ca_cash_used_carryforward,
-                state.year,
-                {}  # CA cash carryforward tracking may not be in charitable_state yet
-            )
-
-            # Calculate pledge obligation tracking
-            pledge_obligations_unmet = 0.0
-            match_earned = 0.0
-
-            if hasattr(state, 'pledge_state') and state.pledge_state:
-                # Calculate unmet obligations that haven't expired (as of end of this year)
-                from datetime import date as date_class
-                year_end = date_class(state.year, 12, 31)
-
-                for obligation in state.pledge_state.obligations:
-                    # Only count obligations where match window is still open
-                    if (obligation.match_window_closes is None or
-                        year_end <= obligation.match_window_closes):
-                        pledge_obligations_unmet += obligation.outstanding_obligation
-
-                # Track lost match opportunities (cumulative)
-                cumulative_match_expiries += state.lost_match_opportunities
-
-            # Company match earned this year
-            if hasattr(state, 'company_match_received'):
-                match_earned = state.company_match_received
-
-            # Calculate unmatched donations (donations that didn't receive company match)
-            total_donations_this_year = cash_donations + stock_donations
-            if match_earned > 0 and hasattr(result, 'user_profile') and result.user_profile.company_match_ratio > 0:
-                # Calculate how much donation value was actually matched
-                # For pledge-based matching, only the amount applied to active obligations gets matched
-                matched_donation_value = match_earned / result.user_profile.company_match_ratio
-                unmatched_donations = max(0, total_donations_this_year - matched_donation_value)
-            else:
-                # No match earned, so all donations were unmatched
-                unmatched_donations = total_donations_this_year
-
-            writer.writerow({
-                'year': state.year,
-                'agi': round(agi, 2),
-                'basis_election': basis_election,
-                'stock_deduction_type': 'basis' if basis_election else 'fmv',
-                'cash_donations': round(cash_donations, 2),
-                'stock_donations': round(stock_donations, 2),
-                'federal_cash_limit': round(federal_cash_limit, 2),
-                'federal_stock_limit': round(federal_stock_limit, 2),
-                'federal_cash_used': round(federal_cash_used, 2),
-                'federal_stock_used': round(federal_stock_used, 2),
-                'federal_cash_carryforward': round(federal_cash_carryforward, 2),
-                'federal_stock_carryforward': round(federal_stock_carryforward, 2),
-                'federal_expired_this_year': round(state.charitable_state.federal_expired_this_year, 2),
-                'total_federal_deduction': round(total_federal_deduction, 2),
-                'federal_stock_carryforward_remaining_by_year': str(federal_stock_remaining_dict),
-                'total_federal_stock_carryforward_remaining': round(total_federal_stock_carryforward, 2),
-                'federal_cash_carryforward_remaining_by_year': str(federal_cash_remaining_dict),
-                'total_federal_cash_carryforward_remaining': round(total_federal_cash_carryforward, 2),
-                'ca_cash_limit': round(ca_cash_limit, 2),
-                'ca_stock_limit': round(ca_stock_limit, 2),
-                'ca_cash_used': round(ca_cash_used, 2),
-                'ca_stock_used': round(ca_stock_used, 2),
-                'ca_cash_carryforward': round(ca_cash_carryforward, 2),
-                'ca_stock_carryforward': round(ca_stock_carryforward, 2),
-                'ca_expired_this_year': round(state.charitable_state.ca_expired_this_year, 2),
-                'ca_stock_carryforward_remaining_by_year': str(ca_stock_remaining_dict),
-                'total_ca_stock_carryforward_remaining': round(total_ca_stock_carryforward, 2),
-                'ca_cash_carryforward_remaining_by_year': str(ca_cash_remaining_dict),
-                'total_ca_cash_carryforward_remaining': round(total_ca_cash_carryforward, 2),
-                'carryforward_expiration_year': carryforward_expiration,
-                'pledge_obligations_unmet': round(pledge_obligations_unmet, 2),
-                'cumulative_match_expiries': round(cumulative_match_expiries, 2),
-                'match_earned': round(match_earned, 2),
-                'unmatched_donations': round(unmatched_donations, 2)
-            })
 
 
 
@@ -1273,13 +908,14 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     # New tracking CSVs
     generate_holding_milestones_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
     save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
+    
 
     # Comprehensive cash flow tracking
     save_comprehensive_cashflow_csv(result, f"{output_dir}/{base_name}_comprehensive_cashflow.csv")
 
-    # Generate detailed financial materialization for transparency
-    # This creates action_summary.csv and annual_summary.csv (keeping these)
-    materialize_detailed_projection(result, output_dir, scenario_name)
+    # NEW: Component-based CSVs replacing detailed_materialization
+    save_components_csv(result, f"{output_dir}/{base_name}_components.csv")
+    save_annual_summary_csv(result, f"{output_dir}/{base_name}_annual_summary.csv")
 
 
 def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> None:

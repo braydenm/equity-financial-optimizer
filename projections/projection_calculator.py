@@ -170,7 +170,7 @@ class ProjectionCalculator:
                 total_equity_value=0.0,
                 shares_sold=deepcopy(cumulative_shares_sold),
                 shares_donated=deepcopy(cumulative_shares_donated),
-                pledge_state=pledge_state,
+                pledge_state=pledge_state,  # Shared reference, will snapshot at year end
                 total_net_worth=0.0,
                 annual_tax_components=annual_components,
                 spouse_income=self.profile.spouse_w2_income,
@@ -188,10 +188,13 @@ class ProjectionCalculator:
             # Process each action chronologically
             for action in sorted(year_actions, key=lambda a: a.action_date):
                 if action.action_type == ActionType.EXERCISE:
-                    # Get the FMV for this year from price projections
-                    if year not in plan.price_projections:
-                        raise ValueError(f"Price projection for year {year} not found in plan")
-                    year_fmv = plan.price_projections[year]
+                    # Get the FMV - use action price if specified (e.g., tender offer), otherwise use projection
+                    if action.price is not None:
+                        year_fmv = action.price
+                    else:
+                        if year not in plan.price_projections:
+                            raise ValueError(f"Price projection for year {year} not found in plan")
+                        year_fmv = plan.price_projections[year]
                     exercise_result = self._process_exercise(action, current_lots, annual_components, year_fmv)
                     year_exercise_costs += exercise_result['exercise_cost']
 
@@ -213,10 +216,17 @@ class ProjectionCalculator:
                         assumed_ipo=self.profile.assumed_ipo
                     )
                     pledge_state.add_obligation(obligation)
+                    
+                    # Track year-specific obligated shares
+                    yearly_state.pledge_shares_obligated_this_year += obligation.maximalist_shares_required
 
                 elif action.action_type == ActionType.DONATE:
                     donation_result = self._process_donation(action, current_lots, annual_components, yearly_state)
                     year_donation_value += donation_result['donation_value']
+                    
+                    # Track year-specific donated shares
+                    yearly_state.pledge_shares_donated_this_year += action.quantity
+                    
                     # Apply donation to pledge obligations using FIFO discharge
                     discharge_result = pledge_state.discharge_donation(
                         donation_amount=donation_result['donation_value'],
@@ -373,6 +383,13 @@ class ProjectionCalculator:
                                    if lot.lifecycle_state in [LifecycleState.VESTED_NOT_EXERCISED,
                                                              LifecycleState.EXERCISED_NOT_DISPOSED])
 
+            # Calculate year-specific expired shares before processing window closures
+            for obligation in pledge_state.obligations:
+                if obligation.match_window_closes and obligation.match_window_closes.year == year:
+                    unfulfilled = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
+                    if unfulfilled > 0:
+                        yearly_state.pledge_shares_expired_this_year += unfulfilled
+            
             # Process match window closures and calculate lost opportunities
             lost_match_value = pledge_state.process_window_closures(
                 current_year=year,
@@ -394,9 +411,11 @@ class ProjectionCalculator:
             yearly_state.lost_match_opportunities = lost_match_value
             yearly_state.ending_cash = year_end_cash
             yearly_state.charitable_state = charitable_state
+            yearly_state.federal_charitable_deduction_result = tax_result.charitable_deduction_result
+            yearly_state.ca_charitable_deduction_result = tax_result.ca_charitable_deduction_result
             yearly_state.equity_holdings = deepcopy(current_lots)
             yearly_state.total_equity_value = total_equity_value
-            yearly_state.pledge_state = pledge_state
+            yearly_state.pledge_state = deepcopy(pledge_state)
             yearly_state.total_net_worth = year_end_cash + total_equity_value + current_investments
 
             # Update cumulative tracking for next year
@@ -514,7 +533,7 @@ class ProjectionCalculator:
             lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
             tax_treatment=TaxTreatment.STCG,  # Initially STCG, will become LTCG after 1 year
             exercise_date=action.action_date,
-            cost_basis=lot.strike_price,
+            cost_basis=current_price if lot.share_type == ShareType.NSO else lot.strike_price,
             fmv_at_exercise=current_price,  # Critical for disqualifying disposition calculations
             taxes_paid=0.0,  # Tax will be calculated at year-end
             expiration_date=lot.expiration_date,  # Preserve expiration date from parent lot

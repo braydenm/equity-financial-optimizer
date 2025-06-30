@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from engine.portfolio_manager import PortfolioManager
+from projections.projection_output import save_all_projection_csvs
 
 
 def print_scenario_results(result, detailed=True, verbose=False):
@@ -585,6 +586,18 @@ def execute_scenario(scenario_input, price_scenario="moderate", projection_years
     )
 
     print_scenario_results(result, detailed=True, verbose=verbose)
+
+    # NEW: Generate CSV outputs
+    if result:
+        # Extract scenario name from path
+        scenario_name = os.path.basename(scenario_path)
+        if scenario_name.endswith('.json'):
+            scenario_name = scenario_name[:-5]
+
+        output_dir = manager._generate_output_path(scenario_name, price_scenario)
+        save_all_projection_csvs(result, scenario_name, output_dir)
+        print(f"\n📊 CSV files saved to: {output_dir}/")
+
     if verbose:
         print_raw_data_tables(result)
     return result

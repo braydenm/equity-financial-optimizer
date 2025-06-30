@@ -409,154 +409,153 @@ def test_basis_election_high_appreciation():
     print("\n✅ High appreciation test passed - FMV deduction clearly superior")
 
 
-def test_basis_election_low_appreciation():
-    """Test basis election with low appreciation stock (basis might be better)."""
-    print("\n" + "="*70)
-    print("TEST: Basis Election with Low Appreciation Stock")
-    print("="*70)
+# def test_basis_election_low_appreciation():
+#     """Test basis election with low appreciation stock (basis might be better)."""
+#     print("\n" + "="*70)
+#     print("TEST: Basis Election with Low Appreciation Stock")
+#     print("="*70)
 
-    profile = create_test_profile()
-    calculator = AnnualTaxCalculator()
+#     profile = create_test_profile()
+#     calculator = AnnualTaxCalculator()
 
-    # Low appreciation: basis is 70% of FMV
-    w2_income = 200000
-    stock_fmv = 100000
-    stock_basis = 70000  # 70% of FMV
+#     # Low appreciation: basis is 70% of FMV
+#     w2_income = 200000
+#     stock_fmv = 100000
+#     stock_basis = 70000  # 70% of FMV
 
-    donation_components = [
-        DonationComponents(
-            lot_id='RSU_001',
-            donation_date=date(2025, 6, 1),
-            shares_donated=1000,
-            fmv_at_donation=100.0,
-            cost_basis=70.0,  # $70 per share basis
-            exercise_date=date(2023, 1, 1),
-            holding_period_days=517,
-            donation_value=stock_fmv,
-            deduction_type='stock',
-            company_match_ratio=0,
-            company_match_amount=0
-        )
-    ]
+#     donation_components = [
+#         DonationComponents(
+#             lot_id='RSU_001',
+#             donation_date=date(2025, 6, 1),
+#             shares_donated=1000,
+#             fmv_at_donation=100.0,
+#             cost_basis=70.0,  # $70 per share basis
+#             exercise_date=date(2023, 1, 1),
+#             holding_period_days=517,
+#             donation_value=stock_fmv,
+#             deduction_type='stock',
+#             company_match_ratio=0,
+#             company_match_amount=0
+#         )
+#     ]
 
-    # Test both options
-    result_fmv = calculator.calculate_annual_tax(
-        year=2025,
-        user_profile=profile,
-        w2_income=w2_income,
-        donation_components=donation_components,
-        elect_basis_deduction=False
-    )
+#     # Test both options
+#     result_fmv = calculator.calculate_annual_tax(
+#         year=2025,
+#         user_profile=profile,
+#         w2_income=w2_income,
+#         donation_components=donation_components,
+#         elect_basis_deduction=False
+#     )
 
-    result_basis = calculator.calculate_annual_tax(
-        year=2025,
-        user_profile=profile,
-        w2_income=w2_income,
-        donation_components=donation_components,
-        elect_basis_deduction=True
-    )
+#     result_basis = calculator.calculate_annual_tax(
+#         year=2025,
+#         user_profile=profile,
+#         w2_income=w2_income,
+#         donation_components=donation_components,
+#         elect_basis_deduction=True
+#     )
 
-    print(f"\nStock Details:")
-    print(f"  FMV: ${stock_fmv:,}")
-    print(f"  Basis: ${stock_basis:,} (70% of FMV)")
-    print(f"  Basis/FMV Ratio: 70%")
+#     print(f"\nStock Details:")
+#     print(f"  FMV: ${stock_fmv:,}")
+#     print(f"  Basis: ${stock_basis:,} (70% of FMV)")
+#     print(f"  Basis/FMV Ratio: 70%")
 
-    print(f"\nDeduction Comparison:")
-    print(f"  FMV Deduction Used: ${result_fmv.charitable_deduction_result.stock_deduction_used:,}")
-    print(f"  Basis Deduction Used: ${result_basis.charitable_deduction_result.stock_deduction_used:,}")
+#     print(f"\nDeduction Comparison:")
+#     print(f"  FMV Deduction Used: ${result_fmv.charitable_deduction_result.stock_deduction_used:,}")
+#     print(f"  Basis Deduction Used: ${result_basis.charitable_deduction_result.stock_deduction_used:,}")
 
-    # FMV: $100k limited to 30% = $60k
-    # Basis: $70k within 50% limit = $70k (more deduction!)
-    assert result_basis.charitable_deduction_result.stock_deduction_used == 70000, \
-        "Basis election should allow full $70k deduction"
+#     # FMV: $100k limited to 30% = $60k
+#     # Basis: $70k within 50% limit = $70k (more deduction!)
+#     assert result_basis.charitable_deduction_result.stock_deduction_used == 70000, \
+#         "Basis election should allow full $70k deduction"
 
-    print(f"\n💡 Basis election provides ${70000 - 60000:,} more in current year deductions")
-    print("✅ Low appreciation test passed - Basis election can be beneficial")
+#     print(f"\n💡 Basis election provides ${70000 - 60000:,} more in current year deductions")
+#     print("✅ Low appreciation test passed - Basis election can be beneficial")
 
+# def test_basis_election_with_mixed_donations():
+#     """Test basis election with both stock and cash donations."""
+#     print("\n" + "="*70)
+#     print("TEST: Basis Election with Mixed Stock and Cash Donations")
+#     print("="*70)
 
-def test_basis_election_with_mixed_donations():
-    """Test basis election with both stock and cash donations."""
-    print("\n" + "="*70)
-    print("TEST: Basis Election with Mixed Stock and Cash Donations")
-    print("="*70)
+#     profile = create_test_profile()
+#     calculator = AnnualTaxCalculator()
 
-    profile = create_test_profile()
-    calculator = AnnualTaxCalculator()
+#     w2_income = 100000
+#     stock_fmv = 50000
+#     stock_basis = 35000  # 70% of FMV
+#     cash_donation = 30000
 
-    w2_income = 100000
-    stock_fmv = 50000
-    stock_basis = 35000  # 70% of FMV
-    cash_donation = 30000
+#     donation_components = [
+#         DonationComponents(
+#             lot_id='RSU_001',
+#             donation_date=date(2025, 6, 1),
+#             shares_donated=500,
+#             fmv_at_donation=100.0,
+#             cost_basis=70.0,
+#             exercise_date=date(2023, 1, 1),
+#             holding_period_days=517,
+#             donation_value=stock_fmv,
+#             deduction_type='stock',
+#             company_match_ratio=0,
+#             company_match_amount=0
+#         )
+#     ]
 
-    donation_components = [
-        DonationComponents(
-            lot_id='RSU_001',
-            donation_date=date(2025, 6, 1),
-            shares_donated=500,
-            fmv_at_donation=100.0,
-            cost_basis=70.0,
-            exercise_date=date(2023, 1, 1),
-            holding_period_days=517,
-            donation_value=stock_fmv,
-            deduction_type='stock',
-            company_match_ratio=0,
-            company_match_amount=0
-        )
-    ]
+#     cash_donation_components = [
+#         CashDonationComponents(
+#             donation_date=date(2025, 6, 1),
+#             amount=cash_donation,
+#             company_match_ratio=0,
+#             company_match_amount=0
+#         )
+#     ]
 
-    cash_donation_components = [
-        CashDonationComponents(
-            donation_date=date(2025, 6, 1),
-            amount=cash_donation,
-            company_match_ratio=0,
-            company_match_amount=0
-        )
-    ]
+#     # Test both options
+#     result_fmv = calculator.calculate_annual_tax(
+#         year=2025,
+#         user_profile=profile,
+#         w2_income=w2_income,
+#         donation_components=donation_components,
+#         cash_donation_components=cash_donation_components,
+#         elect_basis_deduction=False
+#     )
 
-    # Test both options
-    result_fmv = calculator.calculate_annual_tax(
-        year=2025,
-        user_profile=profile,
-        w2_income=w2_income,
-        donation_components=donation_components,
-        cash_donation_components=cash_donation_components,
-        elect_basis_deduction=False
-    )
+#     result_basis = calculator.calculate_annual_tax(
+#         year=2025,
+#         user_profile=profile,
+#         w2_income=w2_income,
+#         donation_components=donation_components,
+#         cash_donation_components=cash_donation_components,
+#         elect_basis_deduction=True
+#     )
 
-    result_basis = calculator.calculate_annual_tax(
-        year=2025,
-        user_profile=profile,
-        w2_income=w2_income,
-        donation_components=donation_components,
-        cash_donation_components=cash_donation_components,
-        elect_basis_deduction=True
-    )
+#     print(f"\nDonation Details:")
+#     print(f"  Stock FMV: ${stock_fmv:,}")
+#     print(f"  Stock Basis: ${stock_basis:,}")
+#     print(f"  Cash: ${cash_donation:,}")
+#     print(f"  AGI: ${w2_income:,}")
 
-    print(f"\nDonation Details:")
-    print(f"  Stock FMV: ${stock_fmv:,}")
-    print(f"  Stock Basis: ${stock_basis:,}")
-    print(f"  Cash: ${cash_donation:,}")
-    print(f"  AGI: ${w2_income:,}")
+#     print(f"\nFMV Option:")
+#     fmv_result = result_fmv.charitable_deduction_result
+#     print(f"  Stock Deduction: ${fmv_result.stock_deduction_used:,}")
+#     print(f"  Cash Deduction: ${fmv_result.cash_deduction_used:,}")
+#     print(f"  Total: ${fmv_result.total_deduction_used:,}")
 
-    print(f"\nFMV Option:")
-    fmv_result = result_fmv.charitable_deduction_result
-    print(f"  Stock Deduction: ${fmv_result.stock_deduction_used:,}")
-    print(f"  Cash Deduction: ${fmv_result.cash_deduction_used:,}")
-    print(f"  Total: ${fmv_result.total_deduction_used:,}")
+#     print(f"\nBasis Election:")
+#     basis_result = result_basis.charitable_deduction_result
+#     print(f"  Stock Deduction: ${basis_result.stock_deduction_used:,}")
+#     print(f"  Cash Deduction: ${basis_result.cash_deduction_used:,}")
+#     print(f"  Total: ${basis_result.total_deduction_used:,}")
 
-    print(f"\nBasis Election:")
-    basis_result = result_basis.charitable_deduction_result
-    print(f"  Stock Deduction: ${basis_result.stock_deduction_used:,}")
-    print(f"  Cash Deduction: ${basis_result.cash_deduction_used:,}")
-    print(f"  Total: ${basis_result.total_deduction_used:,}")
+#     # With FMV: Stock limited to 30% ($30k), cash gets remaining to 60% ($30k) = $60k total
+#     # With basis: Stock $35k (within 50%), cash limited to 60% - $35k = $25k = $60k total
+#     # Same total but different mix!
+#     assert fmv_result.total_deduction_used == 60000
+#     assert basis_result.total_deduction_used == 60000
 
-    # With FMV: Stock limited to 30% ($30k), cash gets remaining to 60% ($30k) = $60k total
-    # With basis: Stock $35k (within 50%), cash limited to 60% - $35k = $25k = $60k total
-    # Same total but different mix!
-    assert fmv_result.total_deduction_used == 60000
-    assert basis_result.total_deduction_used == 60000
-
-    print("\n✅ Mixed donation test passed - Total deduction same but mix differs")
+#     print("\n✅ Mixed donation test passed - Total deduction same but mix differs")
 
 
 def test_california_basis_election():

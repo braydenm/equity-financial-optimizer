@@ -70,6 +70,7 @@ class EquityLoader:
                 share_type=share_type,
                 quantity=lot_data['shares'],
                 strike_price=lot_data['strike_price'],
+                cost_basis=lot_data.get('cost_basis', lot_data['strike_price']),
                 grant_date=self._get_grant_date_from_grants(equity_position),
                 exercise_date=exercise_date,
                 lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,

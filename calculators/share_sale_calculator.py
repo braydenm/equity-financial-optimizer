@@ -135,6 +135,16 @@ class ShareSaleCalculator:
             else:
                 short_term_gain = total_gain
 
+        # Determine tax treatment for display
+        if disposition_type == DispositionType.QUALIFYING_ISO:
+            tax_treatment = "Qualifying"
+        elif disposition_type == DispositionType.DISQUALIFYING_ISO:
+            tax_treatment = "Disqualifying"
+        elif holding_period_days > 365:
+            tax_treatment = "LTCG"
+        else:
+            tax_treatment = "STCG"
+
         return ShareSaleComponents(
             lot_id=lot_id,
             sale_date=sale_date,
@@ -149,7 +159,9 @@ class ShareSaleCalculator:
             ordinary_income=ordinary_income,
             disposition_type=disposition_type,
             is_qualifying_disposition=is_qualifying_disposition,
-            amt_adjustment_reversal=amt_adjustment_reversal
+            amt_adjustment_reversal=amt_adjustment_reversal,
+            action_date=sale_date,
+            tax_treatment=tax_treatment
         )
 
     @staticmethod

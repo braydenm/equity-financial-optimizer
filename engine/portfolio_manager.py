@@ -425,11 +425,24 @@ class PortfolioManager:
         - Tender: Check if date matches known tender offer
         """
         if action_type == ActionType.EXERCISE:
+            # For NSO exercises, check if we should use tender price as FMV
             lot = next((lot for lot in self._initial_lots if lot.lot_id == lot_id), None)
-            if lot:
-                return lot.strike_price
-            else:
+            if not lot:
                 raise ValueError(f"Lot {lot_id} not found for exercise action")
+            
+            # For NSOs, check if there's a tender offer near the exercise date
+            if lot.share_type == ShareType.NSO:
+                tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
+                tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
+                
+                if tender_date and tender_price:
+                    tender_date_obj = date.fromisoformat(tender_date)
+                    # If exercising within 30 days of tender, use tender price as FMV
+                    if abs((action_date - tender_date_obj).days) <= 30:
+                        return tender_price
+            
+            # Otherwise return None to use default price projections
+            return None
 
         # Check tender price for SELL actions, snaps to any nearby tenders if exist
         if action_type in [ActionType.SELL]:

@@ -11,6 +11,7 @@ from datetime import date
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from decimal import Decimal
 from enum import Enum
+from calculators.tax_utils import calculate_iso_qualifying_disposition_date
 
 
 
@@ -96,6 +97,15 @@ class ShareLot:
             except (IndexError, ValueError):
                 # If we can't parse the date, skip this validation
                 pass
+
+    @property
+    def iso_qualifying_date(self) -> Optional[date]:
+        """Date when ISO shares become eligible for qualifying disposition."""
+        if self.share_type != ShareType.ISO:
+            return None
+        if not self.exercise_date:
+            return None
+        return calculate_iso_qualifying_disposition_date(self.grant_date, self.exercise_date)
 
 
 @dataclass
@@ -323,6 +333,10 @@ class YearlyState:
     # Charitable deductions
     charitable_state: CharitableDeductionState
 
+    # NEW: Store full charitable deduction results from annual tax calculator
+    federal_charitable_deduction_result: Optional[Any] = None  # CharitableDeductionResult
+    ca_charitable_deduction_result: Optional[Any] = None  # CharitableDeductionResult
+
     # Tax details
     gross_tax: float = 0.0
     tax_withholdings: float = 0.0
@@ -343,6 +357,11 @@ class YearlyState:
 
     # Pledge obligations
     pledge_state: PledgeState = field(default_factory=PledgeState)
+    
+    # Year-specific pledge tracking
+    pledge_shares_obligated_this_year: int = 0
+    pledge_shares_donated_this_year: int = 0
+    pledge_shares_expired_this_year: int = 0
 
     # Additional metrics
     total_net_worth: float = 0.0

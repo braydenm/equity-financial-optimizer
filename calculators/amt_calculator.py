@@ -150,16 +150,20 @@ def calculate_federal_amt(
     # Calculate AMT tax
     amt_tax = calculate_amt_tax(amt_taxable_income)
 
-    # Apply existing AMT credit to regular tax
-    regular_tax_after_credit = max(0, regular_tax - existing_amt_credit)
-    amt_credit_used = regular_tax - regular_tax_after_credit
+    # First determine which tax applies WITHOUT applying credits
+    is_amt = amt_tax > regular_tax
 
-    # Determine which tax applies
-    is_amt = amt_tax > regular_tax_after_credit
-
-    # AMT credit is generated when you pay AMT
-    # It's the excess of AMT over regular tax (before credits)
-    amt_credit_generated = max(0, amt_tax - regular_tax) if is_amt else 0.0
+    # Then calculate credits based on which tax applies
+    if is_amt:
+        # Paying AMT: generate credits, don't use existing credits
+        tax_owed = amt_tax
+        amt_credit_generated = amt_tax - regular_tax
+        amt_credit_used = 0.0
+    else:
+        # Paying regular tax: use existing credits, don't generate new ones
+        amt_credit_generated = 0.0
+        amt_credit_used = min(existing_amt_credit, regular_tax)
+        tax_owed = regular_tax - amt_credit_used
 
     # Calculate the effective additional tax due to AMT adjustments
     # This is useful for understanding the tax impact of ISO exercises
@@ -219,16 +223,20 @@ def calculate_amt_for_annual_tax(
     amt_taxable_income = max(0, amt_income - amt_exemption)
     amt_tax = calculate_amt_tax(amt_taxable_income)
 
-    # Apply AMT credit to regular tax
-    regular_tax_after_credit = max(0, regular_tax_before_credits - existing_amt_credit)
-    amt_credit_used = regular_tax_before_credits - regular_tax_after_credit
+    # First determine which tax applies WITHOUT applying credits
+    is_amt = amt_tax > regular_tax_before_credits
 
-    # Determine if AMT applies
-    is_amt = amt_tax > regular_tax_after_credit
-    tax_owed = max(amt_tax, regular_tax_after_credit)
-
-    # Calculate AMT credit generated
-    amt_credit_generated = max(0, amt_tax - regular_tax_before_credits) if is_amt else 0.0
+    # Then calculate credits and tax owed based on which tax applies
+    if is_amt:
+        # Paying AMT: generate credits, don't use existing credits
+        tax_owed = amt_tax
+        amt_credit_generated = amt_tax - regular_tax_before_credits
+        amt_credit_used = 0.0
+    else:
+        # Paying regular tax: use existing credits, don't generate new ones
+        amt_credit_generated = 0.0
+        amt_credit_used = min(existing_amt_credit, regular_tax_before_credits)
+        tax_owed = regular_tax_before_credits - amt_credit_used
 
     # Calculate AMT credit carryforward
     amt_credit_carryforward = existing_amt_credit - amt_credit_used + amt_credit_generated

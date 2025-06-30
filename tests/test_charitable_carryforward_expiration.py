@@ -21,7 +21,7 @@ from projections.projection_calculator import ProjectionCalculator, ProjectionPl
 from projections.projection_state import (
     ShareLot, LifecycleState, PlannedAction, ActionType, ShareType, TaxTreatment
 )
-from projections.projection_output import save_charitable_carryforward_csv
+from projections.csv_generators import save_charitable_carryforward_csv
 from calculators.tax_constants import CHARITABLE_CARRYFORWARD_YEARS
 
 
@@ -344,8 +344,8 @@ class TestCharitableCarryforwardExpiration(unittest.TestCase):
             content = f.read()
 
         # Verify headers include expired fields
-        self.assertIn('federal_expired_this_year', content)
-        self.assertIn('ca_expired_this_year', content)
+        self.assertIn('federal_expired_stock', content)
+        self.assertIn('ca_expired_stock', content)
 
         # Verify 2030 row has non-zero expired amounts
         lines = content.strip().split('\n')
@@ -360,9 +360,9 @@ class TestCharitableCarryforwardExpiration(unittest.TestCase):
                 headers = header_line.split(',')
 
                 for i, header in enumerate(headers):
-                    if header == 'federal_expired_this_year':
+                    if header == 'federal_expired_stock':
                         federal_expired_idx = i
-                    elif header == 'ca_expired_this_year':
+                    elif header == 'ca_expired_stock':
                         ca_expired_idx = i
 
                 if federal_expired_idx is not None and ca_expired_idx is not None:

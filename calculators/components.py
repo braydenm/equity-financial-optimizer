@@ -39,6 +39,11 @@ class ISOExerciseComponents:
     # For tracking
     grant_date: date  # Needed for qualifying disposition determination
 
+    # NEW: Display fields for CSV export
+    action_date: Optional[date] = None
+    action_type: str = "exercise"
+    calculator_name: str = "iso_exercise_calculator"
+
     def __post_init__(self):
         """Validate components."""
         if self.shares_exercised < 0:
@@ -67,6 +72,11 @@ class NSOExerciseComponents:
 
     # For tracking
     grant_date: date  # Needed for holding period tracking
+
+    # NEW: Display fields for CSV export
+    action_date: Optional[date] = None
+    action_type: str = "exercise"
+    calculator_name: str = "nso_exercise_calculator"
 
     def __post_init__(self):
         """Validate components."""
@@ -103,6 +113,12 @@ class ShareSaleComponents:
     long_term_gain: float = 0.0
     ordinary_income: float = 0.0  # For disqualifying dispositions
     is_qualifying_disposition: Optional[bool] = None  # Only for ISOs
+
+    # NEW: Display fields for CSV export
+    action_date: Optional[date] = None
+    action_type: str = "sell"
+    calculator_name: str = "share_sale_calculator"
+    tax_treatment: str = ""  # "STCG", "LTCG", "Qualifying", "Disqualifying"
 
     # For ISO disqualifying dispositions
     amt_adjustment_reversal: float = 0.0  # Reversal of previous AMT adjustment
@@ -167,6 +183,11 @@ class DonationComponents:
     pledge_amount_satisfied: float = 0.0
     pledge_id: Optional[str] = None
 
+    # NEW: Display fields for CSV export
+    action_date: Optional[date] = None
+    action_type: str = "donate"
+    calculator_name: str = "share_donation_calculator"
+
     def __post_init__(self):
         """Validate components."""
         if self.shares_donated < 0:
@@ -190,6 +211,11 @@ class CashDonationComponents:
     # Pledge tracking
     pledge_amount_satisfied: float = 0.0
     pledge_id: Optional[str] = None
+
+    # NEW: Display fields for CSV export
+    action_date: Optional[date] = None
+    action_type: str = "cash_donate"
+    calculator_name: str = "cash_donation_calculator"
 
 
 @dataclass

@@ -46,9 +46,10 @@ def get_file_priority() -> Dict[str, int]:
         'comprehensive_cashflow.csv': 4,
         'pledge_obligations.csv': 5,
         'charitable_carryforward.csv': 6,
-        'holding_period_tracking.csv': 7,
-        'state_timeline.csv': 8,
-        'transition_timeline.csv': 9,
+        'charitable_carryforward_direct.csv': 7,
+        'holding_period_tracking.csv': 8,
+        'state_timeline.csv': 9,
+        'transition_timeline.csv': 10,
     }
 
 def format_filename_for_header(filename: str) -> str:

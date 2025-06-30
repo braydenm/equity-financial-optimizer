@@ -393,7 +393,8 @@ def calculate_exercise_components(
         fmv_at_exercise=current_fmv,
         exercise_cost=exercise_cost,
         bargain_element=bargain_element,
-        grant_date=grant_date
+        grant_date=grant_date,
+        action_date=exercise_date
     )
 
 
@@ -437,7 +438,8 @@ def calculate_nso_exercise_components(
         fmv_at_exercise=current_fmv,
         exercise_cost=exercise_cost,
         bargain_element=bargain_element,
-        grant_date=grant_date
+        grant_date=grant_date,
+        action_date=exercise_date
     )
 
 

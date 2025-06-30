@@ -508,7 +508,7 @@
 - Clear NET WORTH calculation showing total assets minus liabilities
 - Automatic inclusion of crypto and real estate assets from user profile
 
-### Enhanced Cumulative Metrics  
+### Enhanced Cumulative Metrics
 - Restructured charitable impact with hierarchical breakdown:
   - Total Charitable Impact (top-level)
   - Personal Donations (sub-item)
@@ -537,3 +537,38 @@
 - Professional formatting suitable for financial planning discussions
 - Optional detailed analysis available on demand
 - Reduced output clutter while preserving analytical depth
+
+## 2025-06-30
+
+### NSO Tender Offer FMV Fix
+- Fixed NSO exercises during tender offers to use tender price as Fair Market Value instead of 409a price
+- Ensures correct bargain element calculation and cost basis for cashless tender exercises
+- Added test_nso_tender_exercise_fmv.py to verify correct behavior
+
+### CSV Generation Architecture Consolidation
+- Implemented explicit IRS 4-step charitable deduction ordering in AnnualTaxCalculator
+- Added ISO qualifying disposition date calculation utility and ShareLot property
+- Created new component-based CSV generation system with automatic field inclusion
+- Enhanced all component classes with display fields (action_date, action_type, calculator_name)
+- Replaced action_summary.csv with components.csv for better maintainability
+- Updated annual_summary.csv generation to use YearlyState data directly
+- Added CSV generation to run_scenario_analysis.py for complete scenario outputs
+- Created comprehensive tests for new CSV generation and ISO qualifying dates
+- Eliminated flat tax rate calculations in favor of progressive tax brackets throughout
+- Zero-maintenance approach: new fields in components automatically appear in CSVs
+
+### AMT Credit Bug Fix
+- Fixed critical bug where AMT credits could be both generated AND consumed in the same year
+- Corrected logic to compare AMT vs Regular tax before applying any credits
+- Ensures credits are either generated (when paying AMT) OR consumed (when paying regular tax), never both
+- Added test_amt_credit_bug.py to verify correct behavior
+- Added federal_tax_regime column to annual_tax_detail.csv showing "AMT" or "Regular" for each year
+
+### Charitable Carryforward Code Cleanup
+- Removed legacy update_fifo_carryforward function and all associated code (~500 lines)
+- Eliminated save_charitable_carryforward_csv_legacy_removed function (369 lines)
+- Deleted save_charitable_carryforward_comparison_csv function (92 lines)  
+- Consolidated CSV generation to use only CharitableDeductionResult data from annual tax calculator
+- Renamed save_charitable_carryforward_csv_direct to save_charitable_carryforward_csv
+- Fixed test imports and updated test_charitable_carryforward_expiration.py
+- Cleaned up all backup files and obsolete references

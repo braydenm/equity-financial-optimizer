@@ -206,8 +206,8 @@ def test_carryforward_reduces_future_taxes():
         year=2026,
         user_profile=profile,
         w2_income=profile.annual_w2_income,
-        carryforward_cash_deduction=result_year1.charitable_deduction_result.cash_carryforward,
-        ca_carryforward_cash_deduction=result_year1.ca_charitable_deduction_result.cash_carryforward,
+        carryforward_cash_by_creation_year=result_year1.charitable_deduction_result.cash_carryforward_remaining_by_creation_year,
+        ca_carryforward_cash_by_creation_year=result_year1.ca_charitable_deduction_result.cash_carryforward_remaining_by_creation_year,
         include_california=True
     )
 

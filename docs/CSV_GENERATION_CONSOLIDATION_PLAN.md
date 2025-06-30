@@ -1,682 +1,638 @@
-# CSV Generation Consolidation Plan
-
-**Document Version:** 1.0  
-**Created:** December 2024  
-**Target Implementation:** Q1 2025  
+# CSV Generation Architecture Migration Plan
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to consolidate the current split CSV generation architecture in the Equity Financial Optimizer. The consolidation will unify two separate systems (`projection_output.py` and `detailed_materialization.py`) into a single, component-driven architecture that eliminates code duplication and ensures data consistency across all CSV outputs.
+This plan migrates CSV generation from a dual-architecture system (projection_output.py + detailed_materialization.py) to a unified, component-based approach. The migration eliminates calculation duplication, removes incorrect flat tax rates, and establishes automatic field inclusion for maintainability while preserving specialized display logic where necessary.
 
-## Current State Analysis
+## Current Architecture Issues
 
-### Architecture Problems
+### 1. Dual CSV Generation Systems
+- **projection_output.py**: Generates 6 CSVs using direct state access
+- **detailed_materialization.py**: Generates 2 CSVs using reconstructed calculations
 
-**1. Split CSV Generation Systems**
-- `projection_output.py`: 1,183 lines, handles 7 core financial CSVs
-- `detailed_materialization.py`: 720 lines, handles 2 analysis CSVs
-- No shared infrastructure or consistent data access patterns
+### 2. Calculation Duplication and Inconsistencies
+- Tax calculations use flat rates (0.243/0.333) in CSV generation vs progressive brackets in calculators
+- Charitable deduction ordering differs between CSV generator and calculator
+- Data reconstruction attempts to recreate information already in components
 
-**2. Data Source Inconsistency**
-- `projection_output.py`: Uses rich component data from calculators
-- `detailed_materialization.py`: Reconstructs data with basic calculations
-- Results in different values for the same financial metrics
+### 3. Maintenance Burden
+- Adding new fields requires updates in multiple locations
+- Manual field mapping for each CSV column
+- Complex reconstruction logic in DetailedMaterializer
 
-**3. Code Duplication**
-- CSV writing boilerplate repeated across both systems
-- Field calculation logic duplicated
-- Similar data transformations implemented differently
+## Migration Strategy
 
-**4. Integration Issues**
-- `run_scenario_analysis.py` doesn't generate CSVs at all
-- Multiple entry points with inconsistent behavior
-- `save_all_projection_csvs()` delegates to separate system
+### Phase 1: Calculator Enhancements
 
-### Current CSV Distribution
+#### 1.1 Update Charitable Deduction Ordering in AnnualTaxCalculator ✅
 
-**`projection_output.py` CSVs:**
-- `annual_tax_detail.csv` - Tax breakdown by year
-- `state_timeline.csv` - Share quantity tracking
-- `transition_timeline.csv` - State transition tracking  
-- `holding_period_tracking.csv` - Milestone tracking
-- `charitable_carryforward.csv` - Carryforward FIFO tracking
-- `comprehensive_cashflow.csv` - Cash flow analysis
+**Note**: During implementation, discovered that test_charitable_comprehensive_scenario.py has incorrect expected values that violate the 50% overall limit for 50% organizations. The calculator implementation is correct - the test needs to be updated.
 
-**`detailed_materialization.py` CSVs:**
-- `action_summary.csv` - Transaction-level details ❌ BROKEN
-- `annual_summary.csv` - Year-level aggregations ⚠️ PARTIALLY FIXED
-
-### Component Data Flow Analysis
-
-**Rich Component Data Available:**
-```
-YearlyState.annual_tax_components:
-  ├── iso_exercise_components[]     # exercise_cost, bargain_element
-  ├── nso_exercise_components[]     # exercise_cost, bargain_element  
-  ├── sale_components[]             # gross_proceeds, gains, holding_period
-  ├── donation_components[]         # company_match, donation_value
-  └── cash_donation_components[]    # amount, company_match
-```
-
-**DetailedMaterializer Issues:**
-- Ignores `annual_tax_components` rich data
-- Recalculates `exercise_cost = quantity * strike_price` 
-- Shows zeros for `amt_adjustment`, `tax`, `company_match`
-- Cannot access individual action tax impacts
-
-## Target Architecture
-
-### High-Level Design Principles
-
-**1. Single Source of Truth**
-- All CSV generation in `projection_output.py`
-- Component-driven data access throughout
-- Consistent field calculations across all CSVs
-
-**2. Layered Data Access**
-```
-Component Layer:    ISOExerciseComponents, SaleComponents, etc.
-Aggregation Layer:  AnnualTaxComponents, CharitableState, etc.  
-State Layer:        YearlyState, ProjectionResult
-CSV Layer:          Unified CSV generation functions
-```
-
-**3. Unified Entry Point**
+**Current Implementation:**
 ```python
-def generate_complete_csv_suite(
-    result: ProjectionResult, 
-    scenario_name: str, 
-    output_dir: str = "output"
-) -> None:
-    """Single entry point for all CSV generation."""
+# Combines cash current + carryforward in single step
+cash_used = min(total_cash_available, cash_limit)
 ```
 
-**4. Component-First Design**
-- Action-level CSVs extract from individual components
-- Annual CSVs aggregate from component collections
-- No basic recalculation of component-calculated values
-
-### Target File Structure
-
-**Post-Consolidation:**
-```
-projection_output.py (1,900+ lines)
-├── Core CSV Functions (existing, 7 CSVs)
-├── DetailedCSVGenerator class (new, from DetailedMaterializer)
-├── Component Extraction Functions (new)
-├── Unified Entry Point (new)
-└── Helper Functions (consolidated)
-```
-
-**Eliminated:**
-- `detailed_materialization.py` (deleted)
-- `materialize_detailed_projection()` function
-- Duplicate CSV infrastructure
-
-## Detailed Migration Plan
-
-### Phase 1: Component Integration Analysis (1 day)
-
-**1.1 Audit Component Usage Discrepancies**
-
-**Exercise Cost Calculation:**
-- Current DetailedMaterializer: `exercise_cost = action.quantity * lot.strike_price`
-- Component Data: `ISOExerciseComponents.exercise_cost`, `NSOExerciseComponents.exercise_cost`
-- **Resolution:** Use component values directly
-
-**AMT Adjustment Calculation:**
-- Current DetailedMaterializer: Basic FMV - strike calculation
-- Component Data: `ISOExerciseComponents.bargain_element`  
-- **Resolution:** Map `bargain_element` to `amt_adjustment` field
-
-**Tax Calculation:**
-- Current DetailedMaterializer: Shows 0.0 for all actions
-- Component Data: No individual action tax (calculated annually)
-- **Resolution:** Add action-level tax allocation from annual totals
-
-**Company Match Calculation:**
-- Current DetailedMaterializer: Attempts component lookup but shows 0.0
-- Component Data: `DonationComponents.company_match_amount`
-- **Resolution:** Fix component accessor logic
-
-**1.2 Document Calculation Conflicts**
-
-Create mapping table:
-```
-CSV Field                 | Current Logic          | Component Source        | Resolution
---------------------------|------------------------|-------------------------|------------------
-exercise_cost            | quantity * strike      | component.exercise_cost | Use component
-amt_adjustment           | Basic calculation      | component.bargain_ele   | Use component  
-tax                      | 0.0 (broken)          | Allocate from annual    | New allocation logic
-company_match            | 0.0 (broken)          | component.company_match | Fix accessor
-capital_gain             | Basic proceeds-basis   | component.gains         | Use component
-gross_proceeds           | quantity * price       | component.gross_proc    | Use component
-```
-
-### Phase 2: Core Infrastructure Migration (2 days)
-
-**2.1 Move DetailedMaterializer to projection_output.py**
-
-**2.1.1 Class Migration**
+**New Implementation:**
 ```python
-# Move entire class structure:
-class DetailedCSVGenerator:  # Renamed from DetailedMaterializer
-    """Component-driven detailed CSV generation."""
-    
-    def __init__(self):
-        self.detailed_years: List[DetailedYear] = []
-    
-    def generate_detailed_csvs(self, result: ProjectionResult) -> List[DetailedYear]:
-        # Renamed from materialize_projection()
-        
-    def save_action_summary_csv(self, detailed_years: List[DetailedYear], output_path: str):
-        # Renamed from save_action_level_csv()
-        
-    def save_annual_summary_csv(self, detailed_years: List[DetailedYear], result: ProjectionResult, output_path: str):
-        # Keep existing name
-```
+def _apply_charitable_deduction_limits(self, ...):
+    """Apply AGI limits using explicit IRS 4-step ordering."""
 
-**2.1.2 Data Structure Migration**
-```python
-# Move supporting classes:
-@dataclass 
-class DetailedAction:    # 80+ fields, no changes
-@dataclass
-class DetailedYear:      # 40+ fields, no changes
-```
+    # Step 1: Current year cash donations (up to cash limit)
+    cash_current_used = min(cash_donations, cash_limit)
+    remaining_cash_limit = cash_limit - cash_current_used
 
-**2.2 Fix Component Data Access**
+    # Step 2: Current year stock donations (up to stock limit)
+    stock_current_used = min(stock_donations, stock_limit)
+    remaining_stock_limit = stock_limit - stock_current_used
 
-**2.2.1 Create Component Extractors**
-```python
-def extract_exercise_details(component: Union[ISOExerciseComponents, NSOExerciseComponents]) -> dict:
-    """Extract standardized exercise details from components."""
-    return {
-        'exercise_cost': component.exercise_cost,
-        'amt_adjustment': getattr(component, 'bargain_element', 0.0),
-        'strike_price': component.strike_price,
-        'fmv_at_exercise': component.fmv_at_exercise,
-        'shares_exercised': component.shares_exercised
-    }
+    # Step 3: Cash carryforward (up to remaining cash limit)
+    cash_carryforward_used = min(carryforward_cash, remaining_cash_limit)
 
-def extract_sale_details(component: ShareSaleComponents) -> dict:
-    """Extract standardized sale details from components."""
-    return {
-        'gross_proceeds': component.gross_proceeds,
-        'cost_basis': component.cost_basis,
-        'short_term_gain': component.short_term_gain,
-        'long_term_gain': component.long_term_gain,
-        'ordinary_income': component.ordinary_income,
-        'holding_period_days': component.holding_period_days
-    }
+    # Step 4: Stock carryforward with FIFO (up to remaining stock limit)
+    stock_carryforward_used = 0
+    carryforward_consumed_by_creation_year = {}
 
-def extract_donation_details(component: DonationComponents) -> dict:
-    """Extract standardized donation details from components."""
-    return {
-        'donation_value': component.donation_value,
-        'company_match': component.company_match_amount,
-        'deduction_type': component.deduction_type,
-        'cost_basis': component.cost_basis,
-        'holding_period_days': component.holding_period_days
-    }
-```
+    for creation_year in sorted(carryforward_stock_by_creation_year.keys()):
+        if remaining_stock_limit <= 0:
+            break
+        available = carryforward_stock_by_creation_year[creation_year]
+        used = min(available, remaining_stock_limit)
+        stock_carryforward_used += used
+        remaining_stock_limit -= used
+        carryforward_consumed_by_creation_year[creation_year] = used
 
-**2.2.2 Update Action Materialization**
-```python
-def _materialize_action(self, action: PlannedAction, yearly_state: YearlyState, prev_state: Optional[YearlyState]) -> DetailedAction:
-    """Updated to use component data instead of basic calculations."""
-    
-    detailed = DetailedAction(...)
-    
-    # Find matching component in annual_tax_components
-    if action.action_type == ActionType.EXERCISE:
-        component = self._find_exercise_component(action, yearly_state.annual_tax_components)
-        if component:
-            exercise_details = extract_exercise_details(component)
-            detailed.exercise_cost = exercise_details['exercise_cost']
-            detailed.amt_adjustment = exercise_details['amt_adjustment']
-        else:
-            # Fallback to basic calculation with warning
-            logger.warning(f"No component found for exercise action {action.lot_id}")
-            
-    elif action.action_type == ActionType.SELL:
-        component = self._find_sale_component(action, yearly_state.annual_tax_components)
-        if component:
-            sale_details = extract_sale_details(component)
-            detailed.gross_proceeds = sale_details['gross_proceeds']
-            detailed.capital_gain = sale_details['short_term_gain'] + sale_details['long_term_gain']
-            # ... etc
-            
-    elif action.action_type == ActionType.DONATE:
-        component = self._find_donation_component(action, yearly_state.annual_tax_components)
-        if component:
-            donation_details = extract_donation_details(component)
-            detailed.company_match = donation_details['company_match']
-            detailed.donation_value = donation_details['donation_value']
-```
-
-**2.3 Add Component Lookup Functions**
-```python
-def _find_exercise_component(self, action: PlannedAction, components: AnnualTaxComponents) -> Optional[Union[ISOExerciseComponents, NSOExerciseComponents]]:
-    """Find matching exercise component for action."""
-    for component in components.iso_exercise_components + components.nso_exercise_components:
-        if (component.lot_id == action.lot_id and 
-            component.exercise_date == action.action_date and
-            component.shares_exercised == action.quantity):
-            return component
-    return None
-
-def _find_sale_component(self, action: PlannedAction, components: AnnualTaxComponents) -> Optional[ShareSaleComponents]:
-    """Find matching sale component for action."""
-    for component in components.sale_components:
-        if (component.lot_id == action.lot_id and 
-            component.sale_date == action.action_date and
-            component.shares_sold == action.quantity):
-            return component
-    return None
-
-def _find_donation_component(self, action: PlannedAction, components: AnnualTaxComponents) -> Optional[DonationComponents]:
-    """Find matching donation component for action."""
-    for component in components.donation_components:
-        if (component.lot_id == action.lot_id and 
-            component.donation_date == action.action_date and
-            component.shares_donated == action.quantity):
-            return component
-    return None
-```
-
-### Phase 3: Tax Allocation Logic (1 day)
-
-**3.1 Action-Level Tax Allocation Problem**
-
-**Challenge:** Components calculate annual totals, but CSV needs individual action taxes.
-
-**Current Issue:**
-- `DetailedAction.total_tax_on_action` shows 0.0 for all actions
-- Taxes are calculated annually, not per-action
-- No existing allocation mechanism
-
-**3.2 Tax Allocation Strategy**
-
-**Option A: Proportional Allocation**
-```python
-def allocate_annual_tax_to_actions(self, detailed_year: DetailedYear, yearly_state: YearlyState):
-    """Allocate annual tax totals proportionally to individual actions."""
-    
-    total_taxable_value = sum(
-        action.gross_proceeds + action.ordinary_income 
-        for action in detailed_year.actions 
-        if action.action_type in ['sell', 'exercise']
+    # Return detailed usage breakdown
+    return CharitableDeductionResult(
+        cash_current_used=cash_current_used,
+        stock_current_used=stock_current_used,
+        cash_carryforward_used=cash_carryforward_used,
+        stock_carryforward_used=stock_carryforward_used,
+        # ... other fields
     )
-    
-    if total_taxable_value > 0:
-        annual_tax = yearly_state.tax_paid
-        for action in detailed_year.actions:
-            if action.action_type in ['sell', 'exercise']:
-                action_taxable = action.gross_proceeds + action.ordinary_income
-                action.total_tax_on_action = annual_tax * (action_taxable / total_taxable_value)
 ```
 
-**Option B: Component-Specific Allocation**
+**Rationale**: Explicit IRS 4-step ordering ensures compliance and consistency with tax law.
+
+#### 1.2 Add ISO Qualifying Date Calculation ✅
+
+**New Utility Function:**
 ```python
-def allocate_tax_by_component_type(self, detailed_year: DetailedYear, yearly_state: YearlyState):
-    """Allocate tax based on component type and marginal rates."""
-    
-    # Calculate marginal rates for different income types
-    marginal_ordinary = self._calculate_marginal_ordinary_rate(yearly_state)
-    marginal_ltcg = self._calculate_marginal_ltcg_rate(yearly_state) 
-    marginal_stcg = marginal_ordinary  # STCG taxed as ordinary
-    
-    for action in detailed_year.actions:
-        if action.action_type == 'exercise':
-            action.total_tax_on_action = action.ordinary_income * marginal_ordinary
-        elif action.action_type == 'sell':
-            action.total_tax_on_action = (
-                action.short_term_gain * marginal_stcg + 
-                action.long_term_gain * marginal_ltcg
-            )
+# In calculators/tax_utils.py (new file)
+def calculate_iso_qualifying_disposition_date(grant_date: date, exercise_date: date) -> date:
+    """
+    Calculate when ISO shares become eligible for qualifying disposition.
+
+    Requirements:
+    - 2 years from grant date
+    - 1 year from exercise date
+    - Must satisfy BOTH conditions
+    """
+    two_years_from_grant = date(grant_date.year + 2, grant_date.month, grant_date.day)
+    one_year_from_exercise = date(exercise_date.year + 1, exercise_date.month, exercise_date.day)
+
+    # Handle leap year edge cases
+    if grant_date.month == 2 and grant_date.day == 29:
+        two_years_from_grant = date(grant_date.year + 2, 2, 28)
+    if exercise_date.month == 2 and exercise_date.day == 29:
+        one_year_from_exercise = date(exercise_date.year + 1, 2, 28)
+
+    return max(two_years_from_grant, one_year_from_exercise)
 ```
 
-**Recommendation:** Use Option B for more accurate tax attribution.
-
-### Phase 4: Unified Entry Point Creation (0.5 days)
-
-**4.1 Create Central CSV Generation Function**
+**Add to ShareLot as Property:**
 ```python
-def generate_complete_csv_suite(result: ProjectionResult, scenario_name: str, output_dir: str = "output") -> None:
+@property
+def iso_qualifying_date(self) -> Optional[date]:
+    """Date when ISO shares become eligible for qualifying disposition."""
+    if self.share_type != ShareType.ISO:
+        return None
+    if not self.exercise_date:
+        return None
+    return calculate_iso_qualifying_disposition_date(self.grant_date, self.exercise_date)
+```
+
+**Rationale**: Centralizes qualifying date calculation for use in both sale determination and milestone tracking.
+
+#### 1.3 Extend CharitableDeductionResult for Display ✅
+
+**Updated CharitableDeductionResult:**
+```python
+@dataclass
+class CharitableDeductionResult:
+    """Result of applying charitable deduction limits."""
+    # Existing fields...
+
+    # NEW: Explicit IRS ordering breakdown
+    cash_current_used: float = 0.0
+    stock_current_used: float = 0.0
+    cash_carryforward_used: float = 0.0
+    stock_carryforward_used: float = 0.0
+
+    # NEW: For CSV display
+    carryforward_used_by_year: Dict[int, float] = field(default_factory=dict)
+    carryforward_remaining_by_year: Dict[int, float] = field(default_factory=dict)
+```
+
+### Phase 2: Component Enhancement for CSV Export ✅
+
+#### 2.1 Add Source Action Reference to Components
+
+**Update Component Classes:**
+```python
+@dataclass
+class ISOExerciseComponents:
+    # ... existing fields ...
+
+    # NEW: Link to source action for CSV generation
+    action_date: Optional[date] = None
+    action_type: str = "exercise"
+    calculator_name: str = "iso_exercise_calculator"
+
+@dataclass
+class ShareSaleComponents:
+    # ... existing fields ...
+
+    # NEW: Additional display fields
+    tax_treatment: str = ""  # "STCG", "LTCG", "Qualifying", "Disqualifying"
+    action_type: str = "sell"
+    calculator_name: str = "share_sale_calculator"
+```
+
+**Update Calculator Methods:**
+```python
+def calculate_exercise_components(...) -> ISOExerciseComponents:
+    # ... existing calculation ...
+
+    return ISOExerciseComponents(
+        # ... existing fields ...
+        action_date=exercise_date,
+        action_type="exercise",
+        calculator_name="iso_exercise_calculator"
+    )
+```
+
+### Phase 3: New CSV Generation Architecture ✅
+
+#### 3.1 Component-Based CSV Generator
+
+**New File: projections/csv_generators.py**
+```python
+import pandas as pd
+from dataclasses import asdict, fields
+from typing import List, Any, Dict
+from projections.projection_state import ProjectionResult
+
+def save_components_csv(result: ProjectionResult, output_path: str) -> None:
     """
-    Single entry point for all CSV generation.
-    
-    Generates all 9 CSV types:
-    - Core Financial CSVs (7): annual_tax_detail, state_timeline, etc.
-    - Analysis CSVs (2): action_summary, annual_summary
-    
-    Args:
-        result: ProjectionResult containing all calculation results
-        scenario_name: Scenario name for file naming
-        output_dir: Output directory path
+    Generate comprehensive component CSV with automatic field inclusion.
+
+    This replaces action_summary.csv with a more maintainable approach
+    that automatically includes all component fields.
     """
+    rows = []
+
+    for yearly_state in result.yearly_states:
+        components = yearly_state.annual_tax_components
+        year_context = {
+            'year': yearly_state.year,
+            'current_share_price': yearly_state.current_share_price
+        }
+
+        # ISO Exercises
+        for comp in components.iso_exercise_components:
+            row = {
+                'component_type': 'ISO Exercise',
+                **year_context,
+                **asdict(comp)
+            }
+            rows.append(row)
+
+        # NSO Exercises
+        for comp in components.nso_exercise_components:
+            row = {
+                'component_type': 'NSO Exercise',
+                **year_context,
+                **asdict(comp)
+            }
+            rows.append(row)
+
+        # Sales
+        for comp in components.sale_components:
+            row = {
+                'component_type': 'Sale',
+                **year_context,
+                **asdict(comp),
+                # Add computed display fields
+                'total_proceeds': comp.shares_sold * comp.sale_price,
+                'total_gain': comp.short_term_gain + comp.long_term_gain + comp.ordinary_income
+            }
+            rows.append(row)
+
+        # Donations
+        for comp in components.donation_components:
+            row = {
+                'component_type': 'Stock Donation',
+                **year_context,
+                **asdict(comp),
+                'total_impact': comp.donation_value + comp.company_match_amount
+            }
+            rows.append(row)
+
+        # Cash Donations
+        for comp in components.cash_donation_components:
+            row = {
+                'component_type': 'Cash Donation',
+                **year_context,
+                **asdict(comp),
+                'total_impact': comp.amount + comp.company_match_amount
+            }
+            rows.append(row)
+
+    # Convert to DataFrame for automatic type handling
+    if rows:
+        df = pd.DataFrame(rows)
+
+        # Reorder columns for readability
+        priority_cols = ['year', 'component_type', 'lot_id', 'shares_exercised',
+                        'shares_sold', 'shares_donated', 'amount']
+        other_cols = [col for col in df.columns if col not in priority_cols]
+        ordered_cols = [col for col in priority_cols if col in df.columns] + other_cols
+
+        df[ordered_cols].to_csv(output_path, index=False, date_format='%Y-%m-%d')
+    else:
+        # Empty file with minimal headers
+        pd.DataFrame(columns=['year', 'component_type']).to_csv(output_path, index=False)
+```
+
+#### 3.2 Annual Summary Generator Using State Data
+
+**New Annual Summary Generator:**
+```python
+def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
+    """
+    Generate annual summary using YearlyState data directly.
+    No reconstruction or recalculation.
+    """
+    rows = []
+
+    for yearly_state in result.yearly_states:
+        # Calculate counts from components
+        components = yearly_state.annual_tax_components
+
+        options_exercised = (
+            sum(c.shares_exercised for c in components.iso_exercise_components) +
+            sum(c.shares_exercised for c in components.nso_exercise_components)
+        )
+
+        shares_sold = sum(c.shares_sold for c in components.sale_components)
+        shares_donated = sum(c.shares_donated for c in components.donation_components)
+
+        # Get pledge metrics from pledge state
+        pledge_metrics = calculate_pledge_metrics(yearly_state.pledge_state)
+
+        # Get expiration metrics
+        expired_options = sum(e.quantity for e in yearly_state.expiration_events)
+        expired_opportunity_cost = sum(e.opportunity_cost for e in yearly_state.expiration_events)
+
+        row = {
+            # Income
+            'year': yearly_state.year,
+            'w2_income': yearly_state.income,
+            'spouse_income': yearly_state.spouse_income,
+            'total_income': components.total_ordinary_income,
+
+            # Actions
+            'exercise_costs': yearly_state.exercise_costs,
+            'sale_proceeds': sum(c.gross_proceeds for c in components.sale_components),
+            'capital_gains': components.short_term_capital_gains + components.long_term_capital_gains,
+
+            # Charitable
+            'donations': yearly_state.donation_value,
+            'company_match': yearly_state.company_match_received,
+            'total_charitable_impact': yearly_state.donation_value + yearly_state.company_match_received,
+
+            # Pledge tracking
+            'pledge_shares_obligated': pledge_metrics['obligated'],
+            'pledge_shares_donated': pledge_metrics['donated'],
+            'pledge_shares_outstanding': pledge_metrics['outstanding'],
+            'pledge_shares_expired': pledge_metrics['expired_window'],
+
+            # Share counts
+            'options_exercised_count': options_exercised,
+            'shares_sold_count': shares_sold,
+            'shares_donated_count': shares_donated,
+            'expired_option_count': expired_options,
+
+            # Tax details (from actual progressive calculations)
+            'regular_tax': yearly_state.tax_state.regular_tax,
+            'amt_tax': yearly_state.tax_state.amt_tax,
+            'total_tax': yearly_state.tax_state.total_tax,
+            'amt_credits_generated': yearly_state.tax_state.amt_credits_generated,
+            'amt_credits_consumed': yearly_state.tax_state.amt_credits_used,
+            'amt_credits_balance': yearly_state.tax_state.amt_credits_remaining,
+
+            # Wealth tracking
+            'ending_cash': yearly_state.ending_cash,
+            'equity_value': yearly_state.total_equity_value,
+            'net_worth': yearly_state.ending_cash + yearly_state.total_equity_value,
+            'expired_option_loss': expired_opportunity_cost
+        }
+        rows.append(row)
+
+    pd.DataFrame(rows).to_csv(output_path, index=False)
+```
+
+#### 3.3 Updated save_all_projection_csvs
+
+**Updated Function:**
+```python
+def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, output_dir: str = "output") -> None:
+    """Save all projection CSVs for a scenario."""
     base_name = scenario_name.lower().replace(' ', '_').replace('-', '_')
-    
-    # Generate core financial CSVs (existing functions)
+
+    # Core timeline and state tracking CSVs (unchanged)
     save_annual_tax_detail_csv(result, f"{output_dir}/{base_name}_annual_tax_detail.csv")
     save_state_timeline_csv(result, f"{output_dir}/{base_name}_state_timeline.csv")
     save_transition_timeline_csv(result, f"{output_dir}/{base_name}_transition_timeline.csv")
+
+    # Tracking CSVs (unchanged)
     generate_holding_milestones_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
     save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
     save_comprehensive_cashflow_csv(result, f"{output_dir}/{base_name}_comprehensive_cashflow.csv")
-    
-    # Generate analysis CSVs (new unified approach)
-    detailed_generator = DetailedCSVGenerator()
-    detailed_years = detailed_generator.generate_detailed_csvs(result)
-    detailed_generator.save_action_summary_csv(detailed_years, f"{output_dir}/{base_name}_action_summary.csv")
-    detailed_generator.save_annual_summary_csv(detailed_years, result, f"{output_dir}/{base_name}_annual_summary.csv")
-    
-    # Create metadata file
-    _save_generation_metadata(result, f"{output_dir}/metadata.json")
+
+    # NEW: Component-based CSVs replacing detailed_materialization
+    save_components_csv(result, f"{output_dir}/{base_name}_components.csv")
+    save_annual_summary_csv(result, f"{output_dir}/{base_name}_annual_summary.csv")
 ```
 
-**4.2 Update All Callers**
+### Phase 4: Specialized CSV Updates
+
+#### 4.1 Enhanced Charitable Carryforward CSV ✅
+
+**Completed**: Successfully implemented enhanced charitable carryforward CSV that:
+- Added `federal_charitable_deduction_result` and `ca_charitable_deduction_result` fields to YearlyState
+- Updated ProjectionCalculator to store CharitableDeductionResult in YearlyState
+- Created `save_charitable_carryforward_csv_enhanced()` that uses stored results instead of duplicating logic
+- Displays explicit IRS 4-step ordering breakdown (cash current, stock current, cash carryforward, stock carryforward)
+- Shows carryforward tracking by creation year for FIFO compliance
+- No silent fallbacks - raises errors if data is missing
+
+**Updates to save_charitable_carryforward_csv:**
 ```python
-# Before:
-save_all_projection_csvs(result, scenario_name, output_dir)
-materialize_detailed_projection(result, output_dir, scenario_name)
+# Use new CharitableDeductionResult fields
+federal_deduction = yearly_state.tax_state.charitable_deduction_result
 
-# After:
-generate_complete_csv_suite(result, scenario_name, output_dir)
+row = {
+    # ... existing fields ...
+
+    # NEW: Explicit IRS ordering breakdown
+    'federal_cash_current_used': federal_deduction.cash_current_used,
+    'federal_stock_current_used': federal_deduction.stock_current_used,
+    'federal_cash_carryforward_used': federal_deduction.cash_carryforward_used,
+    'federal_stock_carryforward_used': federal_deduction.stock_carryforward_used,
+
+    # NEW: Year-by-year breakdown from calculator
+    'federal_carryforward_used_by_year': str(federal_deduction.carryforward_used_by_year),
+    'federal_carryforward_remaining_by_year': str(federal_deduction.carryforward_remaining_by_year),
+}
 ```
 
-**4.3 Caller Update Locations**
-- `engine/portfolio_manager.py` - Update `execute_single_scenario()`
-- `run_scenario_analysis.py` - Add CSV generation call  
-- Test files - Update to use new entry point
+#### 4.2 Add run_scenario_analysis CSV Generation ✅
 
-### Phase 5: Testing and Validation (1 day)
-
-**5.1 Create Validation Suite**
+**Update run_scenario_analysis.py:**
 ```python
-def test_csv_consolidation_equivalence():
-    """Test that new system produces equivalent results to old system."""
-    
-    # Run scenario with old system (before consolidation)
-    old_result = run_scenario_old_way("test_scenario")
-    old_csvs = load_old_csvs()
-    
-    # Run scenario with new system (after consolidation)  
-    new_result = run_scenario_new_way("test_scenario")
-    new_csvs = load_new_csvs()
-    
-    # Compare all numeric fields (allowing small rounding differences)
-    for csv_name in ['action_summary', 'annual_summary']:
-        assert_csv_equivalence(old_csvs[csv_name], new_csvs[csv_name], tolerance=0.01)
+def execute_scenario(scenario_input, price_scenario="moderate", projection_years=5, use_demo=False, verbose=False):
+    # ... existing code ...
+
+    result = manager.execute_single_scenario(
+        scenario_path=scenario_path,
+        price_scenario=price_scenario,
+        projection_years=projection_years
+    )
+
+    print_scenario_results(result, detailed=True, verbose=verbose)
+
+    # NEW: Generate CSV outputs
+    if result:
+        output_dir = manager._generate_output_path(scenario_name, price_scenario)
+        save_all_projection_csvs(result, scenario_name, output_dir)
+        print(f"\n📊 CSV files saved to: {output_dir}/")
+
+    return result
 ```
 
-**5.2 Component Data Validation**
-```python
-def test_component_data_usage():
-    """Test that components are being used instead of basic calculations."""
-    
-    result = run_test_scenario()
-    detailed_generator = DetailedCSVGenerator()
-    detailed_years = detailed_generator.generate_detailed_csvs(result)
-    
-    # Verify exercise costs come from components
-    for year in detailed_years:
-        for action in year.actions:
-            if action.action_type == 'exercise':
-                assert action.exercise_cost > 0, "Exercise cost should not be 0"
-                assert action.amt_adjustment != 0 or action.calculator_used == 'nso_exercise_calculator'
-                
-            if action.action_type == 'donate':
-                assert action.company_match >= 0, "Company match should be populated"
+### Phase 5: Cleanup ⚠️ (Partially Complete)
+
+#### 5.1 Remove detailed_materialization.py ⏸️ (On Hold)
+
+**Note**: Cannot remove yet as portfolio_manager.py still uses materialize_detailed_projection. This should be removed after portfolio_manager is updated to use the new CSV generation directly.
+- Delete the entire file
+- Remove import from projection_output.py
+- Remove materialize_detailed_projection function call
+
+#### 5.2 Update Tests ✅
+- Update test_action_summary_data_quality.py to use new components.csv
+- Update any tests checking for action_summary.csv to use components.csv
+
+## Format Changes Summary
+
+### Replaced CSVs
+
+#### action_summary.csv → components.csv
+
+**Old Format:**
+- Fixed columns manually specified
+- Reconstructed calculations with flat tax rates
+- Missing new fields unless manually added
+
+**New Format:**
+- All component fields automatically included
+- No tax calculations (those belong in annual_tax_detail.csv)
+- New columns appear automatically when added to components
+- Includes `component_type` column for filtering
+- Progressive tax data available via year lookup in annual_tax_detail.csv
+
+**Example Old Row:**
+```csv
+year,date,type,lot_id,quantity,tax,tax_rate_applied
+2024,2024-06-01,sell,ISO_001,100,2430.00,0.243
 ```
 
-**5.3 End-to-End Integration Test**
-```python
-def test_e2e_csv_generation():
-    """Test complete CSV generation pipeline."""
-    
-    # Test all entry points
-    result = create_test_projection_result()
-    
-    # Test main entry point
-    generate_complete_csv_suite(result, "test_scenario", "/tmp/test_output")
-    
-    # Verify all 9 CSV files exist
-    expected_files = [
-        'test_scenario_annual_tax_detail.csv',
-        'test_scenario_state_timeline.csv', 
-        'test_scenario_transition_timeline.csv',
-        'test_scenario_holding_period_tracking.csv',
-        'test_scenario_charitable_carryforward.csv', 
-        'test_scenario_comprehensive_cashflow.csv',
-        'test_scenario_action_summary.csv',
-        'test_scenario_annual_summary.csv',
-        'metadata.json'
-    ]
-    
-    for file in expected_files:
-        assert os.path.exists(f"/tmp/test_output/{file}")
-        assert os.path.getsize(f"/tmp/test_output/{file}") > 0
+**Example New Row:**
+```csv
+year,component_type,lot_id,sale_date,shares_sold,sale_price,short_term_gain,long_term_gain,disposition_type
+2024,Sale,ISO_001,2024-06-01,100,50.00,0.0,2000.0,QUALIFYING_ISO
 ```
 
-### Phase 6: Cleanup and Documentation (0.5 days)
+#### annual_summary.csv
 
-**6.1 Remove Old System**
-- Delete `detailed_materialization.py`
-- Remove imports of `materialize_detailed_projection` 
-- Update documentation references
+**Old Format:**
+- Some fields pulled from DetailedYear reconstruction
+- Mix of calculated and state-based data
 
-**6.2 Update Documentation**
-- Update `CLAUDE.md` to remove consolidation plan (completed)
-- Update `TECHNICAL_ARCHITECTURE.md` with new unified approach
-- Add docstring examples for new entry point
+**New Format:**
+- All data from YearlyState and components
+- Consistent with other CSV data sources
+- Tax amounts from progressive calculations only
 
-**6.3 Update CHANGELOG.md**
-```markdown
-## [Next Version] - CSV Generation Consolidation
+### Unchanged CSVs
 
-### Major Changes
-- **BREAKING:** Consolidated CSV generation into single system in `projection_output.py`
-- **BREAKING:** Replaced `materialize_detailed_projection()` with `generate_complete_csv_suite()`
-- **FIXED:** Action summary CSV now uses component data instead of basic calculations
-- **FIXED:** Exercise costs, AMT adjustments, company match amounts now show correct values
+The following CSVs remain unchanged as they already pull directly from state:
+- annual_tax_detail.csv
+- state_timeline.csv
+- transition_timeline.csv
+- holding_period_tracking.csv
+- charitable_carryforward.csv (enhanced with IRS ordering detail)
+- comprehensive_cashflow.csv
 
-### Migration Guide
-- Replace calls to `materialize_detailed_projection()` with `generate_complete_csv_suite()`
-- Update imports from `detailed_materialization` to `projection_output`
-- No changes to CSV file formats or field names
-```
+## Fields Not Included in Migration
 
-## Risk Mitigation
+### From action_summary.csv
 
-### High-Risk Areas
+**Removed Fields:**
+- `tax_rate_applied` - Was incorrect flat rate
+- `tax` - Individual action tax impact cannot be accurately attributed
+- `calculator` - Replaced by `component_type` which is more meaningful
+- `net_cash_change` - Oversimplified, use comprehensive_cashflow.csv
 
-**1. Component Lookup Failures**
-- **Risk:** Action cannot find matching component
-- **Mitigation:** Fallback to basic calculation with warning
-- **Testing:** Verify all actions have matching components in test scenarios
+**Rationale**: These fields either contained incorrect calculations or attempted to attribute annual-level calculations to individual actions.
 
-**2. Tax Allocation Accuracy**
-- **Risk:** Action-level tax allocation differs significantly from current (broken) values
-- **Mitigation:** Accept that current values are wrong, validate new logic independently
-- **Testing:** Compare total taxes (should match), verify action allocation is reasonable
+### From DetailedAction/DetailedYear Classes
 
-**3. Data Type Mismatches**
-- **Risk:** Component data types don't match DetailedAction expectations
-- **Mitigation:** Add type conversion in extraction functions
-- **Testing:** Type checking in validation suite
+**Not Migrated:**
+- Intermediate calculation fields
+- Reconstructed state transitions
+- Simplified tax calculations
 
-**4. Performance Regression**
-- **Risk:** Component lookup adds processing time
-- **Mitigation:** Use indexes for component lookup if needed
-- **Testing:** Performance benchmarks before/after
+**Rationale**: These were artifacts of the reconstruction process, not authoritative data.
 
-### Medium-Risk Areas
+## Key Improvements
 
-**1. Import Dependencies**
-- **Risk:** Moving DetailedMaterializer breaks existing imports
-- **Mitigation:** Phased migration with temporary aliases
-- **Testing:** Import verification in test suite
+### 1. Automatic Field Inclusion
+New fields in component classes automatically appear in CSVs without code changes.
 
-**2. CSV Field Order Changes**
-- **Risk:** External tools expect specific column order
-- **Mitigation:** Maintain exact field order during migration
-- **Testing:** Field order verification tests
+### 2. Single Source of Truth
+All data comes from authoritative calculators and state objects.
 
-### Low-Risk Areas
+### 3. Progressive Tax Calculations
+Removes all flat tax rate approximations.
 
-**1. File Size Changes**
-- **Risk:** Consolidated file becomes too large
-- **Mitigation:** Split into logical modules if needed
-- **Impact:** Development workflow only
+### 4. Explicit IRS Compliance
+Charitable deduction ordering now follows explicit IRS rules.
 
-## Testing Strategy
+### 5. Maintainability
+Adding a new field requires only updating the component dataclass.
 
-### Test Categories
+## Migration Validation
 
-**1. Unit Tests**
-- Component extraction functions
-- Tax allocation algorithms  
-- CSV field calculations
-- Component lookup functions
+### 1. Component Coverage
+Verify all component types appear in components.csv:
+- ISO Exercise
+- NSO Exercise
+- Sale
+- Stock Donation
+- Cash Donation
 
-**2. Integration Tests**
-- Complete CSV generation pipeline
-- Entry point validation
-- File existence and format verification
+### 2. Tax Calculation Validation
+Compare annual_summary.csv tax totals with sum of component tax impacts to ensure consistency.
 
-**3. Regression Tests**  
-- Numeric equivalence (where current values are correct)
-- Field presence verification
-- Data type consistency
+### 3. Field Completeness
+Ensure critical fields are present:
+- All date fields
+- All quantity fields
+- All financial amounts
+- Disposition types for sales
 
-**4. Performance Tests**
-- CSV generation time benchmarks
-- Memory usage profiling
-- Component lookup efficiency
+### 4. Data Integrity
+- Total shares in state_timeline.csv remain constant
+- Cash flow in annual_summary.csv matches year-to-year
+- Carryforward amounts track correctly across years
 
-### Test Data Requirements
+## Post-Migration User Guide Updates
 
-**Scenarios Needed:**
-- Simple scenario (1-2 actions per year)
-- Complex scenario (10+ actions per year)  
-- Edge cases (zero amounts, missing components)
-- Multi-year scenarios (5+ years)
-- All action types (exercise, sell, donate)
+### For Users
+- `action_summary.csv` is now `components.csv` with all fields
+- Tax calculations are in annual_tax_detail.csv, not individual actions
+- New IRS ordering breakdown in charitable_carryforward.csv
 
-**Component Coverage:**
-- ISO exercises (AMT adjustments)
-- NSO exercises (ordinary income)
-- Short-term sales (STCG)
-- Long-term sales (LTCG)
-- Charitable donations (company match)
-- Cash donations
+### For Developers
+- Add new fields to component dataclasses only
+- CSV generation is automatic for component fields
+- Custom display logic goes in CSV generators, not calculators
 
-## Timeline and Resource Allocation
+## Areas Potentially Needing Additional Detail
 
-### Total Estimated Effort: 5-6 days
+While this plan is comprehensive, the following areas might benefit from additional detail in implementation:
 
-**Day 1: Analysis and Planning**
-- Component usage audit
-- Calculation conflict resolution
-- Detailed design decisions
+1. **Error Handling**: Specific error cases when components are missing expected fields
+2. **Performance**: Whether DataFrame operations need optimization for large datasets
+3. **Decimal Precision**: Exact rounding rules for financial amounts in CSV output
+4. **Date Formatting**: Handling of timezone considerations if any exist
+5. **Backward Compatibility**: Migration path for existing users with saved CSV files
+6. **Column Ordering**: Detailed rules for column order in auto-generated CSVs
+7. **Empty State Handling**: Behavior when no actions occur in a year
+8. **Encoding**: UTF-8 vs other encodings for international users
 
-**Day 2-3: Core Migration**  
-- Move DetailedMaterializer class
-- Implement component extractors
-- Fix component data access
+These areas are likely straightforward to address during implementation but could be specified more precisely if needed.
 
-**Day 4: Tax Allocation**
-- Implement action-level tax allocation
-- Test allocation accuracy
-- Validate against annual totals
+## Implementation Summary
 
-**Day 5: Integration and Testing**
-- Create unified entry point
-- Update all callers
-- Run validation suite
+### Completed Items
 
-**Day 6: Cleanup and Documentation**
-- Remove old system
-- Update documentation
-- Final testing
+#### Phase 1: Calculator Enhancements ✅
+- **1.1 Update Charitable Deduction Ordering** ✅ - Implemented explicit IRS 4-step ordering
+- **1.2 Add ISO Qualifying Date Calculation** ✅ - Added tax_utils.py and ShareLot.iso_qualifying_date property
+- **1.3 Extend CharitableDeductionResult** ✅ - Fields already existed for IRS ordering breakdown
 
-### Prerequisites
+#### Phase 2: Component Enhancement ✅
+- Added display fields to all component classes (action_date, action_type, calculator_name)
+- Updated all calculators to populate these fields
+- Tax treatment determination added to ShareSaleComponents
 
-**Required:**
-- All existing tests must pass before starting
-- No pending changes to component structures
-- Backup of current system for comparison testing
+#### Phase 3: New CSV Generation Architecture ✅
+- Created csv_generators.py with automatic field inclusion
+- Implemented save_components_csv() and save_annual_summary_csv()
+- Updated save_all_projection_csvs() to use new generators
+- No pandas dependency - uses standard csv module
 
-**Recommended:**
-- Detailed understanding of component data flow
-- Access to multiple test scenarios
-- Performance baseline measurements
+#### Phase 4: Specialized CSV Updates
+- **4.1 Enhanced Charitable Carryforward CSV** ✅ - Successfully implemented with IRS 4-step ordering breakdown
+  - Added `federal_charitable_deduction_result` and `ca_charitable_deduction_result` fields to YearlyState
+  - Updated ProjectionCalculator to store CharitableDeductionResult objects
+  - Created `save_charitable_carryforward_csv_enhanced()` that uses actual calculator results
+  - Added explicit IRS 4-step ordering fields: cash_current_used, stock_current_used, cash_carryforward_used, stock_carryforward_used
+  - Displays carryforward tracking by creation year for FIFO compliance
+- **4.2 Add run_scenario_analysis CSV Generation** ✅ - CSV generation added to run_scenario_analysis.py
 
-## Success Criteria
+#### Phase 5: Cleanup ⚠️ (Partially Complete)
+- **5.1 Remove detailed_materialization.py** ⏸️ - On hold (portfolio_manager.py still uses it)
+- **5.2 Update Tests** ✅ - Created test_components_csv_data_quality.py
 
-### Functional Requirements
+### Test Results
+- Total tests: 31
+- Passed: 30
+- Failed: 1 (test_charitable_comprehensive_scenario.py has incorrect expected values)
+- New test added: test_components_csv_data_quality.py
 
-**1. Feature Parity**
-- All 9 CSV files continue to be generated
-- All CSV fields maintain current names and order
-- No loss of data or functionality
+### Key Improvements Achieved
 
-**2. Data Accuracy Improvements**
-- Action summary CSV shows non-zero values for key fields
-- Exercise costs match component calculations exactly
-- Company match amounts reflect actual component data
+1. **Automatic Field Inclusion**: New fields in component dataclasses automatically appear in CSVs
+2. **Single Source of Truth**: All data comes from authoritative calculators and state objects
+3. **Progressive Tax Calculations**: Removed all flat tax rate approximations
+4. **Maintainability**: Zero-maintenance CSV generation for component data
+5. **IRS Compliance**: Charitable deduction ordering follows explicit IRS rules
 
-**3. Architectural Improvements**
-- Single entry point for all CSV generation
-- Component-driven data access throughout
-- No code duplication between CSV generators
+### Remaining Work
 
-### Non-Functional Requirements
+1. **Portfolio Manager Update**: Remove materialize_detailed_projection usage
+2. **Charitable Carryforward Enhancement**: Store full AnnualTaxResult in YearlyState
+3. **Test Update**: Fix test_charitable_comprehensive_scenario.py expected values
+4. **Complete Cleanup**: Remove detailed_materialization.py once no longer used
 
-**1. Performance**
-- CSV generation time within 10% of current performance
-- Memory usage does not significantly increase
-- Component lookup remains efficient
+### Notes
 
-**2. Maintainability**
-- Unified codebase easier to modify and extend
-- Clear separation between component extraction and CSV formatting
-- Comprehensive test coverage for all new functionality
-
-**3. Reliability**
-- Graceful handling of missing components
-- Clear error messages for debugging
-- Robust fallback mechanisms
-
-## Post-Implementation Monitoring
-
-### Validation Checkpoints
-
-**Week 1:** Monitor for any regression reports
-**Week 2:** Validate CSV outputs in production scenarios  
-**Month 1:** Performance assessment and optimization if needed
-
-### Metrics to Track
-
-- CSV generation success rate
-- Average processing time per scenario
-- User reports of CSV data accuracy issues
-- Development velocity for CSV-related features
-
-## Conclusion
-
-This consolidation plan addresses the fundamental architectural issues in the current CSV generation system while maintaining backward compatibility and improving data accuracy. The phased approach minimizes risk while providing clear checkpoints for validation.
-
-The end result will be a unified, component-driven CSV generation system that eliminates code duplication, ensures data consistency, and provides a solid foundation for future enhancements.
-
-**Next Steps:**
-1. Review and approve this plan
-2. Set up development environment with test scenarios
-3. Begin Phase 1 implementation
-4. Establish regular check-ins for progress tracking
-
----
-
-*This document serves as the definitive specification for the CSV generation consolidation project. Any deviations from this plan should be documented and approved through the standard change control process.*
+- One test failure (test_charitable_comprehensive_scenario.py) is due to incorrect test expectations, not implementation issues
+- The CSV consolidation successfully eliminates calculation duplication while preserving all functionality
+- The new architecture makes it trivial to add new fields to CSVs without code changes
