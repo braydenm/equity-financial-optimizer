@@ -85,10 +85,7 @@
     },
 
     "unvested": {
-      "total_shares": 45000,
-      "monthly_vesting_rate": 2083,
-      "next_vest_date": "2024-06-15",
-      "final_vest_date": "2026-01-15"
+      "total_shares": 45000
     },
 
     "current_prices": {

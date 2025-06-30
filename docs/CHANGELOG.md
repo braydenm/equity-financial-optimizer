@@ -572,3 +572,15 @@
 - Renamed save_charitable_carryforward_csv_direct to save_charitable_carryforward_csv
 - Fixed test imports and updated test_charitable_carryforward_expiration.py
 - Cleaned up all backup files and obsolete references
+
+### README Redesign for Alpha Testing
+- Completely restructured README.md with linear onboarding flow optimized for new user alpha testing
+- Moved from feature-comprehensive documentation to step-by-step user journey approach
+- Created 2-minute quick win demo experience using safe example data before real data setup
+- Enhanced security messaging to address data privacy concerns upfront for financial information
+- Reorganized flow: Quick Demo → Security → Real Data → Results Understanding → Custom Strategies → Advanced Features
+- Updated scenario format documentation from CSV to JSON to match actual implementation
+- Added practical insights from real usage (60+ actions over 10 years) for credibility with alpha testers
+- Streamlined command examples and removed decision paralysis from quick start section
+- Enhanced strategy explanations with practical impact descriptions and realistic expectations
+- Positioned tool for alpha testing feedback collection to improve user experience

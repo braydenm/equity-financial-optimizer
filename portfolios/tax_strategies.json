@@ -4,9 +4,7 @@
   "scenarios": [
     "000_natural_evolution",
     "001_exercise_all_vested",
-    "002_tender_and_donate",
-    "007_personalized_comprehensive_strategy",
-    "008_personalized_strategy"
+    "002_tender_and_donate"
   ],
   "price_scenario": "moderate",
   "projection_years": 10,
@@ -15,8 +13,6 @@
     "1. Natural Evolution - baseline do-nothing scenario",
     "2. Exercise All Vested - immediate exercise to start LTCG clock",
     "3. Tender and Donate - balanced liquidity and charity approach",
-    "4. Personalized Comprehensive - conservative exercise amounts, early sales for house fund",
-    "5. Personalized Strategy - optimized exercise timing, better option expiration management",
-    "Both personalized strategies focus on AMT credit consumption, 3-year donation windows, and house funding with no opportunity loss."
+    "Both personalized strategies focus on AMT credit consumption, 3-year donation windows, with no opportunity loss."
   ]
 }
