@@ -495,9 +495,36 @@
 
 ### Production Validation
 - Verified multi-year FIFO tracking (e.g., 2026 uses $178K current + $10K carryforward = $188K total)
-- Confirmed proper carryforward accumulation and expiration across 15-year projections
+- Confirmed proper carryforward accumulation and expiration across all projected years
 - Federal and CA calculations produce identical results (as expected for current tax law)
 - All carryforward logic works seamlessly with existing projection and CSV generation systems
+
+## IPO-Triggered Pledge Obligation Tracking
+
+### Fixed Zero-Donation Pledge Reporting
+- Scenarios with $0 donations now correctly show expired pledge obligations
+- Added IPO-triggered pledge creation when reaching assumed IPO date
+- Calculates total grant pledge requirement (e.g., 50% of all shares) minus already-obligated shares
+- Sets deadline to IPO + 1 year per typical pledge agreements
+
+### Implementation Details
+- IPO obligations created in `projection_calculator.py` during year processing
+- For 50% pledges: uses simple `shares_sold = shares_required` approach
+- For other percentages: applies formula `shares_sold = shares_required * (1 - pledge_pct) / pledge_pct`
+- Reuses existing `PledgeObligation` infrastructure without breaking changes
+
+### Portfolio Reporting Enhancements
+- Enhanced comparison table to show expired pledge shares prominently
+- Removed redundant "pledge outstanding" column, kept only "pledge expired"
+- Natural Evolution scenarios now show true cost (e.g., 60,000 expired shares for test data)
+- Users can see millions in lost company match opportunities
+
+### Testing & Validation
+- Added comprehensive test coverage in `test_ipo_pledge_zero_donations.py`
+- Tests verify zero donations result in full pledge expiration
+- Tests verify pre-IPO sales reduce IPO obligation amount
+- Tests verify donations after deadline don't reduce expired count
+- All tests pass with sanitized example data (120,000 total shares)
 
 ## Enhanced Scenario Summary Format and Verbose Control
 

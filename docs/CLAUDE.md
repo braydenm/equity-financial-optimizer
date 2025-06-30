@@ -45,12 +45,12 @@ for actual tax calculations using progressive brackets (not flat rates).
 **Use discovery questions** - Ask about constraints and risk tolerance rather than assuming
 
 ## Technical Standards
-- Python 3 with type hints throughout
+- python3 (don't try pytest)
 - Decimal for monetary precision
 - ISO 8601 dates
 - Comprehensive docstrings with examples
 - Error messages user-friendly and actionable
-- No external dependencies beyond numpy/pandas
+- No external dependencies
 
 ## Data Flow
 1. User profile (JSON) → loaders → ShareLot objects
@@ -113,12 +113,6 @@ equity-financial-optimizer/
 2. **projections/projection_calculator.py** - Multi-year scenario evaluation demonstrating the event processing pipeline
 3. **engine/portfolio_manager.py** - Scenario execution orchestration showing how everything ties together
 
-## Architecture Documentation
-- TECHNICAL_ARCHITECTURE.md - System design and data flow
-- CHANGELOG.md - Complete feature history
-- PROJECT_SPEC.md - Original requirements
-- DATA_CONTRACT.md - Profile format specification
-
 ## Current Status & Backlog
 
 ### Project Status
@@ -147,7 +141,6 @@ See CHANGELOG.md for complete feature history and implementation details.
 
 **Immediate Opportunities:**
 - Real-world scenario validation with users to stress-test edge cases
-- CSV generation architecture consolidation (detailed in consolidation plan below)
 
 ### Known Issues
 - CA AMT credit tracking not implemented (see TODO comment in annual_tax_calculator.py for future implementation when use cases arise)
@@ -162,46 +155,3 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
-- Fix broken CSV columns in annual_summary.csv (detailed_materialization.py lines 609-667):
-  - `company_match` (line 639): Currently sums from individual actions but should use `yearly_state.company_match_received` 
-  - `amt_credits_consumed` (line 649): Uses placeholder value but should use `yearly_state.tax_state.amt_credits_used`
-  - `amt_credits_balance` (line 650): Uses placeholder value but should use `yearly_state.tax_state.amt_credits_remaining`
-  - `expired_option_count` (line 651): Uses placeholder value but should sum quantities from `yearly_state.expiration_events`
-
-### CSV Generation Architecture Consolidation Plan
-
-**Current Architecture Issues**:
-1. CSV generation split between `projection_output.py` and `detailed_materialization.py`
-2. Multiple entry points with inconsistent CSV generation
-3. `run_scenario_analysis.py` doesn't generate CSVs at all
-
-**Current Split**:
-- `projection_output.py`: Core financial CSVs (cashflow, tax, equity, charitable, pledge)
-- `detailed_materialization.py`: Analysis CSVs (action_summary, annual_summary)
-
-**Consolidation Plan**:
-
-**Phase 1: Unify CSV Generation Functions**
-1. Move `DetailedMaterializer` class from `detailed_materialization.py` to `projection_output.py`
-2. Rename methods for consistency:
-   - `save_action_level_csv()` → `save_action_summary_csv()`
-   - `save_annual_summary_csv()` → keep as is
-3. Update `save_all_projection_csvs()` to directly call these methods instead of delegating to `materialize_detailed_projection()`
-
-**Phase 2: Standardize Entry Points**
-1. Create `generate_complete_csv_suite()` as the single entry point
-2. Update all callers:
-   - `portfolio_manager.py`: Already uses `save_all_projection_csvs()`
-   - `run_scenario_analysis.py`: Add CSV generation after projection
-   - Test files: Use the unified entry point
-
-**Phase 3: Clean Up Architecture**
-1. Delete `detailed_materialization.py` after moving all functionality
-2. Consolidate duplicate CSV field calculations
-3. Standardize CSV field naming conventions
-
-**Migration Strategy**:
-1. Add deprecation notices to `detailed_materialization.py`
-2. Create parallel implementation in `projection_output.py`
-3. Update callers one by one with tests
-4. Remove old implementation once all callers migrated
