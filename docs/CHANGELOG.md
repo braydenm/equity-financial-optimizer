@@ -459,8 +459,8 @@
 ### IRS-Compliant Charitable Deduction Ordering
 - Implemented correct IRS charitable deduction waterfall ordering in `projection_output.py`:
   1. Current Year Cash Contributions (60% AGI limit)
-  2. Current Year Stock Contributions (30% AGI limit)
-  3. Cash Carryforward from Prior Years (remaining 60% limit)
+  2. Cash Carryforward from Prior Years (remaining 60% limit)
+  3. Current Year Stock Contributions (30% AGI limit, or 50% )
   4. Stock Carryforward from Prior Years (remaining 30% limit)
 - Replaced incorrect ratio-based splitting logic with proper step-by-step AGI limits
 - Added comprehensive test validation covering all ordering scenarios and edge cases
@@ -538,6 +538,18 @@
 - Optional detailed analysis available on demand
 - Reduced output clutter while preserving analytical depth
 
+### README Redesign for Alpha Testing
+- Completely restructured README.md with linear onboarding flow optimized for new user alpha testing
+- Moved from feature-comprehensive documentation to step-by-step user journey approach
+- Created 2-minute quick win demo experience using safe example data before real data setup
+- Enhanced security messaging to address data privacy concerns upfront for financial information
+- Reorganized flow: Quick Demo → Security → Real Data → Results Understanding → Custom Strategies → Advanced Features
+- Updated scenario format documentation from CSV to JSON to match actual implementation
+- Added practical insights from real usage (60+ actions over 10 years) for credibility with alpha testers
+- Streamlined command examples and removed decision paralysis from quick start section
+- Enhanced strategy explanations with practical impact descriptions and realistic expectations
+- Positioned tool for alpha testing feedback collection to improve user experience
+
 ## 2025-06-30
 
 ### NSO Tender Offer FMV Fix
@@ -567,20 +579,8 @@
 ### Charitable Carryforward Code Cleanup
 - Removed legacy update_fifo_carryforward function and all associated code (~500 lines)
 - Eliminated save_charitable_carryforward_csv_legacy_removed function (369 lines)
-- Deleted save_charitable_carryforward_comparison_csv function (92 lines)  
+- Deleted save_charitable_carryforward_comparison_csv function (92 lines)
 - Consolidated CSV generation to use only CharitableDeductionResult data from annual tax calculator
 - Renamed save_charitable_carryforward_csv_direct to save_charitable_carryforward_csv
 - Fixed test imports and updated test_charitable_carryforward_expiration.py
 - Cleaned up all backup files and obsolete references
-
-### README Redesign for Alpha Testing
-- Completely restructured README.md with linear onboarding flow optimized for new user alpha testing
-- Moved from feature-comprehensive documentation to step-by-step user journey approach
-- Created 2-minute quick win demo experience using safe example data before real data setup
-- Enhanced security messaging to address data privacy concerns upfront for financial information
-- Reorganized flow: Quick Demo → Security → Real Data → Results Understanding → Custom Strategies → Advanced Features
-- Updated scenario format documentation from CSV to JSON to match actual implementation
-- Added practical insights from real usage (60+ actions over 10 years) for credibility with alpha testers
-- Streamlined command examples and removed decision paralysis from quick start section
-- Enhanced strategy explanations with practical impact descriptions and realistic expectations
-- Positioned tool for alpha testing feedback collection to improve user experience
