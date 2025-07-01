@@ -17,9 +17,6 @@
     "013_cashless_tender_iso_reinvestment",
     "014_optimized_cashless_tender_strategy",
     "015_fully_optimized_strategy",
-    "016_optimizer_best_enhanced",
-    "016_optimizer_best_v1",
-    "020_manual_date_constrained_balanced",
     "021_manual_date_constrained_match_focused",
     "022_constrained_balanced_v2",
     "023_constrained_match_focused_v2",
@@ -44,11 +41,31 @@
     "106_superior_cashflow_optimized",
     "107_superior_deduction_timing_perfect",
     "108_superior_amt_zero",
-    "109_superior_max_value_creation"
+    "109_superior_max_value_creation",
+    "110_superior_adaptive_wealth_max",
+    "111_superior_match_optimized",
+    "112_superior_tax_efficient_wealth",
+    "200_hybrid_aggressive_charitable_optimized",
+    "201_brayden_comprehensive_plan_v4",
+    "202_brayden_comprehensive_plan_v5",
+    "203_brayden_comprehensive_plan_v5_simple",
+    "204_brayden_comprehensive_plan_v5_clean",
+    "205_brayden_comprehensive_plan_v6",
+    "206_brayden_comprehensive_plan_v7",
+    "207_brayden_comprehensive_plan_v8",
+    "208_brayden_comprehensive_plan_v9",
+    "209_2025_iso_exercise_analysis",
+    "210_2026_iso_exercise_delay",
+    "211_tender_only_no_iso",
+    "212_optimized_reduced_losses",
+    "213_zero_expiration_optimized",
+    "214_zero_expiration_max_deduction",
+    "300_pledge_commitment_maximized",
+    "302_pledge_fulfillment_clean"
   ],
   "price_scenario": "moderate",
-  "projection_years": 10,
+  "projection_years": 15,
   "notes": [
-    "Basic execution of entire portfolio of strategies."
+    "Comprehensive execution of all available strategies including 200+ series scenarios."
   ]
 }
