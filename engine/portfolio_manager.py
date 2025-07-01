@@ -433,8 +433,18 @@ class PortfolioManager:
         if action_type == ActionType.EXERCISE:
             # Check if this is a special lot ID for unexercised options
             if lot_id in ['ISO', 'NSO', 'RSU']:
-                # For unexercised options, we don't need to check tender price
-                # The projection calculator will handle the FMV determination
+                # For NSO exercises, still need to check tender price
+                if lot_id == 'NSO':
+                    tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
+                    tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
+                    
+                    if tender_date and tender_price:
+                        tender_date_obj = date.fromisoformat(tender_date)
+                        # If exercising within 30 days of tender, use tender price as FMV
+                        if abs((action_date - tender_date_obj).days) <= 30:
+                            return tender_price
+                
+                # For ISO/RSU or if no tender price applies, let projection calculator handle it
                 return None
             
             # For NSO exercises, check if we should use tender price as FMV

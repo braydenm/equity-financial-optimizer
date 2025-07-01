@@ -57,27 +57,22 @@ def test_tender_nso_exercise_fmv():
                 "total_shares": 10000,
                 "strike_price": 10.0,
                 "vesting_start_date": "2023-01-01",
-                "vesting_schedule": "4_year_monthly_with_cliff",
-                "cliff_months": 12,
                 "expiration_date": "2033-01-01",
                 "charitable_program": {
                     "pledge_percentage": 0.0,
                     "company_match_ratio": 0.0
+                },
+                "vesting_status": {
+                    "vested_unexercised": {
+                        "nso": 5000
+                    },
+                    "unvested": {
+                        "total_shares": 5000,
+                        "vesting_calendar": []
+                    }
                 }
             }],
             "exercised_lots": [],
-            "vested_unexercised": {
-                "total_shares": 5000,
-                "iso_shares": 0,
-                "nso_shares": 5000,
-                "rsu_shares": 0
-            },
-            "unvested": {
-                "total_shares": 5000,
-                "monthly_vesting_rate": 208,
-                "next_vest_date": "2025-07-01",
-                "final_vest_date": "2027-01-01"
-            },
             "current_prices": {
                 "last_409a_price": 25.0,
                 "last_409a_date": "2024-12-01",
