@@ -50,7 +50,7 @@ def test_tender_nso_exercise_fmv():
         },
         "equity_position": {
             "company": "Test Company",
-            "original_grants": [{
+            "grants": [{
                 "grant_id": "GRANT-001",
                 "grant_date": "2023-01-01",
                 "type": "NSO",

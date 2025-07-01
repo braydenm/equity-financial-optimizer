@@ -4,14 +4,12 @@
     "created_date": "2024-01-01",
     "last_updated": "2024-01-01"
   },
-
   "personal_information": {
     "tax_filing_status": "married_filing_jointly",
     "state_of_residence": "California",
     "age": 35,
     "spouse_age": 32,
     "dependents_count": 2,
-
     "federal_tax_rate": 0.37,
     "federal_ltcg_rate": 0.2,
     "state_tax_rate": 0.093,
@@ -20,7 +18,6 @@
     "additional_medicare_rate": 0.009,
     "niit_rate": 0.038
   },
-
   "income": {
     "annual_w2_income": 350000,
     "spouse_w2_income": 150000,
@@ -29,27 +26,49 @@
     "dividend_income": 12000,
     "other_income": 0
   },
-
   "equity_position": {
     "company": "Tech Company",
-
-    "original_grants": [
+    "grants": [
       {
         "grant_id": "GRANT-001",
         "grant_date": "2022-01-15",
         "type": "ISO",
-        "total_shares": 100000,
         "strike_price": 2.5,
         "vesting_start_date": "2022-01-15",
-        "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12,
         "charitable_program": {
           "pledge_percentage": 0.5,
           "company_match_ratio": 3.0
+        },
+        "isos": 50000,
+        "nsos": 50000,
+        "total_options": 100000,
+        "expiration_date": "2032-01-15",
+        "vesting_status": {
+          "vested_unexercised": {
+            "iso": 20000,
+            "nso": 27917
+          },
+          "unvested": {
+            "total_shares": 27083,
+            "vesting_calendar": [
+              {"date": "2025-01-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-02-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2025-03-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-04-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2025-05-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-06-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2025-07-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-08-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2025-09-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-10-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2025-11-15", "shares": 2083, "share_type": "ISO"},
+              {"date": "2025-12-15", "shares": 2083, "share_type": "NSO"},
+              {"date": "2026-01-15", "shares": 2084, "share_type": "ISO"}
+            ]
+          }
         }
       }
     ],
-
     "exercised_lots": [
       {
         "lot_id": "LOT-001",
@@ -76,18 +95,6 @@
         "amt_adjustment": 0
       }
     ],
-
-    "vested_unexercised": {
-      "total_shares": 30000,
-      "iso_shares": 20000,
-      "nso_shares": 10000,
-      "rsu_shares": 0
-    },
-
-    "unvested": {
-      "total_shares": 45000
-    },
-
     "current_prices": {
       "last_409a_price": 25.0,
       "last_409a_date": "2024-01-01",
@@ -96,16 +103,12 @@
       "expected_409a_date": "2024-07-01"
     }
   },
-
   "tax_situation": {
-    "prior_year_taxes": {
-      "year": 2023,
-      "agi": 450000,
-      "total_tax_paid": 180000,
-      "amt_paid": 15000,
-      "effective_rate": 0.4
+    "estimated_taxes": {
+      "quarterly_payments": 0,
+      "regular_income_withholding_rate": 0.35,
+      "supplemental_income_withholding_rate": 0.33
     },
-
     "carryforwards": {
       "amt_credit": 15000,
       "capital_loss": 0,
@@ -116,14 +119,6 @@
     "regular_income_withholding_rate": "35% (Example Rate) = Federal Income Tax (varies by bracket) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Tax (varies by state) + State SDI (varies by state)",
     "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)"
   },
-  "tax_situation": {
-    "estimated_taxes": {
-      "quarterly_payments": 0,
-      "regular_income_withholding_rate": 0.35,
-      "supplemental_income_withholding_rate": 0.33
-    }
-  },
-
   "financial_position": {
     "liquid_assets": {
       "cash": 60000,
@@ -132,26 +127,22 @@
       "crypto": 100000,
       "total": 1110000
     },
-
     "illiquid_assets": {
       "real_estate_equity": 300000,
       "private_investments": 0,
       "unvested_equity_value": 1125000
     },
-
     "liabilities": {
       "mortgage": 500000,
       "other_debt": 0,
       "total": 500000
     },
-
     "monthly_cash_flow": {
       "income": 41667,
       "expenses": 16500,
       "savings": 25167
     }
   },
-
   "goals_and_constraints": {
     "primary_goals": [
       {
@@ -166,18 +157,15 @@
         "amount_needed": 400000
       }
     ],
-
     "liquidity_needs": {
       "emergency_fund": 100000,
       "near_term_cash": 200000,
       "exercise_reserves": 100000,
       "tax_reserves": 150000
     },
-
     "risk_tolerance": "moderate",
     "concentration_limit": 0.5,
     "time_horizon_years": 10
   },
-
   "assumed_ipo": "2033-03-24"
 }

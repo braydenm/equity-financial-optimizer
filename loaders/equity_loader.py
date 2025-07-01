@@ -86,67 +86,126 @@ class EquityLoader:
     def _load_vested_unexercised(self, equity_position: Dict[str, Any]) -> List[ShareLot]:
         """Load currently vested but unexercised options."""
         lots = []
-        vested = equity_position.get('vested_unexercised', {})
-
-        # Get strike price from original grants
-        strike_price = self._get_strike_price_from_grants(equity_position)
-        expiration_date = self._get_expiration_date_from_grants(equity_position)
-        grant_date = self._get_grant_date_from_grants(equity_position)
-        grant_id = self._get_grant_id_from_grants(equity_position)
-
-        # ISO shares
-        if vested.get('iso_shares', 0) > 0:
-            lots.append(ShareLot(
-                lot_id='ISO',
-                share_type=ShareType.ISO,
-                quantity=vested['iso_shares'],
-                strike_price=strike_price,
-                grant_date=grant_date,
-                exercise_date=None,
-                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA,
-                expiration_date=expiration_date,
-                grant_id=grant_id
-            ))
-
-        # NSO shares
-        if vested.get('nso_shares', 0) > 0:
-            lots.append(ShareLot(
-                lot_id='NSO',
-                share_type=ShareType.NSO,
-                quantity=vested['nso_shares'],
-                strike_price=strike_price,
-                grant_date=grant_date,
-                exercise_date=None,
-                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA,
-                expiration_date=expiration_date,
-                grant_id=grant_id
-            ))
-
-        # RSU shares (if any vested but not released)
-        if vested.get('rsu_shares', 0) > 0:
-            lots.append(ShareLot(
-                lot_id='VESTED_RSU',
-                share_type=ShareType.RSU,
-                quantity=vested['rsu_shares'],
-                strike_price=0.0,  # RSUs have no strike price
-                grant_date=grant_date,
-                exercise_date=None,
-                lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
-                tax_treatment=TaxTreatment.NA,
-                expiration_date=None,  # RSUs don't expire
-                grant_id=grant_id
-            ))
+        
+        # Process each grant
+        for grant in equity_position.get('grants', []):
+            vesting_status = grant.get('vesting_status', {})
+            vested = vesting_status.get('vested_unexercised', {})
+            
+            # Skip if no vested unexercised shares
+            if not vested:
+                continue
+                
+            # Get grant details
+            strike_price = grant.get('strike_price', 0.0)
+            grant_date = datetime.fromisoformat(grant['grant_date']).date() if 'grant_date' in grant else None
+            expiration_date = datetime.fromisoformat(grant['expiration_date']).date() if 'expiration_date' in grant else None
+            grant_id = grant.get('grant_id')
+            
+            # ISO shares
+            if vested.get('iso', 0) > 0:
+                lots.append(ShareLot(
+                    lot_id='ISO',
+                    share_type=ShareType.ISO,
+                    quantity=vested['iso'],
+                    strike_price=strike_price,
+                    grant_date=grant_date,
+                    exercise_date=None,
+                    lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=expiration_date,
+                    grant_id=grant_id
+                ))
+            
+            # NSO shares
+            if vested.get('nso', 0) > 0:
+                lots.append(ShareLot(
+                    lot_id='NSO',
+                    share_type=ShareType.NSO,
+                    quantity=vested['nso'],
+                    strike_price=strike_price,
+                    grant_date=grant_date,
+                    exercise_date=None,
+                    lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=expiration_date,
+                    grant_id=grant_id
+                ))
+            
+            # RSU shares (if any vested but not released)
+            if vested.get('rsu', 0) > 0:
+                lots.append(ShareLot(
+                    lot_id='VESTED_RSU',
+                    share_type=ShareType.RSU,
+                    quantity=vested['rsu'],
+                    strike_price=0.0,  # RSUs have no strike price
+                    grant_date=grant_date,
+                    exercise_date=None,
+                    lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
+                    tax_treatment=TaxTreatment.NA,
+                    expiration_date=None,  # RSUs don't expire
+                    grant_id=grant_id
+                ))
 
         return lots
 
     def _load_vesting_calendar(self, equity_position: Dict[str, Any]) -> List[ShareLot]:
         """Load future vesting events from vesting calendar."""
         lots = []
+        
+        # First check the old location for backward compatibility
         unvested = equity_position.get('unvested', {})
         vesting_calendar = unvested.get('vesting_calendar', [])
+        
+        # If not found, check the new location within grants
+        if not vesting_calendar:
+            for grant in equity_position.get('grants', []):
+                vesting_status = grant.get('vesting_status', {})
+                unvested = vesting_status.get('unvested', {})
+                grant_calendar = unvested.get('vesting_calendar', [])
+                
+                if grant_calendar:
+                    # Get grant-specific details
+                    strike_price = grant.get('strike_price', 0.0)
+                    expiration_date = datetime.fromisoformat(grant['expiration_date']).date() if 'expiration_date' in grant else None
+                    grant_id = grant.get('grant_id')
+                    
+                    # Process this grant's vesting calendar
+                    for event in grant_calendar:
+                        vest_date = datetime.fromisoformat(event['date']).date()
+                        share_type = self._parse_share_type(event['share_type'])
 
+                        # Generate unique lot ID for each vesting event
+                        lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}"
+
+                        # Determine lifecycle state based on vesting date
+                        if vest_date <= self.reference_date:
+                            lifecycle_state = LifecycleState.VESTED_NOT_EXERCISED
+                        else:
+                            lifecycle_state = LifecycleState.GRANTED_NOT_VESTED
+
+                        # Use grant date from the grant
+                        grant_date_obj = datetime.fromisoformat(grant['grant_date']).date() if 'grant_date' in grant else date(vest_date.year - 2, vest_date.month, vest_date.day)
+
+                        lot = ShareLot(
+                            lot_id=lot_id,
+                            share_type=share_type,
+                            quantity=event['shares'],
+                            strike_price=strike_price,
+                            grant_date=grant_date_obj,
+                            exercise_date=None,
+                            lifecycle_state=lifecycle_state,
+                            tax_treatment=TaxTreatment.NA,
+                            expiration_date=expiration_date,
+                            grant_id=grant_id
+                        )
+                        lots.append(lot)
+            
+            # If we processed grants, return the lots
+            if lots:
+                return lots
+        
+        # Otherwise, process the old-style vesting calendar
         # Get strike price from original grants
         strike_price = self._get_strike_price_from_grants(equity_position)
         expiration_date = self._get_expiration_date_from_grants(equity_position)
@@ -199,14 +258,14 @@ class EquityLoader:
 
     def _get_strike_price_from_grants(self, equity_position: dict) -> float:
         """Extract strike price from original grants."""
-        grants = equity_position.get('original_grants', [])
+        grants = equity_position.get('grants', [])
         if grants:
             return grants[0].get('strike_price', 0.0)
         return 0.0
 
     def _get_expiration_date_from_grants(self, equity_position: dict) -> Optional[date]:
         """Extract expiration date from original grants."""
-        grants = equity_position.get('original_grants', [])
+        grants = equity_position.get('grants', [])
         if grants and 'expiration_date' in grants[0]:
             expiration_str = grants[0]['expiration_date']
             if expiration_str:
@@ -215,7 +274,7 @@ class EquityLoader:
 
     def _get_grant_date_from_grants(self, equity_position: dict) -> Optional[date]:
         """Extract grant date from original grants."""
-        grants = equity_position.get('original_grants', [])
+        grants = equity_position.get('grants', [])
         if grants and 'grant_date' in grants[0]:
             grant_str = grants[0]['grant_date']
             if grant_str:
@@ -224,7 +283,7 @@ class EquityLoader:
 
     def _get_grant_id_from_grants(self, equity_position: dict) -> Optional[str]:
         """Extract grant ID from original grants."""
-        grants = equity_position.get('original_grants', [])
+        grants = equity_position.get('grants', [])
         if grants and 'grant_id' in grants[0]:
             return grants[0]['grant_id']
         return None

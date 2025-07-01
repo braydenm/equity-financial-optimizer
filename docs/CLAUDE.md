@@ -127,8 +127,7 @@ Company match tracking provides full visibility into charitable leverage with pr
 lost opportunity tracking, and comprehensive CSV reporting for strategic planning.
 
 IPO pledge obligation feature fully implemented with automatic calculation of remaining total pledge
-obligations due 1 year after assumed IPO date. Includes FIFO donation tracking, chronological
-milestone sorting, and enhanced CSV outputs with proper grant data loading pipeline.
+obligations due 3 year after any liquidity event such as tender or IPO date. Includes FIFO donation tracking, chronological milestone sorting, and enhanced CSV outputs with proper grant data loading pipeline.
 
 Comprehensive output improvements complete with enhanced CSV tracking, warning systems,
 grant-specific pledge obligations, and cleaned milestone tracking. All tests passing with full E2E validation.

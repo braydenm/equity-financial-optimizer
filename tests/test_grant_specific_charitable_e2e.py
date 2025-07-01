@@ -76,7 +76,7 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
             },
             "equity_position": {
                 "company": "TestCorp",
-                "original_grants": [
+                "grants": [
                     {
                         "grant_id": "EARLY_EMPLOYEE_GRANT",
                         "grant_date": "2020-01-15",
@@ -333,37 +333,37 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
 
         # Early employee grant obligation (50% pledge)
         early_obligation = next(
-            (o for o in pledge_state.obligations if "EARLY_EXERCISED_LOT" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "EARLY_EMPLOYEE_GRANT"),
             None
         )
         self.assertIsNotNone(early_obligation, "Early employee grant obligation should exist")
         self.assertEqual(early_obligation.pledge_percentage, 0.50)
         # With 50% pledge on 2000 shares sold: required_shares = (0.5 * 2000) / (1 - 0.5) = 2000
-        self.assertEqual(early_obligation.maximalist_shares_required, 2000)
-        self.assertEqual(early_obligation.maximalist_shares_donated, 2000)  # Fully fulfilled
+        self.assertEqual(early_obligation.shares_obligated, 2000)
+        self.assertEqual(early_obligation.shares_fulfilled, 2000)  # Fully fulfilled
 
         # Mid employee grant obligation (25% pledge)
         mid_obligation = next(
-            (o for o in pledge_state.obligations if "MID_EXERCISED_LOT" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "MID_EMPLOYEE_GRANT"),
             None
         )
         self.assertIsNotNone(mid_obligation, "Mid employee grant obligation should exist")
         self.assertEqual(mid_obligation.pledge_percentage, 0.25)
         # With 25% pledge on 1000 shares sold: required_shares = (0.25 * 1000) / (1 - 0.25) = 333
         expected_mid_shares = int((0.25 * 1000) / (1 - 0.25))
-        self.assertEqual(mid_obligation.maximalist_shares_required, expected_mid_shares)
-        self.assertEqual(mid_obligation.maximalist_shares_donated, 200)  # Partially fulfilled
+        self.assertEqual(mid_obligation.shares_obligated, expected_mid_shares)
+        self.assertEqual(mid_obligation.shares_fulfilled, 200)  # Partially fulfilled
 
         # Recent employee grant obligation (should use default 50% pledge)
         recent_obligation = next(
-            (o for o in pledge_state.obligations if "RECENT_VESTED_LOT" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "RECENT_EMPLOYEE_GRANT"),
             None
         )
         self.assertIsNotNone(recent_obligation, "Recent employee grant obligation should exist")
         self.assertEqual(recent_obligation.pledge_percentage, 0.50)  # Uses default from first grant
         # With 50% pledge on 500 shares sold: required_shares = (0.5 * 500) / (1 - 0.5) = 500
-        self.assertEqual(recent_obligation.maximalist_shares_required, 500)
-        self.assertEqual(recent_obligation.maximalist_shares_donated, 0)  # Unfulfilled
+        self.assertEqual(recent_obligation.shares_obligated, 500)
+        self.assertEqual(recent_obligation.shares_fulfilled, 0)  # Unfulfilled
 
         # 7. Validate charitable impact calculations
 
@@ -387,8 +387,8 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
 
         # Debug: Check individual pledge obligations for match calculations
         for i, obligation in enumerate(pledge_state.obligations):
-            print(f"DEBUG: Obligation {i+1}: {obligation.parent_transaction_id}")
-            print(f"  Shares donated: {obligation.maximalist_shares_donated}")
+            print(f"DEBUG: Obligation {i+1}: {obligation.source_event_id}")
+            print(f"  Shares donated: {obligation.shares_fulfilled}")
             print(f"  Pledge percentage: {obligation.pledge_percentage}")
 
         # Debug: Check yearly state for donation details
@@ -442,11 +442,11 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
 
         # Verify equity position structure
         equity_position = profile_data['equity_position']
-        self.assertIn('original_grants', equity_position)
-        self.assertEqual(len(equity_position['original_grants']), 3)
+        self.assertIn('grants', equity_position)
+        self.assertEqual(len(equity_position['grants']), 3)
 
         # Verify grant structures
-        grants = equity_position['original_grants']
+        grants = equity_position['grants']
 
         # Early employee grant
         early_grant = grants[0]

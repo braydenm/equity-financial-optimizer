@@ -62,7 +62,7 @@ Edit `input_data/user_profile.json` with your real data:
 **Essential fields to update:**
 - `personal_information`: Your tax filing status and rates
 - `income`: Your W2 income and spouse income
-- `equity_position.original_grants`: Your actual stock grants
+- `equity_position.grants`: Your actual stock grants
 - `equity_position.exercised_lots`: Any shares you've already exercised
 - `equity_position.current_prices`: Current 409A price and expected growth
 

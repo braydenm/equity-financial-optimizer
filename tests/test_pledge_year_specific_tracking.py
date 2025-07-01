@@ -95,7 +95,7 @@ class TestPledgeYearSpecificTracking(unittest.TestCase):
 
         # Check cumulative totals
         final_state = yearly_states[2030]
-        total_obligated = sum(o.maximalist_shares_required for o in final_state.pledge_state.obligations)
+        total_obligated = sum(o.shares_obligated for o in final_state.pledge_state.obligations)
         self.assertEqual(total_obligated, 6214 * 6,  # 37,284 total
                          "Total cumulative obligated should be 37,284 (6214 × 6 years)")
 
@@ -203,7 +203,7 @@ class TestPledgeYearSpecificTracking(unittest.TestCase):
 
         # Check cumulative total
         final_state = yearly_states[2027]
-        total_obligated = sum(o.maximalist_shares_required for o in final_state.pledge_state.obligations)
+        total_obligated = sum(o.shares_obligated for o in final_state.pledge_state.obligations)
         self.assertEqual(total_obligated, 6000,  # 1000 + 2000 + 3000
                          "Total cumulative obligated should be 6000")
 

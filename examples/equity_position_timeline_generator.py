@@ -52,7 +52,7 @@ def create_realistic_lifecycle_csv(profile: Dict[str, Any], current_date: date =
     equity_pos = profile['equity_position']
 
     # Extract key parameters from profile
-    strike_price = equity_pos['original_grants'][0]['strike_price']
+    strike_price = equity_pos['grants'][0]['strike_price']
 
     # Use provided current_date or extract from profile metadata
     if current_date is None:
@@ -228,8 +228,8 @@ def main():
             print(f"  {event['date']}: {event['quantity']} {event['share_type']} shares vest (lot: {event['lot_id']})")
 
     print(f"\n✨ Equity position timeline includes:")
-    print(f"  - Real grant: {profile['equity_position']['original_grants'][0]['total_options']} options")
-    print(f"  - Strike price: ${profile['equity_position']['original_grants'][0]['strike_price']}")
+    print(f"  - Real grant: {profile['equity_position']['grants'][0]['total_options']} options")
+    print(f"  - Strike price: ${profile['equity_position']['grants'][0]['strike_price']}")
     print(f"  - Total unvested: {profile['equity_position']['unvested']['total_shares']} shares")
     print(f"  - Real holdings: {len(profile['equity_position']['exercised_lots'])} exercised lots")
     print(f"  - Vesting calendar: {len(profile['equity_position']['unvested'].get('vesting_calendar', []))} events")

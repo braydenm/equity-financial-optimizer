@@ -13,6 +13,7 @@ from dataclasses import asdict, fields
 from typing import List, Any, Dict
 from datetime import date
 from projections.projection_state import ProjectionResult, YearlyState, PledgeState
+from calculators.liquidity_event import LiquidityEvent
 
 
 def save_components_csv(result: ProjectionResult, output_path: str) -> None:
@@ -165,13 +166,8 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
 
         # Calculate cumulative outstanding from pledge state
         if yearly_state.pledge_state and yearly_state.pledge_state.obligations:
-            total_obligated = sum(o.maximalist_shares_required for o in yearly_state.pledge_state.obligations)
-            total_donated = sum(o.maximalist_shares_donated for o in yearly_state.pledge_state.obligations)
-            cumulative_outstanding = max(0, total_obligated - total_donated)
-            
+            cumulative_outstanding = yearly_state.pledge_state.total_shares_remaining
         else:
-            total_obligated = 0
-            total_donated = 0
             cumulative_outstanding = 0
 
         # Get expiration metrics
@@ -255,6 +251,77 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
         # Empty file with minimal headers
         with open(output_path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['year'])
+            writer.writeheader()
+
+
+def generate_liquidity_events_csv(result: ProjectionResult, output_path: str) -> None:
+    """
+    Generate CSV tracking all liquidity events and their utilization.
+    
+    Includes tender offers, IPO, and secondary offerings with:
+    - Event details (date, type, price)
+    - Share activity (sales, proceeds)
+    - Donation window tracking
+    - Pledge obligations created
+    
+    Args:
+        result: ProjectionResult containing user profile with liquidity events
+        output_path: Path to save the CSV file
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    rows = []
+    
+    # Get liquidity events from user profile
+    liquidity_events = result.user_profile.liquidity_events
+    
+    for event in liquidity_events:
+        # Get pledge obligations for this event from final state
+        final_state = result.get_final_state()
+        event_obligations = []
+        if final_state and final_state.pledge_state:
+            event_obligations = final_state.pledge_state.get_obligations_for_event(event.event_id)
+        
+        # Calculate obligation totals
+        total_shares_obligated = sum(o.shares_obligated for o in event_obligations)
+        total_shares_fulfilled = sum(o.shares_fulfilled for o in event_obligations)
+        total_shares_remaining = sum(o.shares_remaining for o in event_obligations)
+        
+        row = {
+            'event_id': event.event_id,
+            'event_date': event.event_date.isoformat(),
+            'event_type': event.event_type,
+            'price_per_share': round(event.price_per_share, 2),
+            'shares_vested_at_event': event.shares_vested_at_event,
+            'shares_sold': event.shares_sold,
+            'net_proceeds': round(event.net_proceeds, 2),
+            'cash_donated_from_event': round(event.cash_donated_from_event, 2),
+            'match_window_opens': event.event_date.isoformat(),
+            'match_window_closes': event.match_window_closes.isoformat(),
+            'window_is_open': event.is_window_open(result.plan.end_date),
+            'obligations_created': len(event_obligations),
+            'shares_obligated': total_shares_obligated,
+            'shares_fulfilled': total_shares_fulfilled,
+            'shares_remaining': total_shares_remaining,
+            'fulfillment_rate': round(total_shares_fulfilled / total_shares_obligated, 4) if total_shares_obligated > 0 else 0.0
+        }
+        rows.append(row)
+    
+    # Write CSV
+    if rows:
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+    else:
+        # Empty file with headers
+        with open(output_path, 'w', newline='') as f:
+            fieldnames = ['event_id', 'event_date', 'event_type', 'price_per_share',
+                         'shares_vested_at_event', 'shares_sold', 'net_proceeds',
+                         'cash_donated_from_event', 'match_window_opens', 'match_window_closes',
+                         'window_is_open', 'obligations_created', 'shares_obligated',
+                         'shares_fulfilled', 'shares_remaining', 'fulfillment_rate']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
 
 
@@ -349,6 +416,66 @@ def save_charitable_carryforward_csv(result: ProjectionResult, output_path: str)
     
     # Write to CSV
     if rows:
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+
+
+def generate_pledge_obligations_csv(result: ProjectionResult, output_path: str) -> None:
+    """
+    Generate detailed CSV of all pledge obligations and their fulfillment status.
+    
+    Shows each individual obligation with:
+    - Source event and type
+    - Creation date
+    - Shares obligated/fulfilled/remaining
+    - Grant association
+    - Fulfillment status
+    
+    Args:
+        result: ProjectionResult containing yearly states with pledge obligations
+        output_path: Path to save the CSV file
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    rows = []
+    
+    # Get final state for cumulative obligations
+    final_state = result.get_final_state()
+    if not final_state or not final_state.pledge_state:
+        # Write empty file with headers
+        with open(output_path, 'w', newline='') as f:
+            fieldnames = ['source_event_id', 'obligation_type', 'creation_date',
+                         'grant_id', 'pledge_percentage', 'match_ratio',
+                         'shares_obligated', 'shares_fulfilled', 'shares_remaining',
+                         'fulfillment_percentage', 'is_fulfilled']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+        return
+    
+    # Process each obligation
+    for obligation in final_state.pledge_state.obligations:
+        row = {
+            'source_event_id': obligation.source_event_id,
+            'obligation_type': obligation.obligation_type,
+            'creation_date': obligation.creation_date.isoformat(),
+            'grant_id': obligation.grant_id or '',
+            'pledge_percentage': round(obligation.pledge_percentage, 4),
+            'match_ratio': obligation.match_ratio,
+            'shares_obligated': obligation.shares_obligated,
+            'shares_fulfilled': obligation.shares_fulfilled,
+            'shares_remaining': obligation.shares_remaining,
+            'fulfillment_percentage': round(obligation.fulfillment_percentage, 4),
+            'is_fulfilled': obligation.is_fulfilled
+        }
+        rows.append(row)
+    
+    # Write CSV
+    if rows:
+        # Sort by creation date
+        rows.sort(key=lambda r: r['creation_date'])
+        
         with open(output_path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()

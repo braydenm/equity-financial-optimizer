@@ -57,9 +57,9 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
         assumed_ipo = date.fromisoformat(profile_data['assumed_ipo'])
 
     # Extract charitable programs from grants (use first grant or defaults)
-    original_grants = equity_position.get('original_grants', [])
-    if original_grants and 'charitable_program' in original_grants[0]:
-        charitable_program = original_grants[0]['charitable_program']
+    grants = equity_position.get('grants', [])
+    if grants and 'charitable_program' in grants[0]:
+        charitable_program = grants[0]['charitable_program']
         pledge_percentage = charitable_program.get('pledge_percentage', 0.0)
         company_match_ratio = charitable_program.get('company_match_ratio', 0.0)
     else:
@@ -94,7 +94,7 @@ def load_user_profile_simplified(profile_path: str) -> UserProfile: #Claude TODO
         taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
         amt_credit_carryforward=carryforwards.get('amt_credit', 0),
         assumed_ipo=assumed_ipo,
-        grants=original_grants
+        grants=grants
     )
 
 
@@ -267,7 +267,7 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         taxable_investments=financial_pos['liquid_assets'].get('taxable_investments', 0),
         amt_credit_carryforward=carryforwards.get('amt_credit', 0),
         assumed_ipo=assumed_ipo,
-        grants=original_grants
+        grants=grants
     )
 
     # Set up projection period
@@ -299,16 +299,16 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
         initial_lots.append(lot)
 
     # Extract grant information from profile data - REQUIRED
-    original_grants = profile_data['equity_position']['original_grants']
-    if not original_grants:
+    grants = profile_data['equity_position']['grants']
+    if not grants:
         raise ValueError(
             "Missing required grant information in user_profile.json. "
-            "The 'equity_position.original_grants' field must contain grant data with "
+            "The 'equity_position.grants' field must contain grant data with "
             "'strike_price' and 'grant_date' to accurately model vested positions. "
             "Add this data to your user profile or fix the data loading process."
         )
 
-    grant_info = original_grants[0]  # Use first grant for vested positions
+    grant_info = grants[0]  # Use first grant for vested positions
     if 'strike_price' not in grant_info:
         raise ValueError(
             "Missing 'strike_price' in grant information. "

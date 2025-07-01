@@ -127,7 +127,7 @@ class TestCharitablePerGrant(unittest.TestCase):
             },
             "equity_position": {
                 "company": "TestCorp",
-                "original_grants": grants,
+                "grants": grants,
                 "exercised_lots": [],
                 "vested_unexercised": {
                     "iso_shares": 1000,
@@ -259,7 +259,7 @@ class TestCharitablePerGrant(unittest.TestCase):
         profile_data = self.create_test_profile()
 
         # Remove grants
-        profile_data["equity_position"]["original_grants"] = []
+        profile_data["equity_position"]["grants"] = []
 
         # Save to file
         profile_path = os.path.join(self.test_dir, "test_profile.json")

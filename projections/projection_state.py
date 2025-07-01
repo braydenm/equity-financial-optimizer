@@ -13,6 +13,9 @@ from decimal import Decimal
 from enum import Enum
 from calculators.tax_utils import calculate_iso_qualifying_disposition_date
 
+if TYPE_CHECKING:
+    from calculators.liquidity_event import LiquidityEvent
+
 
 
 
@@ -156,66 +159,40 @@ class CharitableDeductionState:
 
 @dataclass
 class PledgeObligation:
-    """Individual pledge obligation tracking from a specific tender/sale event."""
-    parent_transaction_id: str  # Unique ID of the sale/tender that created this obligation
-    commencement_date: Optional[date] = None  # Date when obligation was created (tender/sale date)
-    match_window_closes: Optional[date] = None  # 3-year match window from commencement
-    total_pledge_obligation: float = 0.0  # Total dollar obligation from pledge % of tender/sale proceeds
-    donations_made: float = 0.0  # Total donations made toward this specific obligation
-    shares_sold: int = 0  # Number of shares tendered/sold that created this obligation
-    pledge_percentage: float = 0.5  # Pledge percentage (0.5 = 50%)
-    maximalist_shares_donated: int = 0  # Number of shares actually donated toward this obligation
-    outstanding_obligation: float = 0.0  # Remaining dollar obligation
-    lost_match_opportunity: float = 0.0  # Forfeited company match value when window closes
-
-    @property
-    def match_eligibility_active(self) -> bool:
-        """Check if company match window is still open."""
-        if not self.match_window_closes:
-            return True  # No window means always eligible
-        from datetime import date
-        return date.today() <= self.match_window_closes
-
-    @property
-    def maximalist_shares_required(self) -> int:
-        """Number of shares required under maximalist interpretation."""
-        # For 50% pledge: donate 1 share for every 1 share sold
-        # For 25% pledge: donate 1 share for every 3 shares sold
-        # shares_donated / (shares_sold + shares_donated) = pledge_percentage
-        # Solving for shares_donated:
-        # shares_donated = (pledge_percentage * shares_sold) / (1 - pledge_percentage)
-        if self.pledge_percentage >= 1:
-            return float('inf')  # Cannot fulfill 100% or more pledge
-        return int((self.pledge_percentage * self.shares_sold) / (1 - self.pledge_percentage))
-
-    @property
-    def maximalist_obligation_shares(self) -> float:
-        """Dollar value of shares required under maximalist interpretation at current price."""
-        # This should be calculated based on share count * current price
-        # Not as a percentage of proceeds
-        return self.maximalist_shares_required  # Caller must multiply by price
-
-    @property
-    def maximalist_fulfillment(self) -> float:
-        """Fulfillment % under maximalist interpretation (share count based)."""
-        required = self.maximalist_shares_required
-        if required == 0:
-            return 0.0
-        return min(1.0, self.maximalist_shares_donated / required)
-
-    # @property
-    # def minimalist_fulfillment(self) -> float:
-    #     """Fulfillment % under minimalist interpretation (dollar based)."""
-    #     if self.total_pledge_obligation == 0:
-    #         return 0.0
-    #     return self.donations_made / self.total_pledge_obligation
+    """
+    Pledge obligation tracking per the donation matching program.
+    
+    Obligations can be created by:
+    1. Share sales during liquidity events
+    2. IPO trigger for remaining unfulfilled pledge on all vested shares
+    """
+    source_event_id: str  # Links to LiquidityEvent that contains this obligation
+    obligation_type: str  # "sale" or "ipo_remainder"
+    creation_date: date  # When the obligation was created
+    shares_obligated: int  # Number of shares required to fulfill pledge
+    shares_fulfilled: int = 0  # Number of shares donated toward this obligation
+    pledge_percentage: float = 0.5  # Pledge percentage that created this obligation
+    grant_id: Optional[str] = None  # Which grant this obligation relates to
+    
+    # For tracking donation eligibility
+    match_ratio: float = 3.0  # Company match ratio for this obligation
 
     @property
     def is_fulfilled(self) -> bool:
         """Check if this obligation is fully satisfied."""
-        # Consider fulfilled if within 1 share of requirement
-        required = self.maximalist_shares_required
-        return abs(self.maximalist_shares_donated - required) <= 1
+        return self.shares_fulfilled >= self.shares_obligated
+    
+    @property
+    def shares_remaining(self) -> int:
+        """Number of shares still needed to fulfill this obligation."""
+        return max(0, self.shares_obligated - self.shares_fulfilled)
+    
+    @property
+    def fulfillment_percentage(self) -> float:
+        """Percentage of obligation fulfilled (0.0 to 1.0)."""
+        if self.shares_obligated == 0:
+            return 1.0
+        return min(1.0, self.shares_fulfilled / self.shares_obligated)
 
 
 @dataclass
@@ -227,90 +204,58 @@ class PledgeState:
         """Add a new pledge obligation."""
         self.obligations.append(obligation)
 
-    def discharge_donation(self, donation_amount: float, shares_donated: int = 0, donation_date: Optional[date] = None) -> dict:
-        """Apply donation to obligations in FIFO order, respecting match window eligibility.
-
-        Returns:
-            dict with 'eligible_amount': amount applied to match-eligible obligations
+    def apply_share_donation(self, shares_donated: int, donation_date: date, liquidity_events: List['LiquidityEvent']) -> dict:
         """
-        remaining_amount = donation_amount
+        Apply share donation to obligations in FIFO order.
+        
+        Only applies to obligations whose source liquidity event window is still open.
+        
+        Returns:
+            dict with 'shares_credited': shares that count toward pledge fulfillment
+        """
         remaining_shares = shares_donated
-        eligible_match_amount = 0.0
-
-        # Sort by commencement date to ensure FIFO discharge
-        sorted_obligations = sorted(self.obligations, key=lambda o: o.commencement_date or date.min)
-
+        shares_credited = 0
+        
+        # Sort by creation date to ensure FIFO discharge
+        sorted_obligations = sorted(self.obligations, key=lambda o: o.creation_date)
+        
         for obligation in sorted_obligations:
-            if remaining_amount <= 0 and remaining_shares <= 0:
+            if remaining_shares <= 0:
                 break
-
-            # Check if match window is still open
-            if (donation_date and obligation.match_window_closes and
-                donation_date > obligation.match_window_closes):
-                continue  # Skip closed match windows
-
-            if obligation.outstanding_obligation > 0:
-                # Apply dollar amount
-                applied_amount = min(remaining_amount, obligation.outstanding_obligation)
-                obligation.donations_made += applied_amount
-                obligation.outstanding_obligation -= applied_amount
-                remaining_amount -= applied_amount
-
-                # Track amount applied to eligible obligation
-                eligible_match_amount += applied_amount
-
-                # Apply shares
-                shares_needed = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
+            
+            # Find the source liquidity event to check window
+            source_event = next((e for e in liquidity_events if e.event_id == obligation.source_event_id), None)
+            if source_event and not source_event.is_window_open(donation_date):
+                continue  # Skip if window is closed
+            
+            # Apply shares to this obligation
+            shares_needed = obligation.shares_remaining
+            if shares_needed > 0:
                 applied_shares = min(remaining_shares, shares_needed)
-                obligation.maximalist_shares_donated += applied_shares
+                obligation.shares_fulfilled += applied_shares
                 remaining_shares -= applied_shares
-
-        return {'eligible_amount': eligible_match_amount}
-
-    @property
-    def total_outstanding_obligation(self) -> float:
-        """Total outstanding obligation across all pledges."""
-        return sum(obligation.outstanding_obligation for obligation in self.obligations)
-
-    def process_window_closures(self, current_year: int, current_price: float, company_match_ratio: float) -> float:
-        """
-        Process match window closures and calculate lost opportunities.
-
-        Args:
-            current_year: Current year being processed
-            current_price: Current share price for valuation
-            company_match_ratio: Company match ratio (e.g., 3.0 for 3:1)
-
-        Returns:
-            Total lost match opportunity value for this year
-        """
-        from datetime import date
-        current_date = date(current_year, 12, 31)  # End of year processing
-        total_lost_value = 0.0
-
-        for obligation in self.obligations:
-            if (obligation.match_window_closes and
-                current_date > obligation.match_window_closes and
-                obligation.lost_match_opportunity == 0.0):  # Not yet processed
-
-                # Calculate unfulfilled shares
-                unfulfilled_shares = obligation.maximalist_shares_required - obligation.maximalist_shares_donated
-
-                if unfulfilled_shares > 0:
-                    # Calculate lost company match value
-                    lost_value = unfulfilled_shares * current_price * company_match_ratio
-                    obligation.lost_match_opportunity = lost_value
-                    total_lost_value += lost_value
-
-        return total_lost_value
+                shares_credited += applied_shares
+        
+        return {'shares_credited': shares_credited, 'shares_uncredited': remaining_shares}
 
     @property
-    def next_deadline(self) -> Optional[date]:
-        """Next approaching match window close among unfulfilled obligations."""
-        unfulfilled = [o for o in self.obligations if not o.is_fulfilled and o.match_window_closes]
-        if not unfulfilled:
-            return None
-        return min(o.match_window_closes for o in unfulfilled)
+    def total_shares_obligated(self) -> int:
+        """Total shares obligated across all pledges."""
+        return sum(obligation.shares_obligated for obligation in self.obligations)
+    
+    @property
+    def total_shares_fulfilled(self) -> int:
+        """Total shares fulfilled across all obligations."""
+        return sum(obligation.shares_fulfilled for obligation in self.obligations)
+    
+    @property
+    def total_shares_remaining(self) -> int:
+        """Total shares still needed to fulfill all obligations."""
+        return sum(obligation.shares_remaining for obligation in self.obligations)
+    
+    def get_obligations_for_event(self, event_id: str) -> List[PledgeObligation]:
+        """Get all obligations associated with a specific liquidity event."""
+        return [o for o in self.obligations if o.source_event_id == event_id]
 
 
 @dataclass
@@ -467,20 +412,23 @@ class ProjectionResult:
         pledge_shares_donated = 0
         pledge_shares_outstanding = 0
         pledge_shares_expired_window = 0
+        
+        # Sum up expired shares from all yearly states
+        for state in self.yearly_states:
+            if hasattr(state, 'pledge_shares_expired_this_year'):
+                pledge_shares_expired_window += state.pledge_shares_expired_this_year
 
         if final_state and final_state.pledge_state.obligations:
             from datetime import date as date_class
             final_year_end = date_class(final_state.year, 12, 31)
 
             for obligation in final_state.pledge_state.obligations:
-                pledge_shares_obligated += obligation.maximalist_shares_required
-                pledge_shares_donated += obligation.maximalist_shares_donated
+                pledge_shares_obligated += obligation.shares_obligated
+                pledge_shares_donated += obligation.shares_fulfilled
 
-                # Calculate shares with expired windows (unfulfilled obligations past window)
-                if (obligation.match_window_closes and
-                    final_year_end > obligation.match_window_closes and
-                    not obligation.is_fulfilled):
-                    pledge_shares_expired_window += (obligation.maximalist_shares_required - obligation.maximalist_shares_donated)
+                # Outstanding shares are those not yet fulfilled
+                if not obligation.is_fulfilled:
+                    pledge_shares_outstanding += obligation.shares_remaining
 
             pledge_shares_outstanding = pledge_shares_obligated - pledge_shares_donated
 
@@ -534,7 +482,7 @@ class ProjectionResult:
             'pledge_shares_outstanding': pledge_shares_outstanding,
             'pledge_shares_expired_window': pledge_shares_expired_window,
             'pledge_fulfillment_rate': pledge_fulfillment_rate,
-            'outstanding_obligation': final_state.pledge_state.total_outstanding_obligation if final_state else 0,
+            'outstanding_obligation': final_state.pledge_state.total_shares_remaining if final_state else 0,
             'amt_credits_final': amt_credits_final,
             'expired_charitable_deduction': total_expired_charitable,
             'expired_option_count': total_expired_shares,
@@ -605,6 +553,9 @@ class UserProfile:
 
     # Grant-specific charitable programs for per-grant pledge tracking
     grants: List[Dict[str, Any]] = field(default_factory=list)
+    
+    # Liquidity events for tracking donation windows and proceeds
+    liquidity_events: List['LiquidityEvent'] = field(default_factory=list)
 
     def get_total_agi(self) -> float:
         """Calculate total AGI for charitable deduction limits."""
@@ -648,12 +599,13 @@ class UserProfile:
         return regular_withholding + supplemental_withholding + self.quarterly_payments
 
 
-def calculate_pledge_metrics_for_year(pledge_state: PledgeState, year: int) -> dict:
+def calculate_pledge_metrics_for_year(pledge_state: PledgeState, year: int, liquidity_events: List['LiquidityEvent']) -> dict:
     """Calculate pledge share metrics as of end of specified year.
 
     Args:
         pledge_state: The pledge state containing all obligations
         year: The year to calculate metrics for (as of end of year)
+        liquidity_events: List of liquidity events to check window expiration
 
     Returns:
         Dict with keys: obligated, donated, outstanding, expired_window
@@ -667,15 +619,17 @@ def calculate_pledge_metrics_for_year(pledge_state: PledgeState, year: int) -> d
 
     for obligation in pledge_state.obligations:
         # Only count obligations that existed by end of this year
-        if obligation.commencement_date and obligation.commencement_date <= year_end:
-            obligated += obligation.maximalist_shares_required
-            donated += obligation.maximalist_shares_donated
+        if obligation.creation_date and obligation.creation_date <= year_end:
+            obligated += obligation.shares_obligated
+            donated += obligation.shares_fulfilled
 
             # Calculate shares with expired windows (unfulfilled obligations past window)
-            if (obligation.match_window_closes and
-                year_end > obligation.match_window_closes and
+            source_event = next((e for e in liquidity_events 
+                               if e.event_id == obligation.source_event_id), None)
+            if (source_event and
+                year_end > source_event.match_window_closes and
                 not obligation.is_fulfilled):
-                expired_window += (obligation.maximalist_shares_required - obligation.maximalist_shares_donated)
+                expired_window += obligation.shares_remaining
 
     outstanding = obligated - donated
 

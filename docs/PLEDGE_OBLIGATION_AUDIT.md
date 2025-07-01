@@ -42,7 +42,7 @@ Share Sale Event → ProjectionCalculator._process_sale()
                 → PledgeCalculator.calculate_obligation()
                 → Creates PledgeObligation with:
                   - Maximalist share requirement
-                  - Match window deadline (min of 3 years or IPO+1 year)
+                  - Match window deadline (min of sale+3 year or IPO+3 year)
                   - Transaction tracking ID
 ```
 
@@ -197,26 +197,26 @@ class LiquidityEvent:
     event_date: date
     event_type: str  # "tender_offer", "ipo", "secondary_offering"
     price_per_share: float
-    
+
     # What happened in this event
     shares_vested_at_event: int
     shares_sold: int
     exercise_costs: float = 0.0
     taxes_withheld: float = 0.0
     net_proceeds: float = 0.0
-    
+
     # Donation tracking for this event
     cash_donated_from_event: float = 0.0
     match_window_closes: date = field(init=False)
-    
+
     def __post_init__(self):
         self.match_window_closes = self.event_date + timedelta(days=3*365)
-    
+
     @property
     def remaining_donatable_proceeds(self) -> float:
         """Cash still available to donate from this event"""
         return self.net_proceeds - self.cash_donated_from_event
-    
+
     def is_window_open(self, as_of_date: date) -> bool:
         return as_of_date <= self.match_window_closes
 ```
@@ -237,11 +237,11 @@ class PledgeObligation:
     shares_obligated: int
     shares_fulfilled: int = 0
     pledge_percentage: float = 0.5
-    
+
     # Remove these fields (now tracked in LiquidityEvent):
     # - match_window_closes (look up via source_event_id)
     # - commencement_date (use creation_date)
-    
+
     @property
     def is_fulfilled(self) -> bool:
         return self.shares_fulfilled >= self.shares_obligated
@@ -257,12 +257,12 @@ Add support for loading liquidity events:
 def load_liquidity_events(profile_data: dict) -> List[LiquidityEvent]:
     """Load liquidity events from profile, with backwards compatibility"""
     events = []
-    
+
     # Load explicit liquidity events
     if "liquidity_events" in profile_data:
         for event_data in profile_data["liquidity_events"]:
             events.append(LiquidityEvent(**event_data))
-    
+
     # Backwards compatibility: convert old fields
     if "last_tender_offer_date" in profile_data and not events:
         events.append(LiquidityEvent(
@@ -272,7 +272,7 @@ def load_liquidity_events(profile_data: dict) -> List[LiquidityEvent]:
             price_per_share=profile_data.get("last_tender_price", 0.0),
             shares_vested_at_event=0  # Will need calculation
         ))
-    
+
     return events
 ```
 
@@ -295,19 +295,19 @@ def calculate_ipo_remainder_obligation(
 ) -> Optional[PledgeObligation]:
     """
     Calculate remaining pledge obligation at IPO.
-    
+
     At IPO, user must fulfill pledge on ALL vested eligible shares,
     not just those sold.
     """
     # Total shares that should be pledged
     total_pledge_shares = int(total_vested_shares * pledge_percentage)
-    
+
     # Shares already obligated from sales
     already_obligated = sum(o.shares_obligated for o in existing_obligations)
-    
+
     # Remaining obligation
     remainder = total_pledge_shares - already_obligated
-    
+
     if remainder > 0:
         return PledgeObligation(
             source_event_id=ipo_event_id,
@@ -316,7 +316,7 @@ def calculate_ipo_remainder_obligation(
             shares_obligated=remainder,
             pledge_percentage=pledge_percentage
         )
-    
+
     return None
 ```
 
@@ -329,13 +329,13 @@ Add liquidity event tracking:
 ```python
 def _process_year_actions(self, year: int, ...):
     # ... existing code ...
-    
+
     # Check for IPO in this year
     for event in self.liquidity_events:
         if event.event_type == "ipo" and event.event_date.year == year:
             # Calculate total vested eligible shares
             vested_shares = self._calculate_vested_eligible_shares(event.event_date)
-            
+
             # Create IPO remainder obligation
             ipo_obligation = PledgeCalculator.calculate_ipo_remainder_obligation(
                 total_vested_shares=vested_shares,
@@ -344,7 +344,7 @@ def _process_year_actions(self, year: int, ...):
                 ipo_date=event.event_date,
                 ipo_event_id=event.event_id
             )
-            
+
             if ipo_obligation:
                 pledge_state.add_obligation(ipo_obligation)
                 yearly_state.pledge_shares_obligated_this_year += ipo_obligation.shares_obligated
@@ -365,11 +365,11 @@ def _process_donation(self, action: Action, ...):
             donation_date=action.action_date,
             donation_amount=action.amount
         )
-        
+
         if source_event:
             # Update the event's tracking
             source_event.cash_donated_from_event += action.amount
-            
+
             # Check if within match window
             if not source_event.is_window_open(action.action_date):
                 # Track as ineligible for match
@@ -385,7 +385,7 @@ def _process_donation(self, action: Action, ...):
 ```python
 def test_ipo_creates_remainder_obligation():
     """Test that IPO creates obligation for all vested shares, not just sold shares"""
-    
+
     # Setup: Profile with 10,000 vested shares, 50% pledge
     profile = UserProfile(
         grants=[{
@@ -404,7 +404,7 @@ def test_ipo_creates_remainder_obligation():
             "price_per_share": 75.0
         }]
     )
-    
+
     # Scenario: Sell only 2000 shares before IPO
     scenario = Scenario(
         actions=[
@@ -416,34 +416,34 @@ def test_ipo_creates_remainder_obligation():
             )
         ]
     )
-    
+
     # Run projection
     result = run_projection(profile, scenario)
-    
+
     # Get 2026 state (IPO year)
     ipo_year_state = result.yearly_states[2026]
-    
+
     # Expected behavior:
     # - 50% pledge on 10,000 vested shares = 5,000 share obligation
     # - Sale created obligation for 1,000 shares (50% of 2,000)
     # - IPO should create remainder obligation for 4,000 shares
-    
+
     # This will FAIL with current implementation
     # Current: Only tracks 1,000 share obligation from sale
     # Expected: Should track 5,000 total (1,000 from sale + 4,000 from IPO)
-    
+
     total_obligations = sum(
         o.shares_obligated for o in ipo_year_state.pledge_state.obligations
     )
-    
+
     assert total_obligations == 5000, f"Expected 5000 total obligation, got {total_obligations}"
-    
+
     # Check IPO remainder obligation exists
     ipo_obligations = [
-        o for o in ipo_year_state.pledge_state.obligations 
+        o for o in ipo_year_state.pledge_state.obligations
         if o.obligation_type == "ipo_remainder"
     ]
-    
+
     assert len(ipo_obligations) == 1, "Should have one IPO remainder obligation"
     assert ipo_obligations[0].shares_obligated == 4000
 ```
@@ -458,7 +458,7 @@ Create new CSV generator for liquidity events:
 def generate_liquidity_events_csv(result: ProjectionResult, output_path: str):
     """Generate CSV tracking all liquidity events and their utilization"""
     rows = []
-    
+
     for event in result.liquidity_events:
         row = {
             'event_id': event.event_id,

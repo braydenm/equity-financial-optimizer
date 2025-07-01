@@ -11,20 +11,20 @@ from datetime import date, timedelta
 from typing import Optional
 
 from projections.projection_state import PledgeObligation
+from typing import List, Optional
 
 
 class PledgeCalculator:
     """Centralized calculator for pledge obligations from share sales."""
 
     @staticmethod
-    def calculate_obligation(
+    def calculate_sale_obligation(
         shares_sold: int,
-        sale_price: float,
         pledge_percentage: float,
         sale_date: date,
-        lot_id: str,
-        assumed_ipo: Optional[date] = None,
-        pledge_window_years: int = 3
+        event_id: str,
+        grant_id: Optional[str] = None,
+        match_ratio: float = 3.0
     ) -> PledgeObligation:
         """
         Calculate pledge obligation from a share sale.
@@ -38,12 +38,11 @@ class PledgeCalculator:
 
         Args:
             shares_sold: Number of shares sold
-            sale_price: Price per share at sale
             pledge_percentage: Pledge percentage (e.g., 0.5 for 50%)
             sale_date: Date of the sale transaction
-            lot_id: Identifier of the lot being sold
-            assumed_ipo: Expected IPO date for calculating match window expiry
-            pledge_window_years: Years allowed to fulfill pledge (default: 3)
+            event_id: ID of the liquidity event containing this sale
+            grant_id: ID of the grant these shares came from
+            match_ratio: Company match ratio for this grant
 
         Returns:
             PledgeObligation with calculated requirements
@@ -52,117 +51,87 @@ class PledgeCalculator:
             ValueError: If pledge_percentage >= 1.0 or other invalid inputs
         """
         # Validate inputs
-        if pledge_percentage > 1.0:
-            raise ValueError(f"Pledge percentage must be less than or equal to 100%, got {pledge_percentage * 100}%")
+        if pledge_percentage >= 1.0:
+            raise ValueError(f"Pledge percentage must be less than 100%, got {pledge_percentage * 100}%")
         if pledge_percentage < 0:
             raise ValueError(f"Pledge percentage cannot be negative, got {pledge_percentage}")
         if shares_sold <= 0:
             raise ValueError(f"Shares sold must be positive, got {shares_sold}")
-        if sale_price < 0:
-            raise ValueError(f"Sale price cannot be negative, got {sale_price}")
 
         # Calculate required shares under maximalist interpretation
         if pledge_percentage == 0:
             shares_required = 0
-            obligation_amount = 0.0
         else:
             shares_required = int((pledge_percentage * shares_sold) / (1 - pledge_percentage))
-            obligation_amount = shares_required * sale_price
-
-        # Create transaction ID
-        transaction_id = f"{lot_id}_{sale_date.isoformat()}"
-
-        # Calculate deadline: min(sale_date + 3 years, assumed_ipo + 1 year)
-        sale_window_deadline = sale_date + timedelta(days=pledge_window_years * 365)
-
-        if assumed_ipo:
-            ipo_window_deadline = assumed_ipo + timedelta(days=365)
-            deadline = min(sale_window_deadline, ipo_window_deadline)
-        else:
-            deadline = sale_window_deadline
 
         # Create and return obligation
         return PledgeObligation(
-            parent_transaction_id=transaction_id,
-            commencement_date=sale_date,
-            match_window_closes=deadline,
-            total_pledge_obligation=obligation_amount,
-            donations_made=0.0,
-            shares_sold=shares_sold,
+            source_event_id=event_id,
+            obligation_type="sale",
+            creation_date=sale_date,
+            shares_obligated=shares_required,
+            shares_fulfilled=0,
             pledge_percentage=pledge_percentage,
-            maximalist_shares_donated=0,
-            outstanding_obligation=obligation_amount
+            grant_id=grant_id,
+            match_ratio=match_ratio
         )
 
     @staticmethod
-    def calculate_fulfillment_progress(
-        obligation: PledgeObligation,
-        shares_donated: int,
-        donation_value: float
-    ) -> PledgeObligation:
+    def calculate_ipo_remainder_obligation(
+        total_vested_shares: int,
+        pledge_percentage: float,
+        existing_obligations: List[PledgeObligation],
+        ipo_date: date,
+        ipo_event_id: str,
+        grant_id: Optional[str] = None,
+        match_ratio: float = 3.0
+    ) -> Optional[PledgeObligation]:
         """
-        Update obligation with fulfillment progress.
-
+        Calculate remaining pledge obligation at IPO.
+        
+        At IPO, user must fulfill pledge on ALL vested eligible shares,
+        not just those sold. This creates an obligation for any unfulfilled
+        portion of the total pledge commitment.
+        
         Args:
-            obligation: Existing pledge obligation
-            shares_donated: Additional shares donated
-            donation_value: Dollar value of donation
-
+            total_vested_shares: Total vested eligible shares at IPO
+            pledge_percentage: Pledge percentage for these shares
+            existing_obligations: All existing pledge obligations
+            ipo_date: Date of the IPO
+            ipo_event_id: ID of the IPO liquidity event
+            grant_id: ID of the grant (for grant-specific tracking)
+            match_ratio: Company match ratio
+        
         Returns:
-            Updated PledgeObligation
+            PledgeObligation for remainder, or None if already fulfilled
         """
-        # Update share count
-        obligation.maximalist_shares_donated += shares_donated
-
-        # Update dollar tracking
-        obligation.donations_made += donation_value
-        obligation.outstanding_obligation = max(
-            0, obligation.total_pledge_obligation - obligation.donations_made
+        # Calculate total shares that should be pledged
+        total_pledge_shares = int(total_vested_shares * pledge_percentage)
+        
+        # Calculate shares already obligated from sales
+        already_obligated = sum(
+            o.shares_obligated 
+            for o in existing_obligations 
+            if o.grant_id == grant_id  # Only count obligations from same grant
         )
-
-        return obligation
-
-    @staticmethod
-    def shares_needed_for_fulfillment(obligation: PledgeObligation) -> int:
-        """
-        Calculate remaining shares needed to fulfill obligation.
-
-        Args:
-            obligation: Pledge obligation to check
-
-        Returns:
-            Number of shares still needed (0 if fulfilled)
-        """
-        required = obligation.maximalist_shares_required
-        donated = obligation.maximalist_shares_donated
-        return max(0, required - donated)
-
-    @staticmethod
-    def is_obligation_fulfilled(obligation: PledgeObligation) -> bool:
-        """
-        Check if obligation is fully satisfied under maximalist interpretation.
-
-        Args:
-            obligation: Pledge obligation to check
-
-        Returns:
-            True if obligation is fulfilled
-        """
-        return obligation.maximalist_shares_donated >= obligation.maximalist_shares_required
-
-    @staticmethod
-    def days_until_deadline(obligation: PledgeObligation, as_of_date: date) -> int:
-        """
-        Calculate days remaining until match window closes.
-
-        Args:
-            obligation: Pledge obligation
-            as_of_date: Date to calculate from
-
-        Returns:
-            Days until match window closes (negative if past deadline)
-        """
-        return (obligation.match_window_closes - as_of_date).days
+        
+        
+        # Calculate remaining obligation
+        remainder = total_pledge_shares - already_obligated
+        
+        if remainder > 0:
+            return PledgeObligation(
+                source_event_id=ipo_event_id,
+                obligation_type="ipo_remainder",
+                creation_date=ipo_date,
+                shares_obligated=remainder,
+                shares_fulfilled=0,
+                pledge_percentage=pledge_percentage,
+                grant_id=grant_id,
+                match_ratio=match_ratio
+            )
+        
+        return None
 
     @staticmethod
     def validate_donation_strategy(
@@ -187,7 +156,7 @@ class PledgeCalculator:
         if pledge_percentage == 0:
             return True  # No pledge requirement
 
-        if pledge_percentage > 1:
+        if pledge_percentage >= 1:
             return False  # Invalid pledge percentage
 
         # Calculate required donation ratio
@@ -197,24 +166,3 @@ class PledgeCalculator:
         # Allow small tolerance for rounding
         return abs(actual_ratio - required_ratio) < 0.001
 
-
-# Example usage and doctest
-if __name__ == "__main__":
-    # Example: 50% pledge on 1000 share sale at $60
-    obligation = PledgeCalculator.calculate_obligation(
-        shares_sold=1000,
-        sale_price=60.0,
-        pledge_percentage=0.5,
-        sale_date=date(2025, 1, 15),
-        lot_id="RSU_2021"
-    )
-
-    print(f"Shares sold: {obligation.shares_sold}")
-    print(f"Shares required to donate: {obligation.maximalist_shares_required}")
-    print(f"Dollar obligation: ${obligation.total_pledge_obligation:,.2f}")
-    print(f"Match window closes: {obligation.match_window_closes}")
-
-    # Validate strategies
-    print("\nStrategy validation:")
-    print(f"Sell 1000, donate 1000 (50%): {PledgeCalculator.validate_donation_strategy(1000, 1000, 0.5)}")
-    print(f"Sell 1000, donate 500 (33%): {PledgeCalculator.validate_donation_strategy(1000, 500, 0.5)}")

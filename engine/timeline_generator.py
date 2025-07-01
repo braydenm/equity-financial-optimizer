@@ -132,7 +132,7 @@ class TimelineGenerator:
 
     def _get_strike_price(self, equity_pos: Dict[str, Any]) -> float:
         """Extract strike price from original grants."""
-        grants = equity_pos.get('original_grants', [])
+        grants = equity_pos.get('grants', [])
         if grants:
             return grants[0].get('strike_price', 0.0)
         return 0.0
@@ -144,7 +144,7 @@ class TimelineGenerator:
             return lot_data['grant_id']
 
         # Fallback to first grant ID if available
-        grants = equity_pos.get('original_grants', [])
+        grants = equity_pos.get('grants', [])
         if grants and 'grant_id' in grants[0]:
             return grants[0]['grant_id']
 

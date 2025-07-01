@@ -131,11 +131,11 @@ class PortfolioManager:
         financial = profile_data['financial_position']
         goals = profile_data['goals_and_constraints']
 
-        # Extract grants from equity_position.original_grants
+        # Extract grants from equity_position.grants
         grants = []
         equity_position = profile_data.get('equity_position', {})
-        if 'original_grants' in equity_position:
-            grants = equity_position['original_grants']
+        if 'grants' in equity_position:
+            grants = equity_position['grants']
 
         # Get charitable info from first grant (v2.0 format)
         default_pledge_percentage = 0.0
@@ -431,6 +431,12 @@ class PortfolioManager:
         - Tender: Check if date matches known tender offer
         """
         if action_type == ActionType.EXERCISE:
+            # Check if this is a special lot ID for unexercised options
+            if lot_id in ['ISO', 'NSO', 'RSU']:
+                # For unexercised options, we don't need to check tender price
+                # The projection calculator will handle the FMV determination
+                return None
+            
             # For NSO exercises, check if we should use tender price as FMV
             lot = next((lot for lot in self._initial_lots if lot.lot_id == lot_id), None)
             if not lot:

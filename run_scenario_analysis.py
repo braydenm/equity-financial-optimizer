@@ -394,7 +394,7 @@ def print_scenario_results(result, detailed=True, verbose=False):
 
         # Charitable donations table (only if donations exist)
         total_donations = sum(state.donation_value for state in result.yearly_states)
-        if total_donations > 0 or (final_state and final_state.pledge_state.total_outstanding_obligation > 0):
+        if total_donations > 0 or (final_state and final_state.pledge_state and final_state.pledge_state.total_shares_remaining > 0):
             print(f"\nCHARITABLE ACTIVITY:")
             print(f"  {'Year':<6} {'Donated':>12} {'Match Earned':>12} {'Deduction':>12} {'Carried Fwd':>12} {'Pledge Oblig':>12}")
             print(f"  {'-'*78}")
@@ -416,7 +416,7 @@ def print_scenario_results(result, detailed=True, verbose=False):
                     carryforward = sum(state.charitable_state.federal_carryforward_remaining.values()) + sum(state.charitable_state.ca_carryforward_remaining.values())
 
                 # Get pledge obligation
-                pledge_obligation = state.pledge_state.total_outstanding_obligation if state.pledge_state else 0
+                pledge_obligation = state.pledge_state.total_shares_remaining if state.pledge_state else 0
 
                 print(f"  {state.year:<6} ${donation_value:>11,.0f} ${company_match:>11,.0f} "
                       f"${deduction_used:>11,.0f} ${carryforward:>11,.0f} ${pledge_obligation:>11,.0f}")
@@ -424,12 +424,12 @@ def print_scenario_results(result, detailed=True, verbose=False):
             # Add pledge fulfillment summary if pledges exist
             if final_state and final_state.pledge_state and final_state.pledge_state.obligations:
                 print(f"\n  Pledge Summary:")
-                total_pledged = sum(o.total_pledge_obligation for o in final_state.pledge_state.obligations)
-                total_fulfilled = sum(o.donations_made for o in final_state.pledge_state.obligations)
+                total_pledged = sum(o.shares_obligated for o in final_state.pledge_state.obligations)
+                total_fulfilled = sum(o.shares_fulfilled for o in final_state.pledge_state.obligations)
                 fulfillment_pct = (total_fulfilled / total_pledged * 100) if total_pledged > 0 else 0
-                print(f"    Total Pledged: ${total_pledged:,.0f}")
-                print(f"    Total Fulfilled: ${total_fulfilled:,.0f} ({fulfillment_pct:.1f}%)")
-                print(f"    Outstanding: ${final_state.pledge_state.total_outstanding_obligation:,.0f}")
+                print(f"    Total Pledged: {total_pledged:,} shares")
+                print(f"    Total Fulfilled: {total_fulfilled:,} shares ({fulfillment_pct:.1f}%)")
+                print(f"    Outstanding: {final_state.pledge_state.total_shares_remaining:,} shares")
 
 def print_raw_data_tables(result):
     """Print raw data tables that map 1:1 to CSV outputs."""

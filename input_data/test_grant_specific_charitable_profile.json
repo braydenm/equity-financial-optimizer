@@ -1,7 +1,7 @@
 {
   "personal_information": {
     "federal_tax_rate": 0.37,
-    "federal_ltcg_rate": 0.20,
+    "federal_ltcg_rate": 0.2,
     "state_tax_rate": 0.133,
     "state_ltcg_rate": 0.133,
     "fica_tax_rate": 0.062,
@@ -34,21 +34,29 @@
   },
   "equity_position": {
     "company": "TestCorp",
-    "original_grants": [
+    "grants": [
       {
         "grant_id": "EARLY_EMPLOYEE_GRANT",
         "grant_date": "2020-01-15",
         "total_options": 50000,
         "isos": 25000,
         "nsos": 25000,
-        "strike_price": 1.50,
+        "strike_price": 1.5,
         "vesting_start_date": "2020-01-15",
-        "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12,
         "expiration_date": "2030-01-15",
         "charitable_program": {
-          "pledge_percentage": 0.50,
+          "pledge_percentage": 0.5,
           "company_match_ratio": 3.0
+        },
+        "vesting_status": {
+          "vested_unexercised": {
+            "iso": 25000,
+            "nso": 20000
+          },
+          "unvested": {
+            "total_shares": 0,
+            "vesting_calendar": []
+          }
         }
       },
       {
@@ -57,15 +65,25 @@
         "total_options": 20000,
         "isos": 10000,
         "nsos": 10000,
-        "strike_price": 5.00,
+        "strike_price": 5.0,
         "vesting_start_date": "2022-06-01",
-        "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12,
         "expiration_date": "2032-06-01",
         "charitable_program": {
           "pledge_percentage": 0.25,
           "company_match_ratio": 1.0
-        }
+        },
+        "vesting_status": {
+          "vested_unexercised": {
+            "iso": 6250,
+            "nso": 4250
+          },
+          "unvested": {
+            "total_shares": 7500,
+            "vesting_calendar": []
+          }
+        },
+        "_vesting_schedule_DEPRECATED": "4_year_monthly_with_cliff",
+        "_cliff_months_DEPRECATED": 12
       },
       {
         "grant_id": "RECENT_EMPLOYEE_GRANT",
@@ -73,11 +91,21 @@
         "total_options": 10000,
         "isos": 5000,
         "nsos": 5000,
-        "strike_price": 15.00,
+        "strike_price": 15.0,
         "vesting_start_date": "2024-03-01",
-        "vesting_schedule": "4_year_monthly_with_cliff",
-        "cliff_months": 12,
-        "expiration_date": "2034-03-01"
+        "expiration_date": "2034-03-01",
+        "vesting_status": {
+          "vested_unexercised": {
+            "iso": 0,
+            "nso": 0
+          },
+          "unvested": {
+            "total_shares": 10000,
+            "vesting_calendar": []
+          }
+        },
+        "_vesting_schedule_DEPRECATED": "4_year_monthly_with_cliff",
+        "_cliff_months_DEPRECATED": 12
       }
     ],
     "exercised_lots": [
@@ -87,9 +115,9 @@
         "exercise_date": "2023-01-15",
         "shares": 5000,
         "type": "NSO",
-        "strike_price": 1.50,
-        "fmv_at_exercise": 12.00,
-        "cost_basis": 1.50,
+        "strike_price": 1.5,
+        "fmv_at_exercise": 12.0,
+        "cost_basis": 1.5,
         "taxes_paid": 18375
       },
       {
@@ -98,24 +126,17 @@
         "exercise_date": "2023-08-01",
         "shares": 2000,
         "type": "NSO",
-        "strike_price": 5.00,
-        "fmv_at_exercise": 12.00,
-        "cost_basis": 5.00,
+        "strike_price": 5.0,
+        "fmv_at_exercise": 12.0,
+        "cost_basis": 5.0,
         "taxes_paid": 6160
       }
-    ],
-    "vested_unexercised": {
-      "iso_shares": 15000,
-      "nso_shares": 8000
-    },
-    "unvested": {
-      "vesting_calendar": []
-    }
+    ]
   },
   "tax_situation": {
     "estimated_taxes": {
-      "regular_income_withholding_rate": 0.30,
-      "supplemental_income_withholding_rate": 0.40,
+      "regular_income_withholding_rate": 0.3,
+      "supplemental_income_withholding_rate": 0.4,
       "quarterly_payments": 25000
     },
     "carryforwards": {

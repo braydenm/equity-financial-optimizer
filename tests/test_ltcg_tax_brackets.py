@@ -44,8 +44,8 @@ def load_demo_profile():
         current_cash=data['financial_position']['liquid_assets']['cash'],
         exercise_reserves=data['goals_and_constraints']['liquidity_needs']['exercise_reserves'],
         # Add other fields with defaults
-        company_match_ratio=data['equity_position']['original_grants'][0]['charitable_program']['company_match_ratio'],
-        pledge_percentage=data['equity_position']['original_grants'][0]['charitable_program']['pledge_percentage']
+        company_match_ratio=data['equity_position']['grants'][0]['charitable_program']['company_match_ratio'],
+        pledge_percentage=data['equity_position']['grants'][0]['charitable_program']['pledge_percentage']
     )
 
     return profile

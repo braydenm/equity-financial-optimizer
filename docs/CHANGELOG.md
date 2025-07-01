@@ -319,7 +319,7 @@
 - Fixed acquisition_date field in action_summary.csv - now populated with actual grant/exercise dates from lot lifecycle
 - Enhanced holding_period_days calculation based on acquisition date vs action date for accurate tax treatment
 - Corrected tax_treatment field to properly reflect STCG (<365 days) vs LTCG (≥365 days) based on holding periods
-- Updated equity loader to extract and populate grant_date from original_grants in user profile
+- Updated equity loader to extract and populate grant_date from grants in user profile
 - Added comprehensive test coverage with test_action_summary_data_quality.py to verify data accuracy
 
 ## Charitable Deduction Usage Bug Fix
@@ -430,7 +430,7 @@
 - Created new milestone type `ipo_pledge_obligation` with special lot ID `TOTAL_PLEDGE` for easy identification
 
 ### Data Pipeline Integration
-- Fixed critical grant loading bug in PortfolioManager where equity grants from JSON `equity_position.original_grants` were not being transferred to UserProfile.grants attribute
+- Fixed critical grant loading bug in PortfolioManager where equity grants from JSON `equity_position.grants` were not being transferred to UserProfile.grants attribute
 - Enhanced IPO pledge calculation to handle both object-based and dictionary-based grant structures
 - Added support for both `total_shares` and `total_options` grant attributes for maximum compatibility
 - Implemented proper aggregation of pledge percentages across multiple grants with charitable programs
@@ -620,3 +620,27 @@
 - Updated copy_scenario_csvs.py to reference components.csv instead of action_summary.csv
 - Updated examples/test_natural_evolution.py to expect components.csv
 - Removed PHASE_5_1_DETAILED_SCOPE.md migration plan document
+
+## 2025-07-01
+
+### Major Pledge Tracking Overhaul
+- **Added LiquidityEvent model** (calculators/liquidity_event.py) to track tender offers, IPO, and donation windows
+- **Implemented IPO remainder obligations** - automatically creates pledge for unfulfilled commitments at IPO
+- **Redesigned PledgeObligation** to use share-based tracking with FIFO fulfillment (replaced dollar-based)
+- **Enhanced pledge tracking** in CSV outputs with year-specific obligated/donated/expired columns
+- **Added cash donation support** from liquidity event proceeds with proper tracking
+- **Created comprehensive pledge tests** (test_ipo_remainder_obligation.py, test_pledge_tracking_gap.py)
+
+### Profile Data Structure Migration
+- **Renamed `original_grants` to `grants`** throughout codebase (57 occurrences across 20 files)
+- **Moved vesting data** into grant-specific `vesting_status.unvested.vesting_calendar` structure
+- **Fixed equity loader** to create future vesting lots (VEST_YYYYMMDD_TYPE) from new grant structure
+- **Added backward compatibility** in projection calculator to support both old and new vesting formats
+- **Cleaned deprecated fields** from all profile templates (demo, user_template, test profiles)
+
+### Bug Fixes and Improvements
+- **Fixed scenario analysis** pledge tracking to use new PledgeState properties
+- **Updated portfolio manager** to handle special lot IDs (ISO, NSO, RSU) for unexercised options
+- **Enhanced CSV generators** with detailed pledge obligation tracking and expiration reporting
+- **Added test_vesting_calendar_loading.py** to prevent regression of vesting lot creation
+- **All 37 tests passing** including new pledge tracking scenarios

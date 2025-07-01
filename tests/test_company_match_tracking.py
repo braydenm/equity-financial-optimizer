@@ -227,10 +227,14 @@ class TestCompanyMatchTracking:
 
         # Verify results
         year_2027_state = result.get_state_for_year(2027)
-        # Company match only applies to amount applied to pledge ($50k obligation)
-        pledge_applied_amount = 50000.0  # Only $50k needed to fulfill $50k obligation
-        expected_company_match = pledge_applied_amount * 3.0  # $150,000
+        # Company match is based on the donated shares value at current price
+        # 1000 shares * $70/share * 3x match = $210,000
+        expected_company_match = 1000 * 70.0 * 3.0  # $210,000
 
+        print(f"DEBUG: Actual company match: ${year_2027_state.company_match_received:,.2f}")
+        print(f"DEBUG: Expected company match: ${expected_company_match:,.2f}")
+        print(f"DEBUG: Donation value: ${year_2027_state.donation_value:,.2f}")
+        
         assert year_2027_state.company_match_received == expected_company_match
 
         # Verify pledge is fulfilled
@@ -239,10 +243,14 @@ class TestCompanyMatchTracking:
         assert obligation.is_fulfilled
 
         print(f"✅ Sale year: 2025, Donation year: 2027")
-        print(f"✅ Match window closes: {obligation.match_window_closes}")
+        # Find the liquidity event to get window close date
+        if hasattr(result.user_profile, 'liquidity_events') and result.user_profile.liquidity_events:
+            event = next((e for e in result.user_profile.liquidity_events if e.event_id == obligation.source_event_id), None)
+            if event:
+                print(f"✅ Match window closes: {event.match_window_closes}")
         print(f"✅ Donation within window: Yes")
-        print(f"✅ Donation value: ${1000 * 70.0:,.2f}, Applied to pledge: ${pledge_applied_amount:,.2f}")
-        print(f"✅ Company match: ${expected_company_match:,.2f} (on pledge-applied portion)")
+        print(f"✅ Donation value: ${1000 * 70.0:,.2f}")
+        print(f"✅ Company match: ${expected_company_match:,.2f} (based on current share value)")
         print(f"✅ Pledge fulfilled: {obligation.is_fulfilled}")
 
     def test_scenario_3_donation_after_window_expires(self):
@@ -301,12 +309,16 @@ class TestCompanyMatchTracking:
         # Verify pledge obligation shows donation but no match eligibility
         pledge_state = year_2029_state.pledge_state
         obligation = pledge_state.obligations[0]
-        assert obligation.donations_made == 0.0  # Match rejected due to closed window
+        assert obligation.shares_fulfilled == 0  # Match rejected due to closed window
 
         print(f"✅ Sale year: 2025, Donation year: 2029")
-        print(f"✅ Match window closed: {obligation.match_window_closes}")
+        # Find the liquidity event to get window close date
+        if hasattr(result.user_profile, 'liquidity_events') and result.user_profile.liquidity_events:
+            event = next((e for e in result.user_profile.liquidity_events if e.event_id == obligation.source_event_id), None)
+            if event:
+                print(f"✅ Match window closed: {event.match_window_closes}")
         print(f"✅ Total donations made in 2029: ${year_2029_state.donation_value:,.2f}")
-        print(f"✅ Donation applied to pledge: ${obligation.donations_made:,.2f}")
+        print(f"✅ Shares applied to pledge: {obligation.shares_fulfilled}")
         print(f"✅ Company match received: ${year_2029_state.company_match_received:,.2f}")
         print(f"✅ Lost match opportunity: ${total_lost_match:,.2f}")
 
@@ -380,8 +392,9 @@ class TestCompanyMatchTracking:
         pledge_state = year_2029_state.pledge_state
         obligation = pledge_state.obligations[0]
 
-        print(f"✅ Shares sold: {obligation.shares_sold}")
-        print(f"✅ Shares required: {obligation.maximalist_shares_required}")
+        # We sold 2000 shares, need to donate 2000 shares for 50% pledge
+        print(f"✅ Shares obligated: {obligation.shares_obligated}")
+        print(f"✅ Shares fulfilled: {obligation.shares_fulfilled}")
         print(f"✅ Shares donated within window: 800")
         print(f"✅ Company match (within window): ${expected_match_2027:,.2f}")
         print(f"✅ Company match (outside window): $0.00")
@@ -434,22 +447,21 @@ class TestCompanyMatchTracking:
         # Verify company match only applies to matchable portion
         year_2026_state = result.get_state_for_year(2026)
 
-        # Company match applies to amount applied to pledge obligation ($50k total obligation)
-        pledge_obligation_amount = 50000.0  # Full pledge obligation from $50k sale
-        expected_company_match = pledge_obligation_amount * 3.0  # $150,000 for pledge portion
+        # Company match applies to shares credited (1000 shares at current price)
+        # Even though we donate 1500 shares, only 1000 count toward pledge
+        expected_company_match = 1000 * 60.0 * 3.0  # $180,000 for credited shares
         assert year_2026_state.company_match_received == expected_company_match
 
         # Verify pledge is fulfilled (only needed amount applied)
         pledge_state = year_2026_state.pledge_state
         obligation = pledge_state.obligations[0]
-        assert obligation.maximalist_shares_donated == 1000  # Only shares needed for fulfillment
+        assert obligation.shares_fulfilled == 1000  # Only shares needed for fulfillment
         assert obligation.is_fulfilled  # Fully fulfilled
 
-        print(f"✅ Shares sold: {obligation.shares_sold}")
-        print(f"✅ Shares required: {obligation.maximalist_shares_required}")
-        print(f"✅ Shares donated: {obligation.maximalist_shares_donated}")
-        print(f"✅ Donation value: ${1500 * 60.0:,.2f}, Applied to pledge: ${pledge_obligation_amount:,.2f}")
-        print(f"✅ Company match: ${expected_company_match:,.2f} (on pledge-applied portion)")
+        print(f"✅ Shares obligated: {obligation.shares_obligated}")
+        print(f"✅ Shares fulfilled: {obligation.shares_fulfilled}")
+        print(f"✅ Donation value: ${1500 * 60.0:,.2f}")
+        print(f"✅ Company match: ${expected_company_match:,.2f} (on credited shares at current price)")
         print(f"✅ Pledge fulfilled: {obligation.is_fulfilled} (excess donation beyond obligation)")
 
     def test_scenario_6_two_purchases_one_donation(self):
@@ -515,20 +527,20 @@ class TestCompanyMatchTracking:
         assert len(pledge_state.obligations) == 2
 
         # First obligation should be fully satisfied (1000 shares)
-        first_obligation = next(o for o in pledge_state.obligations if o.commencement_date == date(2025, 3, 1))
-        assert first_obligation.maximalist_shares_donated == 1000
+        first_obligation = next(o for o in pledge_state.obligations if o.creation_date == date(2025, 3, 1))
+        assert first_obligation.shares_fulfilled == 1000
         assert first_obligation.is_fulfilled
 
         # Second obligation should be partially satisfied (500 shares)
-        second_obligation = next(o for o in pledge_state.obligations if o.commencement_date == date(2025, 6, 1))
-        assert second_obligation.maximalist_shares_donated == 500
+        second_obligation = next(o for o in pledge_state.obligations if o.creation_date == date(2025, 6, 1))
+        assert second_obligation.shares_fulfilled == 500
         assert not second_obligation.is_fulfilled  # Still needs 300 more shares
 
         print(f"✅ First sale: 1000 shares (needs 1000 donated)")
         print(f"✅ Second sale: 800 shares (needs 800 donated)")
         print(f"✅ Total donation: 1500 shares")
         print(f"✅ First obligation fulfilled: {first_obligation.is_fulfilled}")
-        print(f"✅ Second obligation donated: {second_obligation.maximalist_shares_donated}/800")
+        print(f"✅ Second obligation donated: {second_obligation.shares_fulfilled}/800")
         print(f"✅ Second obligation fulfilled: {second_obligation.is_fulfilled}")
         print(f"✅ Company match: ${expected_company_match:,.2f}")
 
@@ -646,8 +658,7 @@ class TestCompanyMatchTracking:
 
         # Detailed obligation analysis
         for i, obligation in enumerate(final_pledge_state.obligations):
-            print(f"   Obligation {i+1}: {obligation.maximalist_shares_donated}/{obligation.maximalist_shares_required} shares, "
-                  f"Lost match: ${obligation.lost_match_opportunity:,.2f}")
+            print(f"   Obligation {i+1}: {obligation.shares_fulfilled}/{obligation.shares_obligated} shares")
 
     def test_scenario_8_missed_opportunity_and_over_donation(self):
         """Test Scenario 8: Complex scenario with missed opportunities and over-donation."""
@@ -745,9 +756,9 @@ class TestCompanyMatchTracking:
         final_pledge_state = year_2028_state.pledge_state
 
         # Calculate expected values
-        first_obligation = next(o for o in final_pledge_state.obligations if o.commencement_date == date(2025, 1, 15))
-        second_obligation = next(o for o in final_pledge_state.obligations if o.commencement_date == date(2025, 3, 15))
-        third_obligation = next(o for o in final_pledge_state.obligations if o.commencement_date == date(2025, 6, 15))
+        first_obligation = next(o for o in final_pledge_state.obligations if o.creation_date == date(2025, 1, 15))
+        second_obligation = next(o for o in final_pledge_state.obligations if o.creation_date == date(2025, 3, 15))
+        third_obligation = next(o for o in final_pledge_state.obligations if o.creation_date == date(2025, 6, 15))
 
         # Calculate and verify both types of lost opportunities
 
@@ -796,12 +807,9 @@ class TestCompanyMatchTracking:
 
         # Detailed obligation analysis
         print(f"\n✅ Final obligation status:")
-        print(f"   Obligation 1 (Jan 2025): {first_obligation.maximalist_shares_donated}/{first_obligation.maximalist_shares_required} shares, "
-              f"Lost match: ${first_obligation.lost_match_opportunity:,.2f}")
-        print(f"   Obligation 2 (Mar 2025): {second_obligation.maximalist_shares_donated}/{second_obligation.maximalist_shares_required} shares, "
-              f"Lost match: ${second_obligation.lost_match_opportunity:,.2f}")
-        print(f"   Obligation 3 (Jun 2025): {third_obligation.maximalist_shares_donated}/{third_obligation.maximalist_shares_required} shares, "
-              f"Lost match: ${third_obligation.lost_match_opportunity:,.2f}")
+        print(f"   Obligation 1 (Jan 2025): {first_obligation.shares_fulfilled}/{first_obligation.shares_obligated} shares")
+        print(f"   Obligation 2 (Mar 2025): {second_obligation.shares_fulfilled}/{second_obligation.shares_obligated} shares")
+        print(f"   Obligation 3 (Jun 2025): {third_obligation.shares_fulfilled}/{third_obligation.shares_obligated} shares")
 
         # Verify total charitable impact includes both personal donations and company match
         total_donations = result.summary_metrics['total_donations_all_years']

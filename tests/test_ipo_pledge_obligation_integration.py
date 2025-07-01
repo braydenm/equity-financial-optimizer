@@ -80,7 +80,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
             },
             "equity_position": {
                 "company": "Test Company",
-                "original_grants": [
+                "grants": [
                     {
                         "grant_id": "TEST_GRANT",
                         "grant_date": "2022-01-15",
@@ -182,7 +182,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
             real_estate_equity=financial['illiquid_assets'].get('real_estate_equity', 0),
             amt_credit_carryforward=tax_situation['carryforwards'].get('amt_credit', 0),
             assumed_ipo=date.fromisoformat(profile_data['assumed_ipo']),
-            grants=profile_data['equity_position']['original_grants']
+            grants=profile_data['equity_position']['grants']
         )
 
         # Create planned actions
@@ -516,7 +516,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
         )
 
         # Add a second grant
-        profile_data["equity_position"]["original_grants"].append({
+        profile_data["equity_position"]["grants"].append({
             "grant_id": "TEST_GRANT_2",
             "grant_date": "2023-01-15",
             "total_shares": 5000,
@@ -552,7 +552,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
     def test_end_to_end_portfolio_manager_integration(self):
         """
         Test PortfolioManager grant loading to catch regressions in grant transfer from JSON to UserProfile.
-        This validates the specific fix where grants weren't being loaded from equity_position.original_grants.
+        This validates the specific fix where grants weren't being loaded from equity_position.grants.
         """
         from engine.portfolio_manager import PortfolioManager
 
@@ -710,7 +710,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
                 "company_match_ratio": 0.0
             },
             "equity_position": {
-                "original_grants": [
+                "grants": [
                     {
                         "grant_id": "REGRESSION_TEST_GRANT",
                         "grant_date": "2022-01-01",

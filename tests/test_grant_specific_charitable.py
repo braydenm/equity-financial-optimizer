@@ -74,7 +74,7 @@ class TestGrantSpecificCharitable(unittest.TestCase):
             },
             "equity_position": {
                 "company": "TestCorp",
-                "original_grants": [
+                "grants": [
                     {
                         "grant_id": "GRANT_001",
                         "grant_date": "2022-01-01",
@@ -317,29 +317,29 @@ class TestGrantSpecificCharitable(unittest.TestCase):
 
         # Check GRANT_001 obligation (50% pledge)
         grant_001_obligation = next(
-            (o for o in pledge_state.obligations if "LOT_GRANT_001" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "GRANT_001"),
             None
         )
         self.assertIsNotNone(grant_001_obligation)
         self.assertEqual(grant_001_obligation.pledge_percentage, 0.5)
         # With 50% pledge: shares_donated = (0.5 * 100) / (1 - 0.5) = 100
         expected_shares = int((0.5 * 100) / (1 - 0.5))
-        self.assertEqual(grant_001_obligation.maximalist_shares_required, expected_shares)
+        self.assertEqual(grant_001_obligation.shares_obligated, expected_shares)
 
         # Check GRANT_002 obligation (25% pledge)
         grant_002_obligation = next(
-            (o for o in pledge_state.obligations if "LOT_GRANT_002" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "GRANT_002"),
             None
         )
         self.assertIsNotNone(grant_002_obligation)
         self.assertEqual(grant_002_obligation.pledge_percentage, 0.25)
         # With 25% pledge: shares_donated = (0.25 * 100) / (1 - 0.25) = 33.33 -> 33
         expected_shares = int((0.25 * 100) / (1 - 0.25))
-        self.assertEqual(grant_002_obligation.maximalist_shares_required, expected_shares)
+        self.assertEqual(grant_002_obligation.shares_obligated, expected_shares)
 
         # Check GRANT_003 obligation (should use default 50% pledge)
         grant_003_obligation = next(
-            (o for o in pledge_state.obligations if "LOT_GRANT_003" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id == "GRANT_003"),
             None
         )
         self.assertIsNotNone(grant_003_obligation)
@@ -347,7 +347,7 @@ class TestGrantSpecificCharitable(unittest.TestCase):
 
         # Check no-grant obligation (should use default 50% pledge)
         no_grant_obligation = next(
-            (o for o in pledge_state.obligations if "LOT_NO_GRANT" in o.parent_transaction_id),
+            (o for o in pledge_state.obligations if o.grant_id is None),
             None
         )
         self.assertIsNotNone(no_grant_obligation)

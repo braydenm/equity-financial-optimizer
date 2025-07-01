@@ -219,50 +219,6 @@ class CashDonationComponents:
 
 
 @dataclass
-class PledgeObligation:
-    """Represents a donation pledge obligation from share sales."""
-    obligation_id: str
-    creation_date: date
-    source_transaction: str  # Reference to sale that created it
-    total_amount: float
-    deadline: date
-
-    # Fulfillment tracking
-    fulfilled_amount: float = 0.0
-    fulfillment_history: List[Dict[str, float]] = field(default_factory=list)
-
-    @property
-    def remaining_amount(self) -> float:
-        """Calculate remaining obligation."""
-        return self.total_amount - self.fulfilled_amount
-
-    @property
-    def is_fulfilled(self) -> bool:
-        """Check if obligation is fully satisfied."""
-        return self.remaining_amount <= 0
-
-    @property
-    def days_until_deadline(self) -> int:
-        """Calculate days remaining to deadline from today."""
-        from datetime import date as dt
-        return (self.deadline - dt.today()).days
-
-    def record_fulfillment(self, amount: float, fulfillment_date: date, reference: str):
-        """Record a fulfillment against this obligation."""
-        if amount <= 0:
-            raise ValueError("Fulfillment amount must be positive")
-        if amount > self.remaining_amount:
-            raise ValueError(f"Fulfillment amount {amount} exceeds remaining obligation {self.remaining_amount}")
-
-        self.fulfilled_amount += amount
-        self.fulfillment_history.append({
-            'date': fulfillment_date.isoformat(),
-            'amount': amount,
-            'reference': reference
-        })
-
-
-@dataclass
 class AnnualTaxComponents:
     """Aggregated tax components for a single year."""
     year: int
