@@ -66,7 +66,7 @@ def save_annual_tax_detail_csv(result: ProjectionResult, output_path: str) -> No
 
             # Determine which tax regime applies
             federal_tax_regime = 'AMT' if state.tax_state.federal_amt_tax > state.tax_state.federal_regular_tax else 'Regular'
-            
+
             writer.writerow({
                 'year': state.year,
                 'w2_income': round(result.user_profile.annual_w2_income if result.user_profile else state.income, 2),
@@ -500,9 +500,7 @@ def generate_holding_milestones_csv(result: ProjectionResult, output_path: str) 
                 for grant in result.user_profile.grants:
                     # Handle both total_shares and total_options attributes (from dict)
                     grant_shares = 0
-                    if 'total_shares' in grant:
-                        grant_shares = grant['total_shares']
-                    elif 'total_options' in grant:
+                    if 'total_options' in grant:
                         grant_shares = grant['total_options']
 
                     if grant_shares > 0 and 'charitable_program' in grant:
@@ -908,7 +906,7 @@ def save_all_projection_csvs(result: ProjectionResult, scenario_name: str, outpu
     # New tracking CSVs
     generate_holding_milestones_csv(result, f"{output_dir}/{base_name}_holding_period_tracking.csv")
     save_charitable_carryforward_csv(result, f"{output_dir}/{base_name}_charitable_carryforward.csv")
-    
+
 
     # Comprehensive cash flow tracking
     save_comprehensive_cashflow_csv(result, f"{output_dir}/{base_name}_comprehensive_cashflow.csv")
@@ -928,7 +926,8 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                      'pledge_shares_outstanding', 'pledge_shares_expired', 'outstanding_obligation',
                      'charitable_personal_value', 'charitable_match_value', 'charitable_total_impact',
                      'pledge_fulfillment_rate', 'outstanding_amt_credits', 'expired_charitable_deduction',
-                     'expired_option_count', 'expired_option_loss']
+                     'expired_option_count', 'expired_option_loss', 'min_cash_balance', 'min_cash_year',
+                     'years_to_burn_amt_credits', 'initial_amt_credits', 'max_tax_burden', 'max_tax_year']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -952,5 +951,11 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                 'outstanding_amt_credits': metrics.get('amt_credits_final', 0),
                 'expired_charitable_deduction': metrics.get('expired_charitable_deduction', 0),
                 'expired_option_count': metrics.get('expired_option_count', 0),
-                'expired_option_loss': metrics.get('expired_option_loss', 0)
+                'expired_option_loss': metrics.get('expired_option_loss', 0),
+                'min_cash_balance': metrics.get('min_cash_balance', 0),
+                'min_cash_year': metrics.get('min_cash_year', 0),
+                'years_to_burn_amt_credits': metrics.get('years_to_burn_amt_credits', 0),
+                'initial_amt_credits': metrics.get('initial_amt_credits', 0),
+                'max_tax_burden': metrics.get('max_tax_burden', 0),
+                'max_tax_year': metrics.get('max_tax_year', 0)
             })

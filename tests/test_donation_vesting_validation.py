@@ -24,11 +24,11 @@ from projections.projection_calculator import ProjectionCalculator
 
 class TestDonationVestingValidation(unittest.TestCase):
     """Test that donations respect vesting constraints."""
-    
+
     def setUp(self):
         """Set up test data."""
         self.base_date = date(2025, 1, 1)
-        
+
         # Create a simple user profile
         self.profile = UserProfile(
             federal_tax_rate=0.24,
@@ -50,7 +50,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 {
                     'grant_id': 'GRANT_001',
                     'grant_date': '2024-01-01',
-                    'total_shares': 10000,
+                    'total_options': 10000,
                     'share_type': 'ISO',
                     'strike_price': 10.0,
                     'vesting_schedule': [
@@ -66,7 +66,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 }
             ]
         )
-        
+
     def test_donation_exceeds_available_shares_should_fail(self):
         """Test that attempting to donate more than available shares raises an error."""
         # Create initial lots - exercised shares
@@ -85,7 +85,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 tax_treatment=TaxTreatment.NA
             )
         ]
-        
+
         # Create projection plan
         plan = ProjectionPlan(
             name="Test Donation Exceeds Available",
@@ -96,7 +96,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             initial_cash=50000,
             price_projections={2025: 50.0}
         )
-        
+
         # Try to donate 5000 shares (more than available)
         plan.add_action(PlannedAction(
             action_date=date(2025, 2, 1),
@@ -105,19 +105,19 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=5000,  # More than available!
             price=50.0
         ))
-        
+
         # Create calculator and attempt projection
         calculator = ProjectionCalculator(self.profile)
-        
+
         # This should raise an error
         with self.assertRaises(ValueError) as context:
             result = calculator.evaluate_projection_plan(plan)
-            
+
         # Check the error message
         self.assertIn("Cannot donate", str(context.exception))
         self.assertIn("5000", str(context.exception))
         self.assertIn("2500", str(context.exception))
-        
+
     def test_donation_within_available_shares_should_succeed(self):
         """Test that donating within available limits works correctly."""
         # Create initial lots - exercised shares
@@ -136,7 +136,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 tax_treatment=TaxTreatment.NA
             )
         ]
-        
+
         # Create projection plan
         plan = ProjectionPlan(
             name="Test Valid Donation",
@@ -147,7 +147,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             initial_cash=50000,
             price_projections={2025: 50.0, 2026: 50.0}
         )
-        
+
         # Donate 2000 shares (within the 2500 available)
         plan.add_action(PlannedAction(
             action_date=date(2025, 3, 1),
@@ -156,20 +156,20 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=2000,
             price=50.0
         ))
-        
+
         # Create calculator and execute projection
         calculator = ProjectionCalculator(self.profile)
         result = calculator.evaluate_projection_plan(plan)
-        
+
         # Should succeed
         self.assertIsNotNone(result)
-        
+
         # Check that donation was processed
         year_2025_state = result.get_state_for_year(2025)
         total_shares_donated = sum(year_2025_state.shares_donated.values())
         self.assertEqual(total_shares_donated, 2000)
         self.assertEqual(year_2025_state.donation_value, 100000.0)  # 2000 * $50
-        
+
     def test_cannot_donate_unexercised_options(self):
         """Test that you cannot donate unexercised options."""
         # Create initial lots - unexercised vested options
@@ -186,7 +186,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 expiration_date=date(2034, 1, 1)
             )
         ]
-        
+
         # Create projection plan
         plan = ProjectionPlan(
             name="Test Donate Unexercised",
@@ -197,7 +197,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             initial_cash=50000,
             price_projections={2025: 50.0}
         )
-        
+
         # Try to donate unexercised options directly
         plan.add_action(PlannedAction(
             action_date=date(2025, 2, 1),
@@ -206,20 +206,20 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=1000,
             price=50.0
         ))
-        
+
         # Create calculator and attempt projection
         calculator = ProjectionCalculator(self.profile)
-        
+
         # This should raise an error or produce no donation
         # The system should require exercise first
         with self.assertRaises(ValueError):
             result = calculator.evaluate_projection_plan(plan)
-        
+
     def test_donation_sequence_with_vesting(self):
         """Test proper sequence: vest -> exercise -> donate."""
         # Create initial lots matching vesting schedule
         initial_lots = []
-        
+
         # Vested and exercised shares
         initial_lots.append(
             ShareLot(
@@ -236,7 +236,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 tax_treatment=TaxTreatment.NA
             )
         )
-        
+
         # Vested but unexercised
         initial_lots.append(
             ShareLot(
@@ -251,7 +251,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 expiration_date=date(2034, 1, 1)
             )
         )
-        
+
         # Create projection plan
         plan = ProjectionPlan(
             name="Test Vesting Sequence",
@@ -262,7 +262,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             initial_cash=100000,
             price_projections={2025: 50.0, 2026: 60.0}
         )
-        
+
         # Can donate already exercised shares immediately
         plan.add_action(PlannedAction(
             action_date=date(2025, 3, 1),
@@ -271,7 +271,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=1000,
             price=50.0
         ))
-        
+
         # Must exercise vested options before donating
         plan.add_action(PlannedAction(
             action_date=date(2025, 6, 1),
@@ -280,7 +280,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=2500,
             price=10.0  # Strike price
         ))
-        
+
         # Now can donate the newly exercised shares
         plan.add_action(PlannedAction(
             action_date=date(2025, 9, 1),
@@ -289,22 +289,22 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=1500,
             price=50.0
         ))
-        
+
         # Create calculator and execute projection
         calculator = ProjectionCalculator(self.profile)
         result = calculator.evaluate_projection_plan(plan)
-        
+
         # Check results
         year_2025_state = result.get_state_for_year(2025)
-        
+
         # Total donated should be 2500 (1000 + 1500)
         total_shares_donated = sum(year_2025_state.shares_donated.values())
         self.assertEqual(total_shares_donated, 2500)
         self.assertEqual(year_2025_state.donation_value, 125000.0)  # 2500 * $50
-        
+
     def test_warning_for_excess_donation(self):
         """Test that donations exceeding pledge percentage generate appropriate tracking.
-        
+
         Note: Based on the current implementation, the system appears to give
         company match on all donated shares, not just those within the pledge.
         This may need to be reviewed for compliance with the donation FAQ rules.
@@ -325,7 +325,7 @@ class TestDonationVestingValidation(unittest.TestCase):
                 tax_treatment=TaxTreatment.NA
             )
         ]
-        
+
         # Create projection plan
         plan = ProjectionPlan(
             name="Test Excess Donation",
@@ -336,7 +336,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             initial_cash=50000,
             price_projections={2025: 50.0, 2026: 50.0}
         )
-        
+
         # Sell 4000 shares (creates 2000 share pledge obligation at 50%)
         plan.add_action(PlannedAction(
             action_date=date(2025, 2, 1),
@@ -345,7 +345,7 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=4000,
             price=50.0
         ))
-        
+
         # Donate 3000 shares (exceeds 2000 pledge by 1000)
         plan.add_action(PlannedAction(
             action_date=date(2025, 3, 1),
@@ -354,19 +354,19 @@ class TestDonationVestingValidation(unittest.TestCase):
             quantity=3000,
             price=50.0
         ))
-        
+
         # Create calculator and execute projection
         calculator = ProjectionCalculator(self.profile)
         result = calculator.evaluate_projection_plan(plan)
-        
+
         # Should succeed
         self.assertIsNotNone(result)
-        
+
         # Check that all shares were donated
         year_2025_state = result.get_state_for_year(2025)
         total_shares_donated = sum(year_2025_state.shares_donated.values())
         self.assertEqual(total_shares_donated, 3000)
-        
+
         # Company match is actually given on all donated shares up to obligation
         # Since we sold 4000 shares with 50% pledge = 2000 obligation
         # But donated 3000 shares, only 2000 count for match
@@ -374,7 +374,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         # But if the system gives match on all 3000: 3000 * $50 * 3 = $450,000
         # Let's check which behavior is implemented
         self.assertEqual(year_2025_state.company_match_received, 450000.0)
-        
+
         # The full donation value should be 3000 * $50 = $150,000
         self.assertEqual(year_2025_state.donation_value, 150000.0)
 

@@ -54,7 +54,7 @@
             "nso": 20000
           },
           "unvested": {
-            "total_shares": 0,
+            "remaining_unvested": 0,
             "vesting_calendar": []
           }
         }
@@ -78,12 +78,10 @@
             "nso": 4250
           },
           "unvested": {
-            "total_shares": 7500,
+            "remaining_unvested": 7500,
             "vesting_calendar": []
           }
-        },
-        "_vesting_schedule_DEPRECATED": "4_year_monthly_with_cliff",
-        "_cliff_months_DEPRECATED": 12
+        }
       },
       {
         "grant_id": "RECENT_EMPLOYEE_GRANT",
@@ -100,12 +98,10 @@
             "nso": 0
           },
           "unvested": {
-            "total_shares": 10000,
+            "remaining_unvested": 10000,
             "vesting_calendar": []
           }
-        },
-        "_vesting_schedule_DEPRECATED": "4_year_monthly_with_cliff",
-        "_cliff_months_DEPRECATED": 12
+        }
       }
     ],
     "exercised_lots": [
@@ -128,8 +124,7 @@
         "type": "NSO",
         "strike_price": 5.0,
         "fmv_at_exercise": 12.0,
-        "cost_basis": 5.0,
-        "taxes_paid": 6160
+        "cost_basis": 5.0
       }
     ]
   },

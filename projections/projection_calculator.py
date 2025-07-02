@@ -86,7 +86,7 @@ class ProjectionCalculator:
             if lot_id in ['ISO', 'NSO', 'RSU']:
                 # These will be validated during actual exercise processing
                 continue
-                
+
             # Find the lot in initial_lots
             lot = next((l for l in plan.initial_lots if l.lot_id == lot_id), None)
             if not lot:
@@ -108,7 +108,7 @@ class ProjectionCalculator:
         """
         # Store plan reference for vesting calculations
         self._current_plan = plan
-        
+
         # Validate the exercise plan before processing
         self._validate_exercise_plan(plan)
 
@@ -213,10 +213,10 @@ class ProjectionCalculator:
 
                     # Find or create liquidity event for this sale
                     sale_event = self._find_or_create_liquidity_event_for_sale(
-                        action.action_date, 
+                        action.action_date,
                         action.price if action.price else current_year_fmv
                     )
-                    
+
                     # Update event with this sale
                     sale_event.shares_sold += action.quantity
                     sale_event.net_proceeds += sale_result['net_proceeds']
@@ -253,10 +253,10 @@ class ProjectionCalculator:
                         donation_date=action.action_date,
                         liquidity_events=self.profile.liquidity_events
                     )
-                    
+
                     # Track shares that actually counted toward pledge
                     shares_credited = discharge_result.get('shares_credited', 0)
-                    
+
                     # Calculate company match based on credited shares
                     # Get match ratio from donation result (set during donation processing)
                     if 'grant_id' in donation_result and donation_result['grant_id']:
@@ -265,7 +265,7 @@ class ProjectionCalculator:
                     else:
                         # Fallback to default match ratio
                         match_ratio = self.profile.company_match_ratio
-                    
+
                     # Company match is based on shares credited * price * match ratio
                     donation_price = action.price if action.price else current_year_fmv
                     actual_company_match = shares_credited * donation_price * match_ratio
@@ -282,14 +282,14 @@ class ProjectionCalculator:
             if (self.profile.assumed_ipo and
                 year == self.profile.assumed_ipo.year and
                 not hasattr(yearly_state, '_ipo_obligation_created')):
-                
+
                 # Find or create IPO liquidity event
                 ipo_event = None
                 for event in self.profile.liquidity_events:
                     if event.event_type == "ipo" and event.event_date.year == year:
                         ipo_event = event
                         break
-                
+
                 if not ipo_event:
                     # Create IPO event if not already in profile
                     ipo_event = LiquidityEvent(
@@ -300,22 +300,22 @@ class ProjectionCalculator:
                         shares_vested_at_event=0  # Will calculate below
                     )
                     self.profile.liquidity_events.append(ipo_event)
-                
+
                 # Process each grant separately for IPO obligations
                 if hasattr(self.profile, 'grants') and self.profile.grants:
                     for grant in self.profile.grants:
                         grant_id = grant.get('grant_id')
-                        grant_shares = grant.get('total_shares', grant.get('total_options', 0))
-                        
+                        grant_shares = grant.get('total_options', 0)
+
                         # Get vested shares for this grant at IPO
                         vested_shares = self._calculate_vested_shares_for_grant(grant, self.profile.assumed_ipo)
                         ipo_event.shares_vested_at_event += vested_shares
-                        
+
                         # Get charitable program for this grant
                         charitable_program = self._get_charitable_program_for_grant(grant_id)
                         pledge_pct = charitable_program['pledge_percentage']
                         match_ratio = charitable_program['company_match_ratio']
-                        
+
                         if pledge_pct > 0:
                             # Create IPO remainder obligation for this grant
                             ipo_obligation = PledgeCalculator.calculate_ipo_remainder_obligation(
@@ -327,11 +327,11 @@ class ProjectionCalculator:
                                 grant_id=grant_id,
                                 match_ratio=match_ratio
                             )
-                            
+
                             if ipo_obligation:
                                 pledge_state.add_obligation(ipo_obligation)
                                 yearly_state.pledge_shares_obligated_this_year += ipo_obligation.shares_obligated
-                
+
                 # Mark that we've created IPO obligations
                 yearly_state._ipo_obligation_created = True
 
@@ -473,7 +473,7 @@ class ProjectionCalculator:
             # Calculate year-specific expired shares before processing window closures
             for obligation in pledge_state.obligations:
                 # Find source event to check window closure
-                source_event = next((e for e in self.profile.liquidity_events 
+                source_event = next((e for e in self.profile.liquidity_events
                                    if e.event_id == obligation.source_event_id), None)
                 if source_event and source_event.match_window_closes.year == year:
                     unfulfilled = obligation.shares_remaining
@@ -629,7 +629,6 @@ class ProjectionCalculator:
             exercise_date=action.action_date,
             cost_basis=current_price if lot.share_type == ShareType.NSO else lot.strike_price,
             fmv_at_exercise=current_price,  # Critical for disqualifying disposition calculations
-            taxes_paid=0.0,  # Tax will be calculated at year-end
             expiration_date=lot.expiration_date,  # Preserve expiration date from parent lot
             grant_id=lot.grant_id  # Preserve grant_id from parent lot
         )
@@ -705,7 +704,7 @@ class ProjectionCalculator:
 
         # Calculate net proceeds (simplified - in reality would subtract taxes)
         net_proceeds = gross_proceeds  # TODO: Subtract actual taxes withheld
-        
+
         return {
             'gross_proceeds': gross_proceeds,
             'net_proceeds': net_proceeds,
@@ -724,7 +723,7 @@ class ProjectionCalculator:
         # Validate share quantity
         if action.quantity > lot.quantity:
             raise ValueError(f"Cannot donate {action.quantity} shares from lot {action.lot_id} - only {lot.quantity} shares available")
-        
+
         # Validate that shares are exercised (you can't donate unexercised options)
         if lot.lifecycle_state != LifecycleState.EXERCISED_NOT_DISPOSED:
             raise ValueError(f"Cannot donate unexercised shares from lot {action.lot_id}. Shares must be exercised before donation.")
@@ -856,7 +855,7 @@ class ProjectionCalculator:
         for event in self.profile.liquidity_events:
             if event.event_date == sale_date:
                 return event
-        
+
         # Create new liquidity event
         event = LiquidityEvent(
             event_id=f"sale_{sale_date.isoformat()}",
@@ -867,77 +866,77 @@ class ProjectionCalculator:
         )
         self.profile.liquidity_events.append(event)
         return event
-    
+
     def _calculate_vested_shares_for_grant(self, grant: Dict, as_of_date: date) -> int:
         """Calculate how many shares are vested for a specific grant as of a given date.
-        
-        Per the donation matching FAQ, obligations are based on "vested shares subject to 
+
+        Per the donation matching FAQ, obligations are based on "vested shares subject to
         your eligible equity awards", not just exercised shares.
         """
         grant_id = grant.get('grant_id', 'unknown')
-        total_options = grant.get('total_shares') or grant.get('total_options')
-        
+        total_options = grant.get('total_options')
+
         if total_options is None:
-            raise ValueError(f"Grant {grant_id} missing total_shares or total_options")
-        
+            raise ValueError(f"Grant {grant_id} missing total_options")
+
         # Check if we have vesting_status (new structure)
         vesting_status = grant.get('vesting_status')
         if vesting_status:
             # Use the new vesting structure
             vested_unexercised = vesting_status.get('vested_unexercised', {})
             vested_shares = vested_unexercised.get('iso', 0) + vested_unexercised.get('nso', 0) + vested_unexercised.get('rsu', 0)
-            
+
             # Add any shares that will vest by the as_of_date
             unvested = vesting_status.get('unvested', {})
             vesting_calendar = unvested.get('vesting_calendar', [])
-            
+
             for vest_event in vesting_calendar:
                 vest_date = date.fromisoformat(vest_event['date'])
                 if vest_date <= as_of_date:
                     vested_shares += vest_event['shares']
-            
+
             # Also count any exercised shares from this grant
             # (though the new structure should have these in vested_unexercised)
-            
+
         else:
             # Fall back to schedule-based calculation for old profiles
             vested_shares = self._calculate_vested_shares_from_schedule(grant, as_of_date)
-        
+
         # Log for transparency
         print(f"Grant {grant_id}: {vested_shares} shares vested as of {as_of_date} (of {total_options} total)")
-        
+
         return vested_shares
-    
+
     def _calculate_vested_shares_from_schedule(self, grant: Dict, as_of_date: date) -> int:
         """Fallback calculation using vesting schedule when actual data is not available."""
         grant_id = grant.get('grant_id', 'unknown')
-        
+
         vesting_start_str = grant.get('vesting_start_date') or grant.get('grant_date')
         if not vesting_start_str:
             raise ValueError(f"Grant {grant_id} missing vesting_start_date or grant_date")
-        
+
         try:
             vesting_start = date.fromisoformat(vesting_start_str)
         except ValueError as e:
             raise ValueError(f"Grant {grant_id} has invalid date format: {vesting_start_str}") from e
-        
-        total_shares = grant.get('total_shares') or grant.get('total_options')
+
+        total_shares = grant.get('total_options')
         if total_shares is None:
             raise ValueError(f"Grant {grant_id} missing total_shares or total_options")
-        
+
         vesting_schedule = grant.get('vesting_schedule')
         if not vesting_schedule:
             raise ValueError(f"Grant {grant_id} missing vesting_schedule")
-        
+
         if 'cliff' in vesting_schedule.lower():
             cliff_months = grant.get('cliff_months')
             if cliff_months is None:
                 raise ValueError(f"Grant {grant_id} has cliff vesting but missing cliff_months")
         else:
             cliff_months = 0
-        
+
         months_elapsed = (as_of_date.year - vesting_start.year) * 12 + (as_of_date.month - vesting_start.month)
-        
+
         if vesting_schedule == '4_year_monthly_with_cliff':
             if months_elapsed < cliff_months:
                 return 0
@@ -947,7 +946,7 @@ class ProjectionCalculator:
                 return int(total_shares * months_elapsed / 48)
         else:
             raise ValueError(f"Grant {grant_id} has unsupported vesting_schedule: {vesting_schedule}")
-    
+
     def calculate_year_withholding(self, year: int, annual_components: AnnualTaxComponents) -> float:
         """
         Calculate tax withholding for a given year based on income types.

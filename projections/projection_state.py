@@ -64,7 +64,6 @@ class ShareLot:
     tax_treatment: TaxTreatment
     exercise_date: Optional[date] = None
     cost_basis: float = 0.0
-    taxes_paid: float = 0.0
     amt_adjustment: float = 0.0
     fmv_at_exercise: Optional[float] = None  # Required for exercised lots, None for unexercised
     expiration_date: Optional[date] = None  # Expiration date for options
@@ -161,7 +160,7 @@ class CharitableDeductionState:
 class PledgeObligation:
     """
     Pledge obligation tracking per the donation matching program.
-    
+
     Obligations can be created by:
     1. Share sales during liquidity events
     2. IPO trigger for remaining unfulfilled pledge on all vested shares
@@ -173,7 +172,7 @@ class PledgeObligation:
     shares_fulfilled: int = 0  # Number of shares donated toward this obligation
     pledge_percentage: float = 0.5  # Pledge percentage that created this obligation
     grant_id: Optional[str] = None  # Which grant this obligation relates to
-    
+
     # For tracking donation eligibility
     match_ratio: float = 3.0  # Company match ratio for this obligation
 
@@ -181,12 +180,12 @@ class PledgeObligation:
     def is_fulfilled(self) -> bool:
         """Check if this obligation is fully satisfied."""
         return self.shares_fulfilled >= self.shares_obligated
-    
+
     @property
     def shares_remaining(self) -> int:
         """Number of shares still needed to fulfill this obligation."""
         return max(0, self.shares_obligated - self.shares_fulfilled)
-    
+
     @property
     def fulfillment_percentage(self) -> float:
         """Percentage of obligation fulfilled (0.0 to 1.0)."""
@@ -207,27 +206,27 @@ class PledgeState:
     def apply_share_donation(self, shares_donated: int, donation_date: date, liquidity_events: List['LiquidityEvent']) -> dict:
         """
         Apply share donation to obligations in FIFO order.
-        
+
         Only applies to obligations whose source liquidity event window is still open.
-        
+
         Returns:
             dict with 'shares_credited': shares that count toward pledge fulfillment
         """
         remaining_shares = shares_donated
         shares_credited = 0
-        
+
         # Sort by creation date to ensure FIFO discharge
         sorted_obligations = sorted(self.obligations, key=lambda o: o.creation_date)
-        
+
         for obligation in sorted_obligations:
             if remaining_shares <= 0:
                 break
-            
+
             # Find the source liquidity event to check window
             source_event = next((e for e in liquidity_events if e.event_id == obligation.source_event_id), None)
             if source_event and not source_event.is_window_open(donation_date):
                 continue  # Skip if window is closed
-            
+
             # Apply shares to this obligation
             shares_needed = obligation.shares_remaining
             if shares_needed > 0:
@@ -235,24 +234,24 @@ class PledgeState:
                 obligation.shares_fulfilled += applied_shares
                 remaining_shares -= applied_shares
                 shares_credited += applied_shares
-        
+
         return {'shares_credited': shares_credited, 'shares_uncredited': remaining_shares}
 
     @property
     def total_shares_obligated(self) -> int:
         """Total shares obligated across all pledges."""
         return sum(obligation.shares_obligated for obligation in self.obligations)
-    
+
     @property
     def total_shares_fulfilled(self) -> int:
         """Total shares fulfilled across all obligations."""
         return sum(obligation.shares_fulfilled for obligation in self.obligations)
-    
+
     @property
     def total_shares_remaining(self) -> int:
         """Total shares still needed to fulfill all obligations."""
         return sum(obligation.shares_remaining for obligation in self.obligations)
-    
+
     def get_obligations_for_event(self, event_id: str) -> List[PledgeObligation]:
         """Get all obligations associated with a specific liquidity event."""
         return [o for o in self.obligations if o.source_event_id == event_id]
@@ -302,7 +301,7 @@ class YearlyState:
 
     # Pledge obligations
     pledge_state: PledgeState = field(default_factory=PledgeState)
-    
+
     # Year-specific pledge tracking
     pledge_shares_obligated_this_year: int = 0
     pledge_shares_donated_this_year: int = 0
@@ -412,7 +411,7 @@ class ProjectionResult:
         pledge_shares_donated = 0
         pledge_shares_outstanding = 0
         pledge_shares_expired_window = 0
-        
+
         # Sum up expired shares from all yearly states
         for state in self.yearly_states:
             if hasattr(state, 'pledge_shares_expired_this_year'):
@@ -468,6 +467,41 @@ class ProjectionResult:
         # Get AMT credits from final state (placeholder for now)
         amt_credits_final = getattr(final_state, 'amt_credits_balance', 0) if final_state else 0
 
+        # Calculate minimum cash balance across all years
+        min_cash_balance = float('inf')
+        min_cash_year = None
+        for state in self.yearly_states:
+            if state.ending_cash < min_cash_balance:
+                min_cash_balance = state.ending_cash
+                min_cash_year = state.year
+
+        # Calculate years to burn AMT credits
+        years_to_burn_amt_credits = 0
+        initial_amt_credits = 0
+        if self.yearly_states:
+            # Find first year with AMT credits
+            for i, state in enumerate(self.yearly_states):
+                if hasattr(state, 'amt_credits_balance') and state.amt_credits_balance > 0:
+                    initial_amt_credits = state.amt_credits_balance
+                    # Find when credits reach zero
+                    for j in range(i, len(self.yearly_states)):
+                        if hasattr(self.yearly_states[j], 'amt_credits_balance'):
+                            if self.yearly_states[j].amt_credits_balance == 0:
+                                years_to_burn_amt_credits = j - i
+                                break
+                    # If still have credits at end, count total years
+                    if years_to_burn_amt_credits == 0 and amt_credits_final > 0:
+                        years_to_burn_amt_credits = len(self.yearly_states) - i
+                    break
+
+        # Calculate maximum single-year tax burden
+        max_tax_burden = 0
+        max_tax_year = None
+        for state in self.yearly_states:
+            if state.tax_state.total_tax > max_tax_burden:
+                max_tax_burden = state.tax_state.total_tax
+                max_tax_year = state.year
+
         self.summary_metrics = {
             'total_cash_final': final_state.ending_cash if final_state else 0,
             'total_taxes_all_years': total_taxes,
@@ -489,7 +523,13 @@ class ProjectionResult:
             'expired_option_loss': total_opportunity_cost,
             'total_opportunity_cost': total_opportunity_cost,
             'total_expired_shares': total_expired_shares,
-            'expiration_details': expiration_details
+            'expiration_details': expiration_details,
+            'min_cash_balance': min_cash_balance,
+            'min_cash_year': min_cash_year,
+            'years_to_burn_amt_credits': years_to_burn_amt_credits,
+            'initial_amt_credits': initial_amt_credits,
+            'max_tax_burden': max_tax_burden,
+            'max_tax_year': max_tax_year
         }
 
 
@@ -553,7 +593,7 @@ class UserProfile:
 
     # Grant-specific charitable programs for per-grant pledge tracking
     grants: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     # Liquidity events for tracking donation windows and proceeds
     liquidity_events: List['LiquidityEvent'] = field(default_factory=list)
 
@@ -624,7 +664,7 @@ def calculate_pledge_metrics_for_year(pledge_state: PledgeState, year: int, liqu
             donated += obligation.shares_fulfilled
 
             # Calculate shares with expired windows (unfulfilled obligations past window)
-            source_event = next((e for e in liquidity_events 
+            source_event = next((e for e in liquidity_events
                                if e.event_id == obligation.source_event_id), None)
             if (source_event and
                 year_end > source_event.match_window_closes and

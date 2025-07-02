@@ -45,12 +45,12 @@
             "nso": 0
           },
           "unvested": {
-            "total_shares": 8000,
+            "remaining_unvested": 8000,
             "vesting_calendar": [
-              {"date": "2025-07-01", "shares": 2000, "share_type": "ISO"},
-              {"date": "2025-10-01", "shares": 2000, "share_type": "ISO"},
-              {"date": "2026-01-01", "shares": 2000, "share_type": "NSO"},
-              {"date": "2026-04-01", "shares": 2000, "share_type": "NSO"}
+              { "date": "2025-07-01", "shares": 2000, "share_type": "ISO" },
+              { "date": "2025-10-01", "shares": 2000, "share_type": "ISO" },
+              { "date": "2026-01-01", "shares": 2000, "share_type": "NSO" },
+              { "date": "2026-04-01", "shares": 2000, "share_type": "NSO" }
             ]
           }
         }
@@ -65,8 +65,7 @@
         "type": "RSU",
         "strike_price": 0,
         "fmv_at_exercise": 10.0,
-        "cost_basis": 0,
-        "taxes_paid": 0
+        "cost_basis": 0
       },
       {
         "lot_id": "RSU_2022_001",
@@ -76,8 +75,7 @@
         "type": "RSU",
         "strike_price": 0,
         "fmv_at_exercise": 12.0,
-        "cost_basis": 0,
-        "taxes_paid": 0
+        "cost_basis": 0
       },
       {
         "lot_id": "ISO_2023_001",
@@ -88,7 +86,6 @@
         "strike_price": 8.0,
         "fmv_at_exercise": 15.0,
         "cost_basis": 8.0,
-        "taxes_paid": 0,
         "amt_adjustment": 21000.0
       },
       {
@@ -99,8 +96,7 @@
         "type": "RSU",
         "strike_price": 0,
         "fmv_at_exercise": 20.0,
-        "cost_basis": 0,
-        "taxes_paid": 0
+        "cost_basis": 0
       }
     ],
     "current_prices": {

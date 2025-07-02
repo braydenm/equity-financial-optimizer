@@ -293,7 +293,6 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
             tax_treatment=tax_treatment,
             exercise_date=exercise_date,
             cost_basis=lot_data.get('cost_basis', lot_data['strike_price']),
-            taxes_paid=lot_data.get('taxes_paid', 0),
             amt_adjustment=lot_data.get('amt_adjustment', 0)
         )
         initial_lots.append(lot)

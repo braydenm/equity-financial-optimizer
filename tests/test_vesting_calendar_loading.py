@@ -30,7 +30,7 @@ class TestVestingCalendarLoading(unittest.TestCase):
                         "grant_id": "GRANT_001",
                         "grant_date": "2023-01-15",
                         "type": "ISO/NSO",
-                        "total_shares": 50000,
+                        "total_options": 50000,
                         "strike_price": 10.0,
                         "vesting_start_date": "2023-01-15",
                         "expiration_date": "2033-01-15",
@@ -40,7 +40,7 @@ class TestVestingCalendarLoading(unittest.TestCase):
                                 "nso": 5000
                             },
                             "unvested": {
-                                "total_shares": 35000,
+                                "remaining_unvested": 35000,
                                 "vesting_calendar": [
                                     {"date": "2025-06-24", "shares": 3106, "share_type": "ISO"},
                                     {"date": "2025-09-24", "shares": 3107, "share_type": "ISO"},
@@ -55,70 +55,70 @@ class TestVestingCalendarLoading(unittest.TestCase):
                 "exercised_lots": []
             }
         }
-        
+
         self.loader = EquityLoader(reference_date=date(2025, 1, 1))
 
     def test_vesting_calendar_lots_created(self):
         """Test that future vesting events create appropriate lots."""
         lots = self.loader.load_lots_from_profile(self.profile_data)
-        
+
         # Find all VEST_ lots
         vest_lots = [lot for lot in lots if lot.lot_id.startswith('VEST_')]
-        
+
         # Should have 5 vesting calendar entries
-        self.assertEqual(len(vest_lots), 5, 
+        self.assertEqual(len(vest_lots), 5,
                         f"Expected 5 VEST_ lots, got {len(vest_lots)}: {[lot.lot_id for lot in vest_lots]}")
-        
+
         # Check specific lot IDs were created
         expected_lot_ids = [
             "VEST_20250624_ISO",
-            "VEST_20250924_ISO", 
+            "VEST_20250924_ISO",
             "VEST_20251224_NSO",
             "VEST_20260124_ISO",
             "VEST_20260324_NSO"
         ]
-        
+
         actual_lot_ids = [lot.lot_id for lot in vest_lots]
         for expected_id in expected_lot_ids:
-            self.assertIn(expected_id, actual_lot_ids, 
+            self.assertIn(expected_id, actual_lot_ids,
                          f"Expected lot {expected_id} not found in {actual_lot_ids}")
 
     def test_vesting_lot_details(self):
         """Test that vesting lots have correct details."""
         lots = self.loader.load_lots_from_profile(self.profile_data)
-        
+
         # Check the first vesting lot
         vest_lot = next((lot for lot in lots if lot.lot_id == "VEST_20250624_ISO"), None)
         self.assertIsNotNone(vest_lot, "VEST_20250624_ISO lot not found")
-        
+
         # Verify lot details
         self.assertEqual(vest_lot.quantity, 3106)
         self.assertEqual(vest_lot.strike_price, 10.0)
         self.assertEqual(vest_lot.share_type.value, "ISO")
         self.assertEqual(vest_lot.grant_id, "GRANT_001")
         self.assertEqual(vest_lot.lifecycle_state, LifecycleState.GRANTED_NOT_VESTED)
-        
+
         # Verify expiration date
         self.assertEqual(vest_lot.expiration_date, date(2033, 1, 15))
 
     def test_mixed_vested_and_unvested(self):
         """Test that both vested and unvested shares are loaded correctly."""
         lots = self.loader.load_lots_from_profile(self.profile_data)
-        
+
         # Should have vested lots
         iso_lot = next((lot for lot in lots if lot.lot_id == "ISO"), None)
         nso_lot = next((lot for lot in lots if lot.lot_id == "NSO"), None)
-        
+
         self.assertIsNotNone(iso_lot, "ISO vested lot not found")
         self.assertIsNotNone(nso_lot, "NSO vested lot not found")
-        
+
         self.assertEqual(iso_lot.quantity, 10000)
         self.assertEqual(nso_lot.quantity, 5000)
-        
+
         # Plus the 5 unvested lots
         vest_lots = [lot for lot in lots if lot.lot_id.startswith('VEST_')]
         self.assertEqual(len(vest_lots), 5)
-        
+
         # Total should be 7 lots (2 vested + 5 unvested)
         self.assertEqual(len(lots), 7)
 
@@ -127,16 +127,16 @@ class TestVestingCalendarLoading(unittest.TestCase):
         # Create loader with future reference date
         future_loader = EquityLoader(reference_date=date(2025, 10, 1))
         lots = future_loader.load_lots_from_profile(self.profile_data)
-        
+
         # Lots that should have vested by October 2025
         june_lot = next((lot for lot in lots if lot.lot_id == "VEST_20250624_ISO"), None)
         sept_lot = next((lot for lot in lots if lot.lot_id == "VEST_20250924_ISO"), None)
         dec_lot = next((lot for lot in lots if lot.lot_id == "VEST_20251224_NSO"), None)
-        
+
         # June and September should be vested
         self.assertEqual(june_lot.lifecycle_state, LifecycleState.VESTED_NOT_EXERCISED)
         self.assertEqual(sept_lot.lifecycle_state, LifecycleState.VESTED_NOT_EXERCISED)
-        
+
         # December should still be unvested
         self.assertEqual(dec_lot.lifecycle_state, LifecycleState.GRANTED_NOT_VESTED)
 
@@ -150,7 +150,7 @@ class TestVestingCalendarLoading(unittest.TestCase):
                         "grant_id": "GRANT_002",
                         "grant_date": "2023-01-15",
                         "type": "ISO",
-                        "total_shares": 10000,
+                        "total_options": 10000,
                         "strike_price": 5.0,
                         "expiration_date": "2033-01-15",
                         "vesting_status": {
@@ -162,9 +162,9 @@ class TestVestingCalendarLoading(unittest.TestCase):
                 ]
             }
         }
-        
+
         lots = self.loader.load_lots_from_profile(minimal_profile)
-        
+
         # Should only have the vested ISO lot
         self.assertEqual(len(lots), 1)
         self.assertEqual(lots[0].lot_id, "ISO")

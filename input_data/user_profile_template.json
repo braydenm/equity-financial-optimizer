@@ -49,21 +49,21 @@
             "nso": 27917
           },
           "unvested": {
-            "total_shares": 27083,
+            "remaining_unvested": 27083,
             "vesting_calendar": [
-              {"date": "2025-01-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-02-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2025-03-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-04-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2025-05-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-06-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2025-07-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-08-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2025-09-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-10-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2025-11-15", "shares": 2083, "share_type": "ISO"},
-              {"date": "2025-12-15", "shares": 2083, "share_type": "NSO"},
-              {"date": "2026-01-15", "shares": 2084, "share_type": "ISO"}
+              { "date": "2025-01-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-02-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2025-03-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-04-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2025-05-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-06-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2025-07-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-08-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2025-09-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-10-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2025-11-15", "shares": 2083, "share_type": "ISO" },
+              { "date": "2025-12-15", "shares": 2083, "share_type": "NSO" },
+              { "date": "2026-01-15", "shares": 2084, "share_type": "ISO" }
             ]
           }
         }
@@ -79,7 +79,6 @@
         "strike_price": 2.5,
         "fmv_at_exercise": 10.0,
         "cost_basis": 2.5,
-        "taxes_paid": 0,
         "amt_adjustment": 75000
       },
       {
@@ -91,7 +90,6 @@
         "strike_price": 2.5,
         "fmv_at_exercise": 15.0,
         "cost_basis": 15.0,
-        "taxes_paid": 75000,
         "amt_adjustment": 0
       }
     ],

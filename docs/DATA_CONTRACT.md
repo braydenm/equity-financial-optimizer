@@ -55,7 +55,7 @@ This document defines the canonical format for user profile data in the Equity F
         "grant_id": "GRANT-001",
         "grant_date": "2022-01-15",
         "type": "ISO|NSO|RSU",
-        "total_shares": 100000,  // or "total_options" for compatibility
+        "total_options": 100000,  // or "total_options" for compatibility
         "isos": 50000,  // ISO portion of total
         "nsos": 50000,  // NSO portion of total
         "strike_price": 2.50,  // 0 for RSUs
@@ -75,7 +75,7 @@ This document defines the canonical format for user profile data in the Equity F
             "nso": 10000
           },
           "unvested": {
-            "total_shares": 20000,
+            "remaining_unvested": 20000,
             "vesting_calendar": [
               {"date": "2025-07-01", "shares": 2000, "share_type": "ISO"},
               {"date": "2025-10-01", "shares": 2000, "share_type": "NSO"}
@@ -96,13 +96,9 @@ This document defines the canonical format for user profile data in the Equity F
         "strike_price": 2.50,
         "fmv_at_exercise": 10.00,
         "cost_basis": 2.50,  // For NSOs, includes ordinary income
-        "taxes_paid": 0,  // Withholding or estimated taxes
         "amt_adjustment": 75000  // For ISOs only
       }
     ],
-
-    // DEPRECATED: vested_unexercised and unvested have been moved into each grant's vesting_status
-    // These top-level fields should no longer be used
 
     "current_prices": {
       "last_409a_price": 25.00,
@@ -269,8 +265,7 @@ This document defines the canonical format for user profile data in the Equity F
   - Each grant must have `vesting_status` with actual vesting data
   - `vesting_status.vested_unexercised`: Shares vested but not yet exercised (by type)
   - `vesting_status.unvested.vesting_calendar`: Future vesting events with dates and share counts
-  - DO NOT use `_vesting_schedule_DEPRECATED` or `_cliff_months_DEPRECATED` fields
-  - Validation: exercised (from lots) + vested_unexercised + unvested must equal total_shares/total_options
+  - Validation: exercised (from lots) + vested_unexercised + unvested must equal total_options
 
 - `exercised_lots`: Array of all exercised share lots
   - Each lot must have `shares` (not `shares_available`)

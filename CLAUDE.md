@@ -65,6 +65,7 @@ for actual tax calculations using progressive brackets (not flat rates).
 - All monetary assertions use exact values, not approximations
 - Test both federal and California calculations
 - Edge cases: negative values, missing data, boundary conditions
+- **Test-Driven Bug Fixes**: When a bug is found, first create a failing test that demonstrates the bug, then implement the fix to make the test pass
 
 ## Key Files for New Agents
 
@@ -154,3 +155,4 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
 - Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
+- **AUDIT NEEDED**: Review cost_basis field usage across profile files and ensure correct flow/calculation for both regular and AMT tax on subsequent sale events. Verify ISOs use strike price as cost basis for regular tax but FMV at exercise for AMT calculations

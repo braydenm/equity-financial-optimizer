@@ -84,7 +84,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
                     {
                         "grant_id": "TEST_GRANT",
                         "grant_date": "2022-01-15",
-                        "total_shares": total_shares,
+                        "total_options": total_shares,
                         "strike_price": 2.5,
                         "vesting_start_date": "2022-01-15",
                         "vesting_schedule": "4_year_monthly_with_cliff",
@@ -107,13 +107,13 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
                     }
                 ],
                 "vested_unexercised": {
-                    "total_shares": 0,
+                    "remaining_unvested": 0,
                     "iso_shares": 0,
                     "nso_shares": 0,
                     "rsu_shares": 0
                 },
                 "unvested": {
-                    "total_shares": 0,
+                    "remaining_unvested": 0,
                     "vesting_calendar": []
                 }
             },
@@ -519,7 +519,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
         profile_data["equity_position"]["grants"].append({
             "grant_id": "TEST_GRANT_2",
             "grant_date": "2023-01-15",
-            "total_shares": 5000,
+            "total_options": 5000,
             "strike_price": 5.0,
             "vesting_start_date": "2023-01-15",
             "vesting_schedule": "4_year_monthly_with_cliff",
@@ -592,7 +592,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
             if real_user_profile.grants:
                 real_grant = real_user_profile.grants[0]
                 self.assertIn('grant_id', real_grant, "Real grant should have grant_id")
-                self.assertTrue('total_options' in real_grant or 'total_shares' in real_grant,
+                self.assertTrue('total_options' in real_grant,
                               "Real grant should have total_options or total_shares")
 
         except Exception as e:
@@ -714,7 +714,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
                     {
                         "grant_id": "REGRESSION_TEST_GRANT",
                         "grant_date": "2022-01-01",
-                        "total_shares": 10000,
+                        "total_options": 10000,
                         "strike_price": 5.0,
                         "charitable_program": {
                             "pledge_percentage": 0.4,  # 40% pledge
@@ -743,7 +743,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
         grant = user_profile.grants[0]
         self.assertIsInstance(grant, dict, "REGRESSION: Grant should be a dict from JSON")
         self.assertIn('grant_id', grant, "REGRESSION: Grant missing grant_id")
-        self.assertTrue('total_shares' in grant or 'total_options' in grant,
+        self.assertTrue('total_options' in grant,
                        "REGRESSION: Grant missing total_shares/total_options")
         self.assertIn('charitable_program', grant,
                      "REGRESSION: Grant missing charitable_program")
@@ -759,7 +759,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
 
         # Verify the fix enables IPO pledge obligation calculation
         # This is what would break if grants aren't loaded properly
-        total_shares = grant.get('total_shares', grant.get('total_options', 0))
+        total_shares = grant.get('total_options', 0)
         pledge_percentage = charitable_program.get('pledge_percentage', 0.0)
         expected_pledge = int(total_shares * pledge_percentage)
 
@@ -790,7 +790,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
             {
                 "grant_id": "REGRESSION_GRANT_1",
                 "grant_date": "2022-01-01",
-                "total_shares": 8000,
+                "total_options": 8000,
                 "strike_price": 5.0,
                 "charitable_program": {
                     "pledge_percentage": 0.5,  # 50% pledge = 4000 shares
@@ -800,7 +800,7 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
             {
                 "grant_id": "REGRESSION_GRANT_2",
                 "grant_date": "2023-01-01",
-                "total_options": 4000,  # Test both total_shares and total_options
+                "total_options": 4000,
                 "strike_price": 10.0,
                 "charitable_program": {
                     "pledge_percentage": 0.25,  # 25% pledge = 1000 shares
@@ -933,12 +933,11 @@ class TestIPOPledgeObligationIntegration(unittest.TestCase):
         self.assertEqual(len(user_profile.grants), 2,
                         "REGRESSION: Should have 2 grants loaded")
 
-        # Verify the fix handles both total_shares and total_options
         grant1 = user_profile.grants[0]
         grant2 = user_profile.grants[1]
 
-        self.assertIn('total_shares', grant1,
-                     "REGRESSION: First grant should have total_shares")
+        self.assertIn('total_options', grant1,
+                     "REGRESSION: First grant should have total_options")
         self.assertIn('total_options', grant2,
                      "REGRESSION: Second grant should have total_options")
 

@@ -132,8 +132,7 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
                         "type": "NSO",
                         "strike_price": 1.50,
                         "fmv_at_exercise": 12.00,
-                        "cost_basis": 1.50,
-                        "taxes_paid": 18375
+                        "cost_basis": 1.50
                     },
                     {
                         "lot_id": "MID_EXERCISED_LOT",
@@ -143,8 +142,7 @@ class TestGrantSpecificCharitableE2E(unittest.TestCase):
                         "type": "NSO",
                         "strike_price": 5.00,
                         "fmv_at_exercise": 12.00,
-                        "cost_basis": 5.00,
-                        "taxes_paid": 6160
+                        "cost_basis": 5.00
                     }
                 ],
                 "vested_unexercised": {

@@ -65,7 +65,7 @@ class TestIPOPledgeZeroDonations(unittest.TestCase):
                 {
                     'grant_id': 'GRANT_001',
                     'grant_date': '2023-01-01',
-                    'total_shares': 80000,
+                    'total_options': 80000,
                     'vesting_start_date': '2023-01-01',
                     'vesting_schedule': '4_year_monthly_with_cliff',
                     'cliff_months': 12,
@@ -159,13 +159,13 @@ class TestIPOPledgeZeroDonations(unittest.TestCase):
         print(f"  Shares Obligated: {metrics.get('pledge_shares_obligated', 0):,}")
         print(f"  Shares Donated: {metrics.get('pledge_shares_donated', 0):,}")
         print(f"  Shares Expired: {metrics.get('pledge_shares_expired_window', 0):,}")
-        
+
         # Debug: Check yearly states for expiration tracking
         print(f"\nYearly expiration tracking:")
         for state in result.yearly_states:
             if hasattr(state, 'pledge_shares_expired_this_year'):
                 print(f"  Year {state.year}: {state.pledge_shares_expired_this_year} shares expired")
-        
+
         # Debug: Check liquidity events
         print(f"\nLiquidity events in profile:")
         if hasattr(self.profile, 'liquidity_events'):

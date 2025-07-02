@@ -21,7 +21,7 @@ def test_tender_nso_exercise_fmv():
     """Test that NSO exercises during tender use tender price as FMV."""
     print("NSO Tender Exercise FMV Test")
     print("=" * 70)
-    
+
     # Create test profile with tender offer
     test_profile = {
         "metadata": {
@@ -54,7 +54,7 @@ def test_tender_nso_exercise_fmv():
                 "grant_id": "GRANT-001",
                 "grant_date": "2023-01-01",
                 "type": "NSO",
-                "total_shares": 10000,
+                "total_options": 10000,
                 "strike_price": 10.0,
                 "vesting_start_date": "2023-01-01",
                 "expiration_date": "2033-01-01",
@@ -67,7 +67,7 @@ def test_tender_nso_exercise_fmv():
                         "nso": 5000
                     },
                     "unvested": {
-                        "total_shares": 5000,
+                        "remaining_unvested": 5000,
                         "vesting_calendar": []
                     }
                 }
@@ -113,11 +113,11 @@ def test_tender_nso_exercise_fmv():
             "time_horizon_years": 5
         }
     }
-    
+
     # Write test profile
     with open('test_tender_profile.json', 'w') as f:
         json.dump(test_profile, f, indent=2)
-    
+
     # Create test scenario with NSO exercise on tender date
     test_scenario = {
         "scenario_name": "nso_tender_exercise",
@@ -131,7 +131,7 @@ def test_tender_nso_exercise_fmv():
                 "notes": "Exercise NSOs during tender"
             },
             {
-                "action_date": "2025-06-01",  
+                "action_date": "2025-06-01",
                 "action_type": "sell",
                 "lot_id": "NSO_EX_20250601",
                 "quantity": 1000,
@@ -139,22 +139,22 @@ def test_tender_nso_exercise_fmv():
             }
         ]
     }
-    
+
     # Write test scenario
     os.makedirs('scenarios/test', exist_ok=True)
     with open('scenarios/test/001_nso_tender_exercise.json', 'w') as f:
         json.dump(test_scenario, f, indent=2)
-    
+
     # Run scenario
     manager = PortfolioManager()
     manager._data_source = 'test'  # Use test data source
     manager._profile_data = test_profile
-    
+
     # Load initial lots from test profile
     from loaders.equity_loader import EquityLoader
     equity_loader = EquityLoader()
     manager._initial_lots = equity_loader.load_lots_from_profile(test_profile)
-    
+
     # Create user profile
     from projections.projection_state import UserProfile
     manager._user_profile = UserProfile(
@@ -177,7 +177,7 @@ def test_tender_nso_exercise_fmv():
         regular_income_withholding_rate=0.35,
         supplemental_income_withholding_rate=0.33
     )
-    
+
     # Execute scenario
     try:
         result = manager.execute_single_scenario(
@@ -186,28 +186,28 @@ def test_tender_nso_exercise_fmv():
             projection_years=1,
             output_dir='output/test_tender'
         )
-        
+
         # Analyze results
         print(f"\nProfile Settings:")
         print(f"  409a Price: ${test_profile['equity_position']['current_prices']['last_409a_price']}")
         print(f"  Tender Price: ${test_profile['equity_position']['current_prices']['tender_offer_price']}")
         print(f"  Tender Date: {test_profile['equity_position']['current_prices']['last_tender_offer_date']}")
-        
+
         # Check NSO exercise components
         yearly_state = result.yearly_states[0]
         nso_components = yearly_state.annual_tax_components.nso_exercise_components
-        
+
         if nso_components:
             nso_comp = nso_components[0]
             print(f"\nNSO Exercise Analysis:")
             print(f"  Strike Price: ${10.0}")
             print(f"  FMV Used: ${nso_comp.fmv_at_exercise}")
             print(f"  Bargain Element: ${nso_comp.bargain_element:,.2f}")
-            
+
             # Check if tender price was used as FMV
             expected_bargain = (56.0 - 10.0) * 1000  # tender_price - strike_price
             actual_bargain = nso_comp.bargain_element
-            
+
             if abs(expected_bargain - actual_bargain) < 0.01:
                 print(f"\n✅ SUCCESS: NSO exercise correctly used tender price as FMV!")
                 print(f"   Expected bargain element: ${expected_bargain:,.2f}")
@@ -217,7 +217,7 @@ def test_tender_nso_exercise_fmv():
                 print(f"   Expected bargain element (using tender price): ${expected_bargain:,.2f}")
                 print(f"   Actual bargain element: ${actual_bargain:,.2f}")
                 print(f"   Appears to have used 409a price instead")
-        
+
         # Check sale components
         sale_components = yearly_state.annual_tax_components.sale_components
         if sale_components:
@@ -226,12 +226,12 @@ def test_tender_nso_exercise_fmv():
             print(f"  Sale Price: ${sale_comp.sale_price}")
             print(f"  Cost Basis: ${sale_comp.cost_basis}")
             print(f"  Capital Gain: ${sale_comp.short_term_gain + sale_comp.long_term_gain:,.2f}")
-            
+
     except Exception as e:
         print(f"\nError running test: {e}")
         import traceback
         traceback.print_exc()
-    
+
     finally:
         # Cleanup
         if os.path.exists('test_tender_profile.json'):
@@ -240,7 +240,7 @@ def test_tender_nso_exercise_fmv():
             os.remove('scenarios/test/001_nso_tender_exercise.json')
         if os.path.exists('scenarios/test'):
             os.rmdir('scenarios/test')
-    
+
     print("\n" + "=" * 70)
 
 
