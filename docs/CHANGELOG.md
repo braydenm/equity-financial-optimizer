@@ -1,658 +1,165 @@
-# CHANGELOG - Equity Financial Optimizer (Claude instructions: Append to end only)
+# CHANGELOG - Equity Financial Optimizer
 
 ## Initial Release
-- Initial equity financial optimizer concept and architecture
-- Basic tender decision calculator for equity liquidity events
-- AMT (Alternative Minimum Tax) estimator for ISO exercises
-- Simple scenario planning framework
-- Company-agnostic design patterns established
-- Built equity compensation optimizer for ISO/NSO/RSU tax optimization with component-based architecture separating event extraction from annual aggregation
+- Built equity optimizer for ISO/NSO/RSU tax planning with component-based architecture
+- Created calculators for tender decisions, AMT estimation, and scenario planning
+- Established company-agnostic design patterns and data-driven approach
+- Implemented progressive tax brackets replacing flat rate approximations
 
 ## Tax Engine Foundation
-- Built progressive bracket calculator replacing flat rate approximations throughout the system
-- ISO Exercise Calculator with federal/state AMT calculations, bargain element tracking, and credit generation
-- Share Sale Calculator with proper STCG/LTCG split and disqualifying disposition handling for ISOs
-- Donation Calculator with component extraction respecting 30% stock/60% cash AGI limits with carryforward
-- Annual Tax Aggregator combining all components with proper federal/CA calculations and AGI-based limits
-- Implemented proper LTCG federal brackets (0%/15%/20%) based on income levels replacing flat rates
-- Fixed NSO exercise calculations to use progressive brackets instead of incorrect 48.65% flat rate (~25% tax savings)
+- Built ISO Exercise Calculator with federal/state AMT and credit generation
+- Created Share Sale Calculator with STCG/LTCG split and disqualifying dispositions
+- Implemented Donation Calculator with 30% stock/60% cash AGI limits and carryforward
+- Added Annual Tax Aggregator with proper federal/CA calculations and income-based LTCG brackets (0%/15%/20%)
 
 ## Architecture Evolution
-- Split monolithic calculator into specialized components with clean separation of concerns
-- Migrated from CSV-based actions to JSON scenario definitions for better structure and validation
-- Added portfolio system for multi-scenario comparison capabilities
-- Implemented automatic equity position timeline generation through lifecycle states
-- Created share lifecycle tracking from grant→vest→exercise→disposition with proper state transitions
-- True component-based architecture where calculators extract components for annual aggregation
+- Split monolithic calculator into specialized components with clean separation
+- Migrated from CSV-based actions to JSON scenario definitions
+- Implemented portfolio system for multi-scenario comparison
+- Created share lifecycle tracking (grant→vest→exercise→disposition)
 
 ## Tender Calculator Refactor
 - Created unified TenderCalculator with pure calculation logic
-- Built TenderStrategyGenerator with 7 different selection strategies
-- Implemented strategy discovery pattern (optimal emerges from comparison, not predetermined)
-- Added evaluate_tender_strategies() to scenario planner
-- Created comprehensive tests for new components
-
-## Calculator Taxonomy Update
-- Renamed tax_estimator.py to iso_exercise_calculator.py
-- Renamed tender_calculator.py to share_sale_calculator.py
-- Updated all imports and class names throughout codebase
-- Cleaned up examples to use API directly
+- Built TenderStrategyGenerator with 7 selection strategies
+- Implemented strategy discovery pattern (optimal emerges from comparison)
+- Added comprehensive test coverage for all components
 
 ## Share Donation Calculator
-- Implemented comprehensive donation calculations with AGI limitations
-- Handles 30% stock / 60% cash federal limits and 50% CA limits
-- Built donation_strategy_generator.py with 7 different strategies
-- Added carryforward rules and company match calculations
-- Integrated with scenario planner through evaluate_donation_strategies()
+- Implemented donation calculations with federal/state AGI limitations
+- Added 5-year carryforward tracking and company match calculations
+- Built donation_strategy_generator with multiple optimization strategies
+- Integrated with scenario planner for comprehensive analysis
 
 ## Data Contract v2.0
 - Created comprehensive DATA_CONTRACT.md defining canonical profile format
-- Built migrate_profile.py utility to convert v1.x profiles to v2.0
+- Built profile migration utility for v1.x to v2.0 conversion
+- Established JSON inputs only, CSV outputs only principle
+- Created direct JSON→ShareLot loading eliminating CSV intermediate format
 
-## Realistic Scenario Development & System Improvements
-- Fixed lot naming consistency by changing VESTED_ISO/NSO to ISO/NSO upstream in equity_loader.py, timeline_generator.py, and natural_evolution_generator.py
-- Removed downstream string replacement logic in projection_output.py
-- Added share quantity validation to projection calculator methods (_process_exercise, _process_sale, _process_donation)
-- Created four fundamental equity compensation strategies as realistic baseline scenarios:
-  - 003_exercise_aggressive: Exercise ISOs as they vest to start LTCG clock ASAP
-  - 004_amt_basic: Manage AMT by exercising ~$100K bargain element per year
-  - 005_charitable_frontload: Exercise and donate early to maximize company match window
-  - 006_diversify: Exercise and sell shares to diversify portfolio ASAP
-- Built portfolio comparison system for side-by-side strategy evaluation
-- Implemented raw data tables functionality in run_scenario_analysis.py with 1:1 CSV mapping:
-  - Created `print_raw_data_tables()` function for terminal output
-  - ANNUAL CASH FLOW table mapping to yearly_cashflow.csv
-  - TAX BREAKDOWN table mapping to tax_timeline.csv
-  - ASSETS BREAKDOWN table mapping to annual_summary.csv
-  - ACTION SUMMARY table mapping to action_summary.csv
-  - Tables use raw numbers only (no $ or % symbols) for easy spreadsheet copy/paste
-  - Column headers match CSV field names with underscores
-- Updated test suite to work with new lot naming conventions
-- Portfolio analysis reveals Exercise Aggressive strategy achieves 53.7% higher net worth than Natural Evolution baseline
+## Realistic Scenario Development
+- Fixed lot naming consistency (VESTED_ISO/NSO → ISO/NSO) across loaders
+- Added share quantity validation to prevent over-exercise/sale/donation
+- Created fundamental strategies: aggressive exercise, AMT management, charitable, diversification
+- Built portfolio comparison system for side-by-side evaluation
 
-## Financial Calculation Validation & Accuracy Fixes
-- Fixed critical AMT credit carryforward bug where credits weren't being properly carried forward year-over-year in projection_calculator.py
-- Fixed investment growth calculation error where unrealized gains were incorrectly added to liquid cash balance
-- Investment growth now properly stays in investment balance as unrealized gains, improving cash flow accuracy
-- AMT credits from user profile now correctly apply to first projection year with proper documentation
-- Validated AMT credit generation, usage, and carryforward logic matches tax regulations
-- Created regression test (test_amt_credit_carryforward.py) that would fail under old implementation but passes with fix
-- Eliminated all conditional field checking throughout codebase
-- Standardized field names across all components
-- Implemented v2.0 data contract with canonical field names
-- Created direct JSON→ShareLot loading via EquityLoader removing CSV as intermediate format
-- Built comprehensive UserProfile with separate federal/state rates replacing combined rate approximations
-- Established principle: JSON for inputs only, CSV for outputs/visualization only
-
-## Portfolio-Based Scenario System
-- Built data-driven scenario architecture with actions defined in JSON files, not code
-- Created portfolio_manager.py for executing single scenarios or portfolio comparisons
-- Implemented automatic price determination (strike for exercises, tender/projected for sales)
-- Separated price growth scenarios into configurable JSON removing hardcoded assumptions
-- Added natural evolution baseline showing trajectory with no actions taken
-- Added comprehensive scenario documentation
-
-## Security & Organization Overhaul
-- Implemented data-source specific scenarios (demo vs user)
-- Created numbered scenario format (000_, 001_, 002_)
-- Enhanced output structure with complete execution traceability
-- Built secure ProfileLoader with automatic demo data fallback and three-file pattern
-- Created main CLI tools: run_portfolio_analysis.py and run_scenario_analysis.py
-- Implemented secure ProfileLoader with demo/user data separation and automatic fallback
-- Created three-file pattern: user_profile.json (private), demo_profile.json (safe), template
-- Built data-source aware timeline generation preventing lot ID mismatches
-- Added output organization: output/{data_source}/{price_scenario}/scenario_{name}/
-- Generated metadata.json for complete execution traceability
-
-## Annual Tax Composition Refactor
-- Created component data structures for all tax events (ISOExerciseComponents, NSOExerciseComponents, ShareSaleComponents, DonationComponents)
-- Built AnnualTaxCalculator with proper progressive tax brackets
-- Fixed critical bugs:
-  - NSO exercises now use brackets instead of flat 48.65% rate
-  - LTCG uses 0%/15%/20% federal brackets based on income
-  - AMT properly calculated at annual level
-  - Charitable deductions respect AGI limits
+## Security & Organization
+- Implemented demo/user data separation with automatic fallback
+- Created numbered scenario format (000-999) with clear categorization
+- Built secure ProfileLoader with three-file pattern (user/demo/template)
+- Added output organization by data source and price scenario
 
 ## CSV Output Overhaul
-- Removed redundant CSVs and renamed for clarity
 - Enhanced action_summary.csv with full tax treatment details
-- Added specialized tracking CSVs:
-  - annual_tax_detail.csv with full component breakdown
-  - action_summary.csv with acquisition dates, holding periods, tax treatment
-  - state_timeline.csv and transition_timeline.csv for lot tracking
-  - holding_period_tracking.csv for qualifying disposition monitoring
-  - pledge_obligations.csv tracking donation commitments and company match
-  - charitable_carryforward.csv showing AGI limits and carryover amounts with 5-year expiration
-  - tax_component_breakdown.csv attributing taxes to specific income types and lots
-- No external dependencies on CSV outputs enabling flexible reporting evolution
+- Added specialized tracking: holding periods, pledge obligations, charitable carryforward
+- Created tax_component_breakdown.csv for detailed attribution
+- Removed redundant outputs and standardized naming conventions
 
 ## Projection Engine
-- Built multi-year ProjectionCalculator orchestrating all component calculators with cash flow tracking
-- Implemented natural vesting through state transitions eliminating complex event detection logic
-- Added comprehensive pledge tracking with maximalist/minimalist interpretations and FIFO discharge
-- Created AMT credit carryforward tracking across years with proper usage rules
-- Built charitable deduction carryforward with 5-year expiration tracking
-
-## Lifecycle Architecture Simplification
-- Removed unnecessary lifecycle event detection complexity
-- Created loaders/equity_loader.py for direct JSON-to-ShareLot loading
-- Eliminated CSV as intermediate format (now output-only)
+- Built multi-year ProjectionCalculator with cash flow tracking
 - Implemented natural vesting through state transitions
-- Clean data flow: JSON input → Process → CSV output
-- Deleted deprecated modules (lifecycle_events_deprecated.py, timeline_loader.py)
-- Created proper VestingEvent data classes for clean contracts
-- Future vesting loads as granted_not_vested lots transitioning naturally to vested
+- Added AMT credit and charitable deduction carryforward tracking
+- Created comprehensive pledge tracking with FIFO discharge
 
-## Testing Infrastructure
-- Comprehensive test suite with 9 modules covering all calculators and components
-- Real-world demo scenarios including tender offers, charitable donations, ISO exercises
-- CSV validation tests ensuring output correctness and data flow integrity
-- Component-based tests replacing legacy flat-rate calculations
-- Fixed all failing tests establishing clean baseline
-- Fixed test data inconsistencies and improved validation
-
-## Tax Constants Consolidation & Federal/State Separation
-- Fixed critical AGI cash donation limit bug (50% → 60% per IRS 2025 rules)
-- Created centralized tax_constants.py eliminating ~200 lines of duplication
-- Built amt_calculator.py for single source of AMT calculations
-- Resolved AGI inconsistency between calculators
-- Added FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS and CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS for basis election 50% limits
-- Replaced hardcoded 0.50 values in annual_tax_calculator.py with constants from tax_constants.py (2 instances)
-- Enhanced CharitableDeductionState with complete federal/state separation: federal_current_year_deduction, ca_current_year_deduction, and separate carryforward dictionaries
-- Removed all backward compatibility properties (current_year_deduction, carryforward_remaining, total_available) that masked federal/state differences
-- Updated projection calculator to handle separate federal and CA carryforward tracking with dedicated federal_charitable_carryforward and ca_charitable_carryforward dictionaries
-- Enhanced CSV outputs with explicit federal vs state columns: federal_cash_limit vs ca_cash_limit, federal_cash_used vs ca_cash_used, etc.
-- Updated CSV column names for clarity: regular_tax → federal_regular_tax/ca_regular_tax, state_tax → ca_tax for consistency
-- Updated DetailedYear structure to track both federal_charitable_deductions_used and ca_charitable_deductions_used
-- Fixed all code references to use explicit federal/state field names throughout projection_output.py, detailed_materialization.py, and test files
-- Added comprehensive regression tests to prevent future hardcoded tax values and verify federal vs state persistence functionality
-- Documented CA AMT credit tracking limitation as TODO for future implementation when use cases arise
-- Impact: Improved maintainability for tax law changes and enabled accurate state-specific charitable tax planning with proper multi-year carryforward optimization
+## Tax Constants Consolidation
+- Fixed AGI cash donation limit (50% → 60% per IRS 2025)
+- Created centralized tax_constants.py eliminating duplication
+- Built amt_calculator.py as single source of AMT calculations
+- Added federal/state separation for all charitable calculations
 
 ## Charitable Basis Election
-- Added per-year basis election configuration via tax_elections in scenario JSON
-- Enhanced annual tax calculator with elect_basis_deduction parameter
-- When elected, stock donations use cost basis instead of FMV for deduction
-- When elected, AGI limit increases from 30% to 50% for stock donations
-- CSV output shows basis election status and deduction type per year
+- Added per-year basis election configuration in scenario JSON
+- When elected, stock donations use cost basis with 50% AGI limit
+- Enhanced CSV outputs to show election status and deduction type
 - Created comprehensive tests for high/low appreciation scenarios
-- Added example scenario (004_basis_election_example.json) demonstrating usage
 
-## Architecture Achievements
-- True component-based architecture where calculators extract components for annual aggregation
-- Clean separation of concerns: calculators know their domain, annual calculator handles complexity
-- Scenario discovery pattern: optimal strategies emerge from comparison, not predetermined
-- Strong data contracts with well-defined classes replacing dictionary/object dual handling
-- No external dependencies on CSV outputs enabling flexible reporting evolution
+## Withholding System Refactor
+- Replaced 4 withholding fields with 2 rate-based fields
+- Added intelligent supplemental withholding for stock compensation
+- Improved future year projections using base withholding rates
+- Maintained backward compatibility while improving accuracy
 
-## Withholding Rate System Refactoring
-- Replaced 4 separate withholding amount fields with 2 unified rate-based fields for simplified configuration
-- Added `regular_income_withholding_rate` and `supplemental_income_withholding_rate` to replace `federal_withholding`, `state_withholding`, `base_federal_withholding`, and `base_state_withholding`
-- Implemented automatic withholding calculation based on income types (regular vs supplemental)
-- Intelligent withholding system uses base rates for future years to avoid inflated projections from stock exercise years
-- Added supplemental withholding for stock compensation (NSO exercises, RSU vesting) with combined rates
-- Supplemental rate combines federal (22%), CA (10.23%), Medicare (1.45%), and CA SDI (1.2%) - total ~34.88%
-- Added detailed tax component breakdowns in JSON `_comments` sections for transparency
-- Updated all profile loaders (portfolio manager, scenario loader, natural evolution generator) to use new rate-based system
-- Enhanced `TAX_RATE_CALCULATIONS.md` with comprehensive withholding rate guidance and examples
-- Maintained backward compatibility in tax calculations while improving withholding accuracy and cash flow projections
-- Updated `DATA_CONTRACT.md` to reflect new profile structure with rate-based withholding
+## Company Match Tracking
+- Implemented comprehensive match tracking with 3-year window enforcement
+- Added match window validation preventing expired donations from receiving match
+- Built lost opportunity tracking when windows expire unfulfilled
+- Enhanced CSVs with match visibility and leverage metrics
 
-## Company Match Tracking & Match Window Enforcement
-- Implemented comprehensive company match tracking system with complete visibility into charitable leverage
-- Added company match aggregation across all years with new summary metrics: `total_company_match_all_years`, `total_charitable_impact`, and `match_leverage_ratio`
-- Enhanced `YearlyState` with `company_match_received` field for annual tracking and `lost_match_opportunities` for expired window tracking
-- Replaced "deadline" terminology with "match window" concept for clarity, updating `PledgeObligation` with `match_window_closes` field
-- Implemented strict 3-year match window enforcement preventing donations from receiving company match after window expiration
-- Added match window validation in `discharge_donation()` method with donation date parameter for proper temporal validation
-- Built `process_window_closures()` method to calculate lost match opportunities when windows expire unfulfilled
-- Enhanced company match calculation to only apply to donation amounts actually applied to match-eligible pledge obligations
-- Fixed cash flow calculation to exclude company match from net cash flow since match goes directly to DAF, not user cash
-- Updated comprehensive CSV outputs: added `company_match_received` to `comprehensive_cashflow.csv` and `total_charitable_impact` to `annual_summary.csv`
-- Enhanced `charitable_carryforward.csv` with pledge obligation tracking: `pledge_obligations_unmet`, `cumulative_match_expiries`, and `match_earned` fields
-- Created comprehensive test suite covering 7 complex scenarios plus 3 profile comparison scenarios testing 50% pledge/3:1 match vs 25% pledge/1:1 match configurations
-- Added proper pledge mathematics with `calculate_required_donation_shares()` helper using formula: `shares_donated = (pledge_percentage * shares_sold) / (1 - pledge_percentage)`
-- Implemented FIFO discharge logic for multiple pledge obligations with proper match window eligibility validation
-- Added lost match opportunity calculations valued at current market prices when windows close with unfulfilled obligations
-- Impact: Complete visibility into charitable leverage enables users to maximize hundreds of thousands in additional charitable impact through strategic timing within 3-year match windows
+## Option Expiration
+- Added EXPIRED lifecycle state and expiration_date to ShareLot
+- Implemented automatic expiration processing with opportunity cost tracking
+- Created ExpirationEvent class with proper warnings
+- Added comprehensive test coverage for all scenarios
 
-## Option Expiration Implementation
-- Added `EXPIRED` lifecycle state to LifecycleState enum
-- Added `expiration_date` field to ShareLot model with proper flow from grants
-- Implemented `process_natural_expiration()` function for natural state transitions
-- Added `ExpirationEvent` class with proper tracking and opportunity cost warnings
-- Updated ProjectionCalculator to process expiration events alongside vesting
-- Fixed CSV state timeline to properly track expired shares in "Expired" state
-- Created comprehensive test suite with 8 test cases covering all expiration scenarios
-- Added demo scenario 906_expiring_options.json to demonstrate functionality
-- Expired options automatically excluded from exercisable inventory
-- Complete audit trail of expiration events in transition_timeline.csv
-- Proper differentiation between vested (opportunity cost) and unvested expiration
+## Cash Flow Accuracy
+- Updated projections to include all income sources (spouse, interest, dividends)
+- Added living expenses and investment growth modeling
+- Implemented proper withholding vs gross tax liability calculation
+- Fixed AMT credit carryforward from user profile
 
-## Comprehensive Cash Flow Accuracy
-- Updated ProjectionCalculator to include all income sources (spouse W2, interest, dividends, bonuses)
-- Added living expenses from monthly_cash_flow section
-- Implemented tax withholdings vs gross tax liability calculation
-- AMT credit carryforward usage from tax_situation now flows through projections
-- Investment growth modeling for taxable_investments implemented
-- Accurate initial cash position from liquid_assets
-- Enhanced CSV outputs and text summaries with realistic cash projections
+## Charitable Deduction Compliance
+- Implemented IRS-compliant FIFO consumption (earliest year first)
+- Added 5-year expiration tracking with proper warnings
+- Fixed ordering: cash before stock, current year before carryovers
+- Created comprehensive test scenarios for validation
 
-## NSO Bargain Element Fix
-- Fixed portfolio_manager._determine_action_price() to return FMV for exercises instead of strike price
-- NSO exercises now correctly calculate bargain element (FMV - strike price)
-- Supplemental withholding automatically applied to NSO ordinary income (~34.88%)
-- ISO exercises continue to work correctly with AMT adjustments
-- All sales and donations continue using projected prices correctly
-- Added test_nso_exercise_withholding.py to verify NSO withholding calculations
-- All existing tests continue to pass
+## Runtime Validation
+- Added exercise plan validation preventing duplicate lot exercises
+- Provides clear error messages for planning inconsistencies
+- Validates total exercises don't exceed lot sizes upfront
+- Eliminates confusing runtime errors with educational messages
 
-### Minor Fixes
-- Fixed AMT credit carryforward bug where credits weren't being properly carried forward year-over-year
-- Fixed investment growth incorrectly being added to liquid cash - now stays in investment balance as unrealized gains
-- Removed tax_component_breakdown.csv generation - redundant with action_summary.csv components and used misleading hardcoded tax rates instead of progressive brackets
-- Fixed calculator field in action_summary.csv to correctly distinguish ISO vs NSO exercises (now shows "nso_exercise_calculator" for NSO exercises instead of always showing "iso_exercise_calculator")
-- Fixed company_match calculation in action_summary.csv and annual_summary.csv - now properly shows 3:1 company match for donations by accessing donation_components data
+## Asset Tracking Enhancement
+- Added crypto and real estate to net worth calculations
+- Enhanced text output with complete asset breakdown
+- Fixed portfolio concentration calculations across all assets
+- Updated CSVs to include non-equity holdings
 
-## Charitable Deduction Carryforward Full IRS Compliance Implementation
-- Fixed critical bug where charitable deduction carryforwards never expired per IRS 5-year rule
-- Implemented complete IRS-compliant FIFO consumption: "use carryover from earliest year first"
-- Enhanced projection_calculator.py to track carryforward by creation year for both expiration and FIFO ordering
-- Added federal_expired_this_year and ca_expired_this_year tracking to CharitableDeductionState
-- Enhanced annual_tax_calculator.py to accept and consume carryforwards by creation year
-- Added carryforward_consumed_by_creation_year and carryforward_remaining_by_creation_year to CharitableDeductionResult
-- Fixed charitable deduction ordering: cash before stock, current year before carryovers
-- Added support for 50% limit organizations
-- Updated charitable_carryforward.csv to include expired amounts for lost tax benefit visibility
-- Created comprehensive 7-year test scenario verifying FIFO, expiration, and varying AGI handling
-- Corrected carryforward calculation bug where expiration logic ran after total calculation, causing incorrect carryforward amounts
-- Added missing expired_carryforward field to CharitableDeductionResult, enabling proper expiration tracking in projections
-- Added fifty_pct_limit_org parameter to calculate_annual_tax() method for public charity vs private foundation handling
-- Fixed test expectations to correctly reflect 50% limit organization rules (public charities)
-- Enhanced test documentation to clarify IRS organization types and deduction limit interactions
-- Fixed sequential AGI limit application ensuring overall charitable limit is respected
-
-**Recent Fix (Charitable Deduction Carryforward Expiration)**
-- Fixed critical bug in charitable deduction carryforward expiration logic
-- Previous implementation expired carryforwards in year 6 (when `years_since > 5`)
-- Corrected to expire at end of year 5 (when `years_since >= 5`) per IRS rules
-- Key changes:
-  - Moved expiration check AFTER carryforward consumption (allows use in year 5)
-  - Changed condition from `> 5` to `>= 5` for proper 5-year expiration
-  - Updated all related tests to match corrected behavior
-- Verified with comprehensive test suite covering simple, complex, and edge cases
-
-## Runtime Validation System for Scenario Integrity
-- Added comprehensive exercise plan validation in projection_calculator.py to prevent duplicate lot exercises
-- Validates total planned exercises don't exceed lot sizes before processing begins
-- Provides clear error messages identifying specific lots and quantities that exceed limits
-- Prevents confusing "Lot not found" runtime errors by catching planning issues early
-- Educational error messages guide users to check for duplicate exercise actions
-- Eliminates scenario debugging time by validating plan consistency upfront
-
-## Complete Asset Tracking Enhancement
-- Enhanced net worth calculations to include all user assets from profile
-- Added other assets and real_estate_equity fields to UserProfile class for comprehensive tracking
-- Updated portfolio_manager.py to load crypto and real estate values from user profile financial_position
-- Enhanced text output with separate Crypto and Real Estate columns in assets breakdown table
-- Updated investment tracking table to include all non-equity assets for accurate portfolio concentration percentages
-- Raw data tables now include crypto and real_estate columns for complete financial visibility
-- Fixed concentration risk calculations to reflect true diversification across all asset classes
-
-## CSV Output and Tax Reporting Improvements
-- Fixed annual_tax_detail.csv federal/state tax separation by adding dedicated fields to TaxState
-- Added federal_regular_tax, federal_amt_tax, ca_regular_tax, ca_amt_tax tracking in projection_calculator.py
-- Enhanced charitable_carryforward.csv with total_federal_deduction and federal_stock_carryforward_remaining_by_year columns
-- Improved text output with comprehensive tax breakdown table showing major 1065-style components by year
-- Enhanced investment tracking table with per-share price, held shares, total value, and portfolio percentages
-- Added charitable carryforward display to cumulative metrics in text summary
-- Updated lot ID display in expiration warnings for better debugging visibility
-
-## Pledge System Bug Fix
-- Fixed critical bug where pledge_elections in scenario JSON files were not being processed
-- Added pledge election override support in ProjectionCalculator to apply scenario-specific pledge settings
-- Enhanced portfolio manager to process pledge_elections and override user profile defaults
-- All pledge tracking now works correctly: obligations created from sales, company match applied to donations
-- Added comprehensive test coverage with test_pledge_system_functionality.py to verify pledge mathematics
-
-## Action Summary Data Quality Improvements
-- Fixed acquisition_date field in action_summary.csv - now populated with actual grant/exercise dates from lot lifecycle
-- Enhanced holding_period_days calculation based on acquisition date vs action date for accurate tax treatment
-- Corrected tax_treatment field to properly reflect STCG (<365 days) vs LTCG (≥365 days) based on holding periods
-- Updated equity loader to extract and populate grant_date from grants in user profile
-- Added comprehensive test coverage with test_action_summary_data_quality.py to verify data accuracy
-
-## Charitable Deduction Usage Bug Fix
-- Fixed critical bug where charitable basis election with zero cost basis resulted in no federal deductions
-- Enhanced charitable deduction calculation to use FMV when basis election would yield very low deductions (<10% of FMV)
-- Added comprehensive test coverage with test_charitable_deduction_usage.py to verify deduction calculations
-
-## Charitable Deduction Carryforward Bug Fix
-- Fixed critical bug in charitable basis election logic that used inconsistent calculation methods
-- Removed flawed 10% heuristic that incorrectly switched between basis and FMV deduction amounts
-- Standardized charitable deduction calculation to consistently use basis when elect_basis_deduction=True
-- Fixed CSV generation logic to match annual tax calculator behavior for basis elections
-- Eliminated false carryforward creation by ensuring both calculation paths use identical logic
-- All charitable deduction tests now pass with 100% utilization rate instead of previous 73.6%
+## Pledge System Improvements
+- Fixed pledge_elections processing from scenario JSON
+- Enhanced action_summary.csv with accurate acquisition dates and holding periods
+- Fixed charitable deduction calculation for zero-basis donations
+- Standardized basis election logic eliminating false carryforwards
 
 ## Comprehensive Output Improvements
-- Implemented comprehensive value tracking framework to enable fully informed scenario comparisons
-- Enhanced all CSV outputs with detailed metrics tracking personal wealth, charitable impact, and tax efficiency
+- Added assumed_ipo field for pledge deadline calculations
+- Enhanced CSVs with AMT credit tracking and option exercise counts
+- Implemented warning system for AMT credits, pledges, and expirations
+- Created comprehensive value tracking across personal wealth and charitable impact
 
-### Profile & Data Model Updates
-- Added `assumed_ipo` field to UserProfile dataclass with default "2033-03-24" for pledge expiration calculations
-- Added `grant_id` field to ShareLot dataclass for future grant-based charitable program tracking
-- Removed `market_assumptions` and `decision_parameters` sections from all profile JSON files (user_profile.json, demo_profile.json, user_profile_template.json)
-- Updated all UserProfile constructors across codebase (portfolio_manager.py, scenario_loader.py, natural_evolution_generator.py)
-- Implemented test-driven one-shot rewrite approach with no migration script required
+## IPO Pledge Obligations
+- Implemented automatic IPO remainder obligation calculations
+- Added FIFO donation tracking for accurate outstanding amounts
+- Enhanced holding period CSV with chronological milestone sorting
+- Fixed grant loading pipeline for proper pledge calculations
 
-### Value Tracking Enhancements
-- Enhanced annual_summary.csv with 7 new tracking fields:
-  * `options_exercised_count` - quantity of options exercised this year
-  * `shares_sold_count` - quantity of shares sold this year
-  * `shares_donated_count` - quantity of shares donated this year
-  * `amt_credits_generated` - new AMT credits created this year
-  * `amt_credits_consumed` - AMT credits used this year
-  * `amt_credits_balance` - ending AMT credit balance
-  * `expired_option_count` - quantity of options that expired this year
-  * Renamed `opportunity_cost` to `expired_option_loss` for clarity
-  * Renamed `pledge_shares_expired_window` to `pledge_shares_expired` for consistency
-- Enhanced portfolio_comparison.csv with 8 new comprehensive metrics:
-  * `charitable_personal_value` - total personal donations across all years
-  * `charitable_match_value` - total company match received across all years
-  * `charitable_total_impact` - combined charitable value (personal + match)
-  * `pledge_fulfillment_rate` - percentage of pledged shares actually donated
-  * `outstanding_amt_credits` - ending unused AMT credit balance
-  * `expired_charitable_deduction` - charitable deductions that expired unused
-  * `expired_option_count` - total count of expired options
-  * `expired_option_loss` - total dollar value of expired in-the-money options
-- Updated ProjectionResult.summary_metrics to calculate all new comprehensive metrics
-- Improved pledge obligation deadline calculations to use min(sale_date + 3 years, assumed_ipo + 1 year)
-- Enhanced donation pricing logic to use tender prices when available in same calendar year
-- Enhanced comprehensive_cashflow.csv with clear field separation: `ending_investments` and `static_investments`
+## Charitable Ordering Fix
+- Implemented correct IRS waterfall: cash current→carryforward→stock current→carryforward
+- Added complete FIFO tracking for all four carryforward types
+- Enhanced CSV organization with logical federal/state separation
+- Added expired deduction warnings with actionable guidance
 
-### Warning System Implementation
-- Added AMT Credit consumption warnings that alert if credits will take >20 years to consume at current rate
-- Added Pledge Obligation warnings showing outstanding obligations and expired match opportunities with actionable guidance
-- Added Charitable Deduction expiration warnings tracking unused deductions after 5-year carryforward period
-- Enhanced option expiration warnings with detailed per-lot loss calculations and strategic guidance
-- All warnings integrated into run_scenario_analysis.py output with clear visual indicators and recommended actions
+## Enhanced Summary Format
+- Redesigned output as professional balance sheet format
+- Added structured equity position lifecycle analysis
+- Implemented --verbose flag for detailed table control
+- Restructured README for alpha testing onboarding
 
-### Pledge System Enhancements
-- Updated PledgeCalculator.calculate_obligation() to accept assumed_ipo parameter for deadline calculations
-- Modified pledge window calculation to enforce both 3-year post-sale AND IPO+1 year deadlines
-- Enhanced donation pricing in portfolio_manager._determine_action_price() to check tender prices for both SELL and DONATE actions
-- Separated tender price logic: SELL actions use 30-day window, DONATE actions use same calendar year
-- Ensured assumed_ipo flows from UserProfile through projection_calculator to pledge calculations
+## 2025-06-30 Updates
+- Fixed NSO tender exercises to use tender price as FMV
+- Consolidated CSV generation to component-based architecture
+- Fixed AMT credit bug preventing same-year generation and consumption
+- Removed 1000+ lines of legacy CSV generation code
 
-### Implementation Results
-- All 22 existing tests continue to pass ensuring backward compatibility
-- Real-world scenario validation confirms new metrics populate correctly
-- Warning systems trigger appropriately for critical financial deadlines
-- Enhanced CSV outputs enable detailed portfolio analysis and strategic planning
-- System now tracks all forms of value: personal wealth, charitable impact, tax efficiency, and outstanding liabilities
-- Comprehensive framework supports informed decision-making across complex equity compensation scenarios
+## 2025-07-01 Updates
+- Added LiquidityEvent model for tender/IPO tracking
+- Implemented IPO remainder obligations with automatic creation
+- Migrated to grant-based profile structure (original_grants → grants)
+- Fixed vesting calendar loading from new grant format
 
-## Comprehensive Output Improvements Completion
-- Enhanced action_summary.csv with 4 new fields: `current_share_price`, `action_value`, `lot_options_remaining`, `lot_shares_remaining`
-- Added `other_investments` field to comprehensive_cashflow.csv consolidating crypto and real estate assets
-- Enhanced equity_position_timeline.csv with `grant_id` column for complete grant tracking and compliance
-- Full grant-specific charitable program system implemented with E2E validation covering multiple grant scenarios
-
-### Bug Fixes
-- Fixed transition timeline bug where exercised ISOs were incorrectly marked as expiring
-- Enhanced expiration detection logic to distinguish between actual expiration and exercise events
-- Completed comprehensive milestone-based holding_period_tracking.csv with state-specific countdown calculations
-
-### Milestone Tracking System
-- Implemented generate_holding_milestones_csv() with full CLAUDE.md specification compliance
-- Added milestone types: ltcg_eligible, ipo_pledge_deadline, iso_qualifying_disposition, option_expiration
-- Integrated assumed_ipo date for accurate pledge deadline calculations
-- Created countdown timers with both days_until_milestone and years_until_milestone fields
-
-### Enhanced CSV Architecture
-- Converted pledge_obligations.csv to share-based tracking with dollars as supporting context
-- Added grant_id tracking to pledge obligations for complete audit trail
-- Maintained backward compatibility while improving user experience
-
-### Comprehensive Testing & Validation
-- Achieved 28/28 test suite pass rate with comprehensive edge case coverage
-- Validated 15-year scenario lifecycle including full charitable deduction carryforward
-- Confirmed sub-second performance for complex multi-grant scenarios
-- Verified production readiness with robust error handling and data quality
-
-## IPO Pledge Obligation Feature Implementation
-
-### Core Feature Development
-- Implemented IPO pledge obligation milestone generation in holding period tracking CSV
-- Added automatic calculation of remaining total pledge obligations due 1 year after assumed IPO date
-- Integrated FIFO donation tracking across all years to accurately calculate outstanding pledge amounts
-- Created new milestone type `ipo_pledge_obligation` with special lot ID `TOTAL_PLEDGE` for easy identification
-
-### Data Pipeline Integration
-- Fixed critical grant loading bug in PortfolioManager where equity grants from JSON `equity_position.grants` were not being transferred to UserProfile.grants attribute
-- Enhanced IPO pledge calculation to handle both object-based and dictionary-based grant structures
-- Added support for both `total_shares` and `total_options` grant attributes for maximum compatibility
-- Implemented proper aggregation of pledge percentages across multiple grants with charitable programs
-
-### CSV Output Enhancements
-- Removed countdown columns (`days_until_milestone`, `years_until_milestone`) from holding period tracking for cleaner output
-- Implemented chronological sorting of all milestones by `milestone_date` for better timeline visualization
-- Fixed FIFO pledge tracking to eliminate duplicate pledge window expiry entries for discharged obligations
-- Enhanced charitable carryforward CSV to show proper creation year breakdown instead of expiration year formatting
-
-### Testing & Validation
-- Created comprehensive integration test suite covering user examples (10K shares, 50% pledge scenarios)
-- Validated end-to-end data flow from JSON profile loading through CSV output generation
-- Confirmed proper handling of leap year IPO dates with fallback logic
-- Verified chronological milestone sorting integrates seamlessly with existing milestone types
-- All existing tests continue to pass ensuring backward compatibility
-
-### Production Readiness
-- Feature works with both demo and user data automatically
-- Integrates with existing `copy_scenario_csvs.py` utility for easy data export
-- Handles edge cases: no pledges, fully satisfied pledges, multiple grants, and missing data
-- Clear descriptive milestone text showing calculation details for user validation
-
-## Charitable Carryforward FIFO Logic and IRS Ordering Implementation
-
-### IRS-Compliant Charitable Deduction Ordering
-- Implemented correct IRS charitable deduction waterfall ordering in `projection_output.py`:
-  1. Current Year Cash Contributions (60% AGI limit)
-  2. Cash Carryforward from Prior Years (remaining 60% limit)
-  3. Current Year Stock Contributions (30% AGI limit, or 50% )
-  4. Stock Carryforward from Prior Years (remaining 30% limit)
-- Replaced incorrect ratio-based splitting logic with proper step-by-step AGI limits
-- Added comprehensive test validation covering all ordering scenarios and edge cases
-
-### Complete FIFO Carryforward Tracking
-- Implemented creation year-based FIFO tracking for all four carryforward types:
-  - Federal Stock Carryforward (`federal_stock_carryforward_remaining_by_year`)
-  - Federal Cash Carryforward (`federal_cash_carryforward_remaining_by_year`)
-  - California Stock Carryforward (`ca_stock_carryforward_remaining_by_year`)
-  - California Cash Carryforward (`ca_cash_carryforward_remaining_by_year`)
-- Added total columns for each type (e.g., `total_federal_stock_carryforward_remaining`)
-- Proper 5-year expiration handling with FIFO burndown (oldest carryforward consumed first)
-- Accurate creation year labeling
-
-### Smart Code Architecture
-- Created reusable `update_fifo_carryforward()` function eliminating 4x code duplication
-- Verified Federal = CA charitable limits optimization (reuses calculations where identical)
-- Clean dictionary display with zero-entry removal and proper formatting
-- Extensible design ready for additional carryforward types
-
-### Enhanced CSV Column Organization
-- Reordered charitable carryforward CSV for intuitive flow:
-  - Basic info → Current donations → Federal section → CA section → Other tracking
-- Logical grouping with Federal and CA sections clearly separated
-- Consistent naming: `_by_year` for dictionaries, plain names for totals
-
-### Expired Charitable Deduction Warning System
-- Implemented total expired charitable deduction calculation in summary metrics
-- Added prominent warning display for lost carryforward (uses ❗️ emoji for visibility)
-- Proper aggregation across all projected years
-- Actionable guidance about timing donations to maximize deduction utilization
-
-### Production Validation
-- Verified multi-year FIFO tracking (e.g., 2026 uses $178K current + $10K carryforward = $188K total)
-- Confirmed proper carryforward accumulation and expiration across all projected years
-- Federal and CA calculations produce identical results (as expected for current tax law)
-- All carryforward logic works seamlessly with existing projection and CSV generation systems
-
-## IPO-Triggered Pledge Obligation Tracking
-
-### Fixed Zero-Donation Pledge Reporting
-- Scenarios with $0 donations now correctly show expired pledge obligations
-- Added IPO-triggered pledge creation when reaching assumed IPO date
-- Calculates total grant pledge requirement (e.g., 50% of all shares) minus already-obligated shares
-- Sets deadline to IPO + 1 year per typical pledge agreements
-
-### Implementation Details
-- IPO obligations created in `projection_calculator.py` during year processing
-- For 50% pledges: uses simple `shares_sold = shares_required` approach
-- For other percentages: applies formula `shares_sold = shares_required * (1 - pledge_pct) / pledge_pct`
-- Reuses existing `PledgeObligation` infrastructure without breaking changes
-
-### Portfolio Reporting Enhancements
-- Enhanced comparison table to show expired pledge shares prominently
-- Removed redundant "pledge outstanding" column, kept only "pledge expired"
-- Natural Evolution scenarios now show true cost (e.g., 60,000 expired shares for test data)
-- Users can see millions in lost company match opportunities
-
-### Testing & Validation
-- Added comprehensive test coverage in `test_ipo_pledge_zero_donations.py`
-- Tests verify zero donations result in full pledge expiration
-- Tests verify pre-IPO sales reduce IPO obligation amount
-- Tests verify donations after deadline don't reduce expired count
-- All tests pass with sanitized example data (120,000 total shares)
-
-## Enhanced Scenario Summary Format and Verbose Control
-
-### Accounting-Style Balance Sheet
-- Redesigned final state display as professional balance sheet format
-- Added structured ASSETS section with aligned amounts and subtotals
-- Included LIABILITIES section for outstanding pledge obligations
-- Clear NET WORTH calculation showing total assets minus liabilities
-- Automatic inclusion of crypto and real estate assets from user profile
-
-### Enhanced Cumulative Metrics
-- Restructured charitable impact with hierarchical breakdown:
-  - Total Charitable Impact (top-level)
-  - Personal Donations (sub-item)
-  - Company Match Earned (sub-item)
-- Added Outstanding Company Match Opportunity calculation based on remaining pledge shares
-- Enhanced pledge tracking with expired match window value calculation
-- Fixed expired charitable carryforward to show total expired (not remaining balance)
-
-### Comprehensive Equity Position Analysis
-- Complete lifecycle state breakdown showing all share dispositions:
-  - Granted (Unvested), Vested (Unexercised), Exercised (Held)
-  - Disposed (Sold), Disposed (Donated), Expired (Lost)
-- Percentage allocation showing portfolio composition
-- Automatic calculation across all years and action types
-- Professional tabular format with clear totals
-
-### Verbose Mode Implementation
-- Added `--verbose` flag to control detailed table display
-- Default mode shows clean, executive summary format
-- Verbose mode includes comprehensive financial tables and raw data analysis
-- Maintains backward compatibility while improving user experience
-- Updated help documentation with verbose flag examples
-
-### User Experience Improvements
-- Cleaner default output focused on key financial outcomes
-- Professional formatting suitable for financial planning discussions
-- Optional detailed analysis available on demand
-- Reduced output clutter while preserving analytical depth
-
-### README Redesign for Alpha Testing
-- Completely restructured README.md with linear onboarding flow optimized for new user alpha testing
-- Moved from feature-comprehensive documentation to step-by-step user journey approach
-- Created 2-minute quick win demo experience using safe example data before real data setup
-- Enhanced security messaging to address data privacy concerns upfront for financial information
-- Reorganized flow: Quick Demo → Security → Real Data → Results Understanding → Custom Strategies → Advanced Features
-- Updated scenario format documentation from CSV to JSON to match actual implementation
-- Added practical insights from real usage (60+ actions over 10 years) for credibility with alpha testers
-- Streamlined command examples and removed decision paralysis from quick start section
-- Enhanced strategy explanations with practical impact descriptions and realistic expectations
-- Positioned tool for alpha testing feedback collection to improve user experience
-
-## 2025-06-30
-
-### NSO Tender Offer FMV Fix
-- Fixed NSO exercises during tender offers to use tender price as Fair Market Value instead of 409a price
-- Ensures correct bargain element calculation and cost basis for cashless tender exercises
-- Added test_nso_tender_exercise_fmv.py to verify correct behavior
-
-### CSV Generation Architecture Consolidation
-- Implemented explicit IRS 4-step charitable deduction ordering in AnnualTaxCalculator
-- Added ISO qualifying disposition date calculation utility and ShareLot property
-- Created new component-based CSV generation system with automatic field inclusion
-- Enhanced all component classes with display fields (action_date, action_type, calculator_name)
-- Replaced action_summary.csv with components.csv for better maintainability
-- Updated annual_summary.csv generation to use YearlyState data directly
-- Added CSV generation to run_scenario_analysis.py for complete scenario outputs
-- Created comprehensive tests for new CSV generation and ISO qualifying dates
-- Eliminated flat tax rate calculations in favor of progressive tax brackets throughout
-- Zero-maintenance approach: new fields in components automatically appear in CSVs
-
-### AMT Credit Bug Fix
-- Fixed critical bug where AMT credits could be both generated AND consumed in the same year
-- Corrected logic to compare AMT vs Regular tax before applying any credits
-- Ensures credits are either generated (when paying AMT) OR consumed (when paying regular tax), never both
-- Added test_amt_credit_bug.py to verify correct behavior
-- Added federal_tax_regime column to annual_tax_detail.csv showing "AMT" or "Regular" for each year
-
-### Charitable Carryforward Code Cleanup
-- Removed legacy update_fifo_carryforward function and all associated code (~500 lines)
-- Eliminated save_charitable_carryforward_csv_legacy_removed function (369 lines)
-- Deleted save_charitable_carryforward_comparison_csv function (92 lines)
-- Consolidated CSV generation to use only CharitableDeductionResult data from annual tax calculator
-- Renamed save_charitable_carryforward_csv_direct to save_charitable_carryforward_csv
-- Fixed test imports and updated test_charitable_carryforward_expiration.py
-- Cleaned up all backup files and obsolete references
-
-### CSV Generation Migration Completed (Phase 5.1)
-- Removed detailed_materialization.py module completely (1000+ lines)
-- Migrated all CSV generation to component-based architecture in csv_generators.py
-- Replaced action_summary.csv with components.csv throughout the codebase
-- Removed test_action_summary_data_quality.py (replaced by test_components_csv_data_quality.py)
-- Updated copy_scenario_csvs.py to reference components.csv instead of action_summary.csv
-- Updated examples/test_natural_evolution.py to expect components.csv
-- Removed PHASE_5_1_DETAILED_SCOPE.md migration plan document
-
-## 2025-07-01
-
-### Major Pledge Tracking Overhaul
-- **Added LiquidityEvent model** (calculators/liquidity_event.py) to track tender offers, IPO, and donation windows
-- **Implemented IPO remainder obligations** - automatically creates pledge for unfulfilled commitments at IPO
-- **Redesigned PledgeObligation** to use share-based tracking with FIFO fulfillment (replaced dollar-based)
-- **Enhanced pledge tracking** in CSV outputs with year-specific obligated/donated/expired columns
-- **Added cash donation support** from liquidity event proceeds with proper tracking
-- **Created comprehensive pledge tests** (test_ipo_remainder_obligation.py, test_pledge_tracking_gap.py)
-
-### Profile Data Structure Migration
-- **Renamed `original_grants` to `grants`** throughout codebase (57 occurrences across 20 files)
-- **Moved vesting data** into grant-specific `vesting_status.unvested.vesting_calendar` structure
-- **Fixed equity loader** to create future vesting lots (VEST_YYYYMMDD_TYPE) from new grant structure
-- **Added backward compatibility** in projection calculator to support both old and new vesting formats
-- **Cleaned deprecated fields** from all profile templates (demo, user_template, test profiles)
-
-### Bug Fixes and Improvements
-- **Fixed scenario analysis** pledge tracking to use new PledgeState properties
-- **Updated portfolio manager** to handle special lot IDs (ISO, NSO, RSU) for unexercised options
-- **Enhanced CSV generators** with detailed pledge obligation tracking and expiration reporting
-- **Added test_vesting_calendar_loading.py** to prevent regression of vesting lot creation
-- **All 37 tests passing** including new pledge tracking scenarios
-
-### Portfolio Analysis Improvements
-- Improved equity position output formatting with clean tables instead of verbose dictionaries
-- Replaced `max_tax_burden` metric with `years_with_insufficient_cash` for better cash flow analysis
-- New metric identifies years where available cash cannot cover tax obligations before considering asset sales
-
-### Tax Constants Centralization
-- **Centralized all hardcoded tax values** into tax_constants.py for maintainability
-- **Added CHARITABLE_50PCT_ORG_OVERALL_LIMIT** constant for 50% organization donation limits
-- **Replaced magic numbers** in annual_tax_calculator.py with proper constants (MEDICARE_RATE, SOCIAL_SECURITY_WAGE_BASE, ADDITIONAL_MEDICARE_THRESHOLD)
-- **Updated LTCG holding period checks** to use LTCG_HOLDING_PERIOD_DAYS constant (366 days) across share_sale_calculator.py and equity_loader.py
-- **Improved code maintainability** by eliminating hardcoded tax thresholds and rates throughout the codebase
+## 2025-07-02 Updates
+- Fixed timeline generator to process ALL grants instead of just first grant
+- Completed lot ID migration from old format (ISO/NSO/RSU) to grant-specific (ISO_GRANT_001)
+- Created 47 atomic test scenarios for comprehensive coverage
+- Reorganized portfolios into demo/ and user/ subdirectories
+- Added validation errors for deprecated lot ID formats
+- Enhanced cash flow tracking to identify insufficient cash years

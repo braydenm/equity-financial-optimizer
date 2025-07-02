@@ -2,10 +2,12 @@
 """
 Test suite for TimelineGenerator with Profile v2.0 structure.
 
-These tests demonstrate the current bugs in TimelineGenerator:
-1. It expects a flat structure but profiles use grant-based structure
-2. It fails to generate future vesting events
-3. EquityLoader creates duplicate lot IDs with multiple grants
+These tests verify that TimelineGenerator correctly handles:
+1. Grant-based profile structure (v2.0)
+2. Future vesting event generation
+3. Unique lot ID creation across multiple grants
+
+Note: Backward compatibility with flat profile structure is no longer supported.
 """
 
 import sys
@@ -144,36 +146,6 @@ def test_timeline_generator_multi_grant_profile():
     assert len(future_vests) >= 2, f"Expected at least 2 future vesting events, got {len(future_vests)}"
 
 
-def test_timeline_generator_backward_compatibility():
-    """Test timeline generation with old profile structure."""
-    profile = {
-        'equity_position': {
-            'vested_unexercised': {
-                'iso_shares': 1000,
-                'nso_shares': 2000
-            },
-            'unvested': {
-                'vesting_calendar': [
-                    {'date': '2025-07-24', 'shares': 3107, 'share_type': 'ISO'}
-                ]
-            }
-        }
-    }
-    
-    generator = TimelineGenerator()
-    timeline_rows = generator._create_timeline_rows(profile, date(2025, 6, 1))
-    
-    # Should still work with old structure
-    assert len(timeline_rows) > 0, "Should generate rows with old profile structure"
-    
-    # Check that we have the expected vested shares
-    has_iso = any(row['share_type'] == 'ISO' and row['quantity'] == 1000 for row in timeline_rows)
-    has_nso = any(row['share_type'] == 'NSO' and row['quantity'] == 2000 for row in timeline_rows)
-    
-    assert has_iso, "Should have ISO vested shares"
-    assert has_nso, "Should have NSO vested shares"
-
-
 def test_equity_loader_lot_id_collision():
     """Test that EquityLoader creates unique lot IDs for multiple grants."""
     from loaders.equity_loader import EquityLoader
@@ -209,7 +181,7 @@ def test_equity_loader_lot_id_collision():
     # Check lot IDs
     lot_ids = [lot.lot_id for lot in lots]
     
-    # This will FAIL - currently creates duplicate 'ISO' lot IDs
+    # Verify lot IDs are unique
     assert len(lot_ids) == len(set(lot_ids)), f"Lot IDs should be unique, but got: {lot_ids}"
     
     # Each grant should have unique lot IDs
@@ -226,13 +198,11 @@ def test_equity_loader_lot_id_collision():
 
 if __name__ == "__main__":
     print("Running TimelineGenerator Profile v2.0 tests...")
-    print("These tests are expected to FAIL with the current implementation.")
-    print("They demonstrate bugs that need to be fixed.\n")
+    print("These tests verify the grant-based profile handling.\n")
     
     tests = [
         ("Single grant profile", test_timeline_generator_single_grant_profile),
         ("Multi-grant profile", test_timeline_generator_multi_grant_profile),
-        ("Backward compatibility", test_timeline_generator_backward_compatibility),
         ("EquityLoader lot ID collision", test_equity_loader_lot_id_collision)
     ]
     
@@ -242,15 +212,16 @@ if __name__ == "__main__":
         print(f"\nRunning: {test_name}")
         try:
             test_func()
-            print(f"✓ PASSED (unexpected - this test should fail!)")
+            print(f"✓ PASSED")
         except AssertionError as e:
-            print(f"✗ FAILED (expected): {e}")
+            print(f"✗ FAILED: {e}")
             failed_tests.append((test_name, str(e)))
         except Exception as e:
             print(f"✗ ERROR: {type(e).__name__}: {e}")
             failed_tests.append((test_name, f"ERROR: {e}"))
     
-    print(f"\n\nSummary: {len(failed_tests)}/{len(tests)} tests failed (as expected)")
-    print("\nThese failures confirm the bugs exist and need to be fixed:")
+    print(f"\n\nSummary: {len(failed_tests)}/{len(tests)} tests failed")
+    if failed_tests:
+        print("\nFailures:")
     for test_name, error in failed_tests:
         print(f"- {test_name}: {error}")
