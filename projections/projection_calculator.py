@@ -724,6 +724,10 @@ class ProjectionCalculator:
         # Validate share quantity
         if action.quantity > lot.quantity:
             raise ValueError(f"Cannot donate {action.quantity} shares from lot {action.lot_id} - only {lot.quantity} shares available")
+        
+        # Validate that shares are exercised (you can't donate unexercised options)
+        if lot.lifecycle_state != LifecycleState.EXERCISED_NOT_DISPOSED:
+            raise ValueError(f"Cannot donate unexercised shares from lot {action.lot_id}. Shares must be exercised before donation.")
 
         # Get donation price
         if not action.price:
