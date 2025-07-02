@@ -1,0 +1,22 @@
+{
+  "scenario_name": "007_iso_disqualifying",
+  "description": "Test ISO disqualifying disposition - Exercise and sell within 1 year",
+  "actions": [
+    {
+      "action_date": "2025-06-15",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise ISOs"
+    },
+    {
+      "action_date": "2026-05-01",
+      "action_type": "sell",
+      "lot_id": "ISO_DEMO_GRANT_001_EX_20250615",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Sell within 1 year - disqualifying disposition"
+    }
+  ]
+}

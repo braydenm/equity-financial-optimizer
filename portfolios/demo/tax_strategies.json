@@ -1,0 +1,18 @@
+{
+  "name": "Tax Strategy Comparison",
+  "description": "Compare different tax optimization strategies for equity compensation",
+  "scenarios": [
+    "000_natural_evolution",
+    "001_exercise_all_vested",
+    "002_tender_and_donate"
+  ],
+  "price_scenario": "moderate",
+  "projection_years": 10,
+  "notes": [
+    "This portfolio compares three core tax strategies:",
+    "1. Natural Evolution - baseline do-nothing scenario (massive expirations expected)",
+    "2. Exercise All Vested - exercise options as they vest to start LTCG clock",
+    "3. Tender and Donate - balanced liquidity and charity approach with company match",
+    "Focus is on demonstrating the cost of inaction vs proactive strategies."
+  ]
+}

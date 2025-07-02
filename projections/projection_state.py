@@ -494,13 +494,26 @@ class ProjectionResult:
                         years_to_burn_amt_credits = len(self.yearly_states) - i
                     break
 
-        # Calculate maximum single-year tax burden
-        max_tax_burden = 0
-        max_tax_year = None
+        # Calculate cash flow adequacy for each year
+        cash_flow_issues = []
+        years_with_insufficient_cash = 0
+
         for state in self.yearly_states:
-            if state.tax_state.total_tax > max_tax_burden:
-                max_tax_burden = state.tax_state.total_tax
-                max_tax_year = state.year
+            # Check if ending cash after all expenses and taxes is negative
+            # or if there wasn't enough cash to pay taxes
+            tax_obligation = state.tax_state.total_tax
+            cash_available = state.starting_cash + state.income - state.exercise_costs
+
+            if cash_available < tax_obligation:
+                shortfall = tax_obligation - cash_available
+                cash_flow_issues.append({
+                    'year': state.year,
+                    'tax_obligation': tax_obligation,
+                    'cash_available': cash_available,
+                    'shortfall': shortfall,
+                    'ending_cash': state.ending_cash
+                })
+                years_with_insufficient_cash += 1
 
         self.summary_metrics = {
             'total_cash_final': final_state.ending_cash if final_state else 0,
@@ -528,8 +541,8 @@ class ProjectionResult:
             'min_cash_year': min_cash_year,
             'years_to_burn_amt_credits': years_to_burn_amt_credits,
             'initial_amt_credits': initial_amt_credits,
-            'max_tax_burden': max_tax_burden,
-            'max_tax_year': max_tax_year
+            'cash_flow_issues': cash_flow_issues,
+            'years_with_insufficient_cash': years_with_insufficient_cash
         }
 
 

@@ -1,0 +1,30 @@
+{
+  "scenario_name": "009_exercise_future_vests",
+  "description": "Test exercising future vesting shares as they vest",
+  "actions": [
+    {
+      "action_date": "2025-07-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20250701_ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise July 2025 vest"
+    },
+    {
+      "action_date": "2025-10-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20251001_ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise October 2025 vest"
+    },
+    {
+      "action_date": "2026-01-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20260101_NSO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise January 2026 NSO vest"
+    }
+  ]
+}

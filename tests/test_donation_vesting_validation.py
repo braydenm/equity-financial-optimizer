@@ -175,7 +175,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         # Create initial lots - unexercised vested options
         initial_lots = [
             ShareLot(
-                lot_id='ISO',
+                lot_id='ISO_TEST_GRANT_001',
                 grant_id='GRANT_001',
                 quantity=5000,
                 share_type=ShareType.ISO,
@@ -202,7 +202,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         plan.add_action(PlannedAction(
             action_date=date(2025, 2, 1),
             action_type=ActionType.DONATE,
-            lot_id='ISO',
+            lot_id='ISO_TEST_GRANT_001',
             quantity=1000,
             price=50.0
         ))
@@ -240,7 +240,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         # Vested but unexercised
         initial_lots.append(
             ShareLot(
-                lot_id='ISO',
+                lot_id='ISO_TEST_GRANT_001',
                 grant_id='GRANT_001',
                 quantity=2500,
                 share_type=ShareType.ISO,
@@ -276,7 +276,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         plan.add_action(PlannedAction(
             action_date=date(2025, 6, 1),
             action_type=ActionType.EXERCISE,
-            lot_id='ISO',
+            lot_id='ISO_TEST_GRANT_001',
             quantity=2500,
             price=10.0  # Strike price
         ))
@@ -285,7 +285,7 @@ class TestDonationVestingValidation(unittest.TestCase):
         plan.add_action(PlannedAction(
             action_date=date(2025, 9, 1),
             action_type=ActionType.DONATE,
-            lot_id='ISO_EX_20250601',
+            lot_id='ISO_TEST_GRANT_001_EX_20250601',
             quantity=1500,
             price=50.0
         ))

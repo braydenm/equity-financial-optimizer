@@ -1,0 +1,17 @@
+{
+  "scenario_name": "012_no_basis_election",
+  "description": "Test charitable donation without basis election - Deduct FMV",
+  "tax_elections": {
+    "charitable_basis_election_years": []
+  },
+  "actions": [
+    {
+      "action_date": "2026-03-01",
+      "action_type": "donate",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate without basis election - deduct FMV"
+    }
+  ]
+}

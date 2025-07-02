@@ -82,11 +82,14 @@ class ProjectionCalculator:
 
         # Check against initial lot sizes
         for lot_id, total_exercise_quantity in exercise_totals.items():
-            # Skip validation for special lot IDs (ISO, NSO, RSU) which represent unexercised options
-            if lot_id in ['ISO', 'NSO', 'RSU']:
-                # These will be validated during actual exercise processing
-                continue
-
+            # Check for deprecated lot ID format
+            if lot_id in ['ISO', 'NSO', 'RSU', 'VESTED_ISO', 'VESTED_NSO']:
+                raise ValueError(
+                    f"Deprecated lot ID format '{lot_id}' is no longer supported. "
+                    f"Please use grant-specific lot IDs like 'ISO_GRANT_ID' or 'NSO_GRANT_ID'. "
+                    f"Check your scenario files and update lot references."
+                )
+            
             # Find the lot in initial_lots
             lot = next((l for l in plan.initial_lots if l.lot_id == lot_id), None)
             if not lot:
@@ -574,6 +577,13 @@ class ProjectionCalculator:
             annual_components: Annual tax components to update
             current_year_fmv: Fair market value for the current year from price projections
         """
+        # Check for deprecated lot ID format
+        if action.lot_id in ['ISO', 'NSO', 'RSU', 'VESTED_ISO', 'VESTED_NSO']:
+            raise ValueError(
+                f"Deprecated lot ID format '{action.lot_id}' is no longer supported. "
+                f"Please use grant-specific lot IDs like 'ISO_GRANT_ID' or 'NSO_GRANT_ID'."
+            )
+        
         # Find the lot being exercised
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
         if not lot:
@@ -651,6 +661,13 @@ class ProjectionCalculator:
     def _process_sale(self, action: PlannedAction, current_lots: List[ShareLot],
                      annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, Any]:
         """Process a sale action and extract tax components."""
+        # Check for deprecated lot ID format
+        if action.lot_id in ['ISO', 'NSO', 'RSU', 'VESTED_ISO', 'VESTED_NSO']:
+            raise ValueError(
+                f"Deprecated lot ID format '{action.lot_id}' is no longer supported. "
+                f"Please use grant-specific lot IDs like 'ISO_GRANT_ID' or 'NSO_GRANT_ID'."
+            )
+        
         # Find the lot being sold
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
         if not lot:
@@ -715,6 +732,13 @@ class ProjectionCalculator:
     def _process_donation(self, action: PlannedAction, current_lots: List[ShareLot],
                          annual_components: AnnualTaxComponents, yearly_state: YearlyState) -> Dict[str, float]:
         """Process a donation action and extract tax components."""
+        # Check for deprecated lot ID format
+        if action.lot_id in ['ISO', 'NSO', 'RSU', 'VESTED_ISO', 'VESTED_NSO']:
+            raise ValueError(
+                f"Deprecated lot ID format '{action.lot_id}' is no longer supported. "
+                f"Please use grant-specific lot IDs like 'ISO_GRANT_ID' or 'NSO_GRANT_ID'."
+            )
+        
         # Find the lot being donated
         lot = next((l for l in current_lots if l.lot_id == action.lot_id), None)
         if not lot:

@@ -98,7 +98,7 @@ class TestCSVGeneration(unittest.TestCase):
                 ),
                 # Vested NSOs ready to exercise
                 ShareLot(
-                    lot_id="NSO",
+                    lot_id="NSO_TEST_GRANT_001",
                     share_type=ShareType.NSO,
                     quantity=4000,
                     strike_price=5.0,
@@ -109,7 +109,7 @@ class TestCSVGeneration(unittest.TestCase):
                 ),
                 # Vested ISOs ready to exercise
                 ShareLot(
-                    lot_id="ISO",
+                    lot_id="ISO_TEST_GRANT_001",
                     share_type=ShareType.ISO,
                     quantity=10000,
                     strike_price=5.0,
@@ -152,7 +152,7 @@ class TestCSVGeneration(unittest.TestCase):
             PlannedAction(
                 action_date=date(2025, 7, 1),
                 action_type=ActionType.EXERCISE,
-                lot_id="ISO",
+                lot_id="ISO_TEST_GRANT_001",
                 quantity=5000,
                 price=50.0,
                 notes="Exercise half of vested ISOs"
@@ -328,7 +328,6 @@ class TestCSVGeneration(unittest.TestCase):
         # Should show 3000 shares vesting in 2025
         self.assertEqual(int(vesting_row.get('2025', 0)), 3000)
 
-    @unittest.skip("Skipping expiration test - lifecycle event detection removed in favor of natural state transitions")
     def test_transition_timeline_shows_expiration(self):
         """Test that transition_timeline.csv shows expiration events."""
         profile, plan = self.create_comprehensive_test_data()
@@ -410,8 +409,8 @@ class TestCSVGeneration(unittest.TestCase):
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        # Should find 'ISO' not 'VESTED_ISO'
-        iso_rows = [r for r in rows if r['Lot_ID'] == 'ISO']
+        # Should find 'ISO_TEST_GRANT_001' not 'VESTED_ISO'
+        iso_rows = [r for r in rows if r['Lot_ID'] == 'ISO_TEST_GRANT_001']
         vested_iso_rows = [r for r in rows if r['Lot_ID'] == 'VESTED_ISO']
 
         self.assertGreater(len(iso_rows), 0, "Should have ISO rows")

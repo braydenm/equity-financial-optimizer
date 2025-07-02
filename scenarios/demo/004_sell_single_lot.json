@@ -1,0 +1,14 @@
+{
+  "scenario_name": "004_sell_single_lot",
+  "description": "Test basic sale - Sell portion of existing RSU shares",
+  "actions": [
+    {
+      "action_date": "2025-09-15",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Sell half of RSU_2021_001 lot (LTCG)"
+    }
+  ]
+}

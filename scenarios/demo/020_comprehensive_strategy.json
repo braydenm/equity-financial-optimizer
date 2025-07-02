@@ -1,0 +1,89 @@
+{
+  "scenario_name": "020_comprehensive_strategy",
+  "description": "Test comprehensive multi-year strategy - Exercise, sell, donate optimally",
+  "tax_elections": {
+    "charitable_basis_election_years": []
+  },
+  "actions": [
+    {
+      "action_date": "2025-07-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20250701_ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise July vest"
+    },
+    {
+      "action_date": "2025-09-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Sell for liquidity"
+    },
+    {
+      "action_date": "2025-10-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20251001_ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise October vest"
+    },
+    {
+      "action_date": "2025-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Year-end donation"
+    },
+    {
+      "action_date": "2026-01-15",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 6000,
+      "price": null,
+      "notes": "Exercise more vested ISOs"
+    },
+    {
+      "action_date": "2026-04-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20260401_NSO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise NSO vest"
+    },
+    {
+      "action_date": "2026-09-01",
+      "action_type": "sell",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1500,
+      "price": null,
+      "notes": "Sell exercised ISOs (LTCG)"
+    },
+    {
+      "action_date": "2026-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 750,
+      "price": null,
+      "notes": "Year-end donation"
+    },
+    {
+      "action_date": "2027-03-01",
+      "action_type": "sell",
+      "lot_id": "VEST_20250701_ISO_DEMO_GRANT_001_EX_20250715",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Sell exercised shares (LTCG)"
+    },
+    {
+      "action_date": "2027-09-01",
+      "action_type": "donate",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate to maximize deduction"
+    }
+  ]
+}

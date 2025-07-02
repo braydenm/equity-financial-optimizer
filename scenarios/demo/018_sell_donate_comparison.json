@@ -1,0 +1,22 @@
+{
+  "scenario_name": "018_sell_donate_comparison",
+  "description": "Test sell vs donate tax efficiency - Compare tax impact",
+  "actions": [
+    {
+      "action_date": "2025-09-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Sell LTCG shares - creates tax liability"
+    },
+    {
+      "action_date": "2025-09-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate LTCG shares - creates deduction"
+    }
+  ]
+}

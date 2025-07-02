@@ -1,0 +1,17 @@
+{
+  "scenario_name": "011_basis_election",
+  "description": "Test charitable basis election - Donate with basis election",
+  "tax_elections": {
+    "charitable_basis_election_years": [2026]
+  },
+  "actions": [
+    {
+      "action_date": "2026-03-01",
+      "action_type": "donate",
+      "lot_id": "ISO_2023_001",
+      "quantity": 1000,
+      "price": null,
+      "notes": "Donate with basis election - deduct cost basis not FMV"
+    }
+  ]
+}

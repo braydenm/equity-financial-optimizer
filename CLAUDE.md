@@ -31,7 +31,20 @@ for actual tax calculations using progressive brackets (not flat rates).
 
 # Summary instructions
 
-When you are using compact, please write a comprehensive and detailed summary, include in your summary 1) what the original kickoff message was, 2) what task we set about solving originally, 3) any progress made or problems run into on that main task, 4) any diversions pursued and how deep down the tree we might be, 5) any tests run in the history that appeared to be failing 6) any tests that need to be run again now to confirm their state, 7) all files touched or edited this session along with an explaination of why and what the goal was, 8) any files that we are planning on touching but haven't edited yet, and the plans for these files, 9) the entire context of the users last 10 messages to you, along with a summary of what was achieved or problems ran into for each of those messages, 10) a list of tips of working with this codebase such as paths to specific files or instructions the user has recently given to you that you previously weren't doing so you can remember to keep doing them immediately after, 11) project basis such as the commands we frequently run 12) example files we should make sure to read from to understand key formatting or expected structure of the files we are likely to be working on in this upcoming session.
+When you are using compact, please write a comprehensive and detailed summary, include in your summary 1) what the original kickoff message was, including any automated system kickoff as well as the first message sent to you by the user 2) what task we set about solving originally, 3) any progress made or problems run into on that main task, 4) any diversions pursued and how deep down the tree we might be, 5) any tests run in the history that appeared to be failing 6) any tests that need to be run again now to confirm their state, 7) all files touched or edited this session along with an explaination of why and what the goal was, 8) any files that we are planning on touching but haven't edited yet, and the plans for these files, 9) the entire context of the users last 10 messages to you, along with a summary of what was achieved or problems ran into for each of those messages, 10) a list of tips of working with this codebase such as paths to specific files or instructions the user has recently given to you that you previously weren't doing so you can remember to keep doing them immediately after, 11) project basis such as the commands we frequently run 12) example files we should make sure to read from to understand key formatting or expected structure of the files we are likely to be working on in this upcoming session. 13) Include a section for "unwritten content that I might want to add to docs/CHANGELOG.md" 14) include a section for "uncommitted work along with a draft commit message to build on top of for when subsequent tasks in this session are completed"
+After that, continue the default compaction instructions covering chronological conversational history, task status and summary etc. This usually covers the following:
+
+- Analysis: Chronological review of the conversation
+  - Summary Structure:
+    a. Primary request and intent
+    b. Key technical concepts discussed
+    c. Files and code sections touched
+    d. Errors encountered and fixes
+    e. Problem-solving approaches used
+    f. User messages verbatim
+    g. Pending tasks
+    h. Current work status
+    i. Optional next steps
 
 
 ### Code Changes

@@ -1,0 +1,14 @@
+{
+  "scenario_name": "016_expiring_options",
+  "description": "Test option expiration - Let some options expire to show opportunity cost",
+  "actions": [
+    {
+      "action_date": "2031-12-15",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 6000,
+      "price": null,
+      "notes": "Exercise only half before expiration on 2032-01-01"
+    }
+  ]
+}

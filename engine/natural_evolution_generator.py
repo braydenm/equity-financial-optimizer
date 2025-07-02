@@ -321,6 +321,7 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
 
     strike_price = grant_info['strike_price']
     grant_date = datetime.strptime(grant_info['grant_date'], '%Y-%m-%d').date()
+    grant_id = grant_info.get('grant_id', 'GRANT_001')  # Default if not specified
 
     # Extract expiration date if available (required for options)
     expiration_date = None
@@ -330,27 +331,29 @@ def generate_natural_evolution_from_profile_data(profile_data: Dict[str, Any],
     # Add vested unexercised positions
     if vested_unexercised.get('iso_shares', 0) > 0:
         iso_lot = ShareLot(
-            lot_id="ISO",
+            lot_id=f"ISO_{grant_id}",
             share_type=ShareType.ISO,
             quantity=vested_unexercised['iso_shares'],
             strike_price=strike_price,
             grant_date=grant_date,
             lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
             tax_treatment=TaxTreatment.NA,
-            expiration_date=expiration_date
+            expiration_date=expiration_date,
+            grant_id=grant_id
         )
         initial_lots.append(iso_lot)
 
     if vested_unexercised.get('nso_shares', 0) > 0:
         nso_lot = ShareLot(
-            lot_id="NSO",
+            lot_id=f"NSO_{grant_id}",
             share_type=ShareType.NSO,
             quantity=vested_unexercised['nso_shares'],
             strike_price=strike_price,
             grant_date=grant_date,
             lifecycle_state=LifecycleState.VESTED_NOT_EXERCISED,
             tax_treatment=TaxTreatment.NA,
-            expiration_date=expiration_date
+            expiration_date=expiration_date,
+            grant_id=grant_id
         )
         initial_lots.append(nso_lot)
 

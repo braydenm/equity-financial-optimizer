@@ -3,8 +3,20 @@
   "description": "Compare the tax impact of electing basis deduction vs standard FMV deduction for charitable donations",
   "data_source": "demo",
   "price_scenario": "moderate",
+  "projection_years": 5,
   "scenarios": [
-    "004_basis_election_example",
-    "005_no_basis_election_comparison"
-  ]
+    "011_basis_election",
+    "012_no_basis_election"
+  ],
+  "comparison_metrics": [
+    "total_net_worth",
+    "total_taxes_paid",
+    "total_donations",
+    "charitable_deduction_taken"
+  ],
+  "output_settings": {
+    "generate_summary_csv": true,
+    "generate_detailed_comparison": true,
+    "highlight_differences": true
+  }
 }

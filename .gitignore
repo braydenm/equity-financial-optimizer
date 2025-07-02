@@ -51,6 +51,7 @@ docs/reference/equity-donation-matching-faq.md
 docs/reference/tender-offer-may-2025.md
 portfolios/brayden_*.json
 portfolios/all_strategies.json
+portfolios/user/
 scenario_config.json
 *.csv
 *.xlsx

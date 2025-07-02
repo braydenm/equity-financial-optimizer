@@ -927,7 +927,7 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                      'charitable_personal_value', 'charitable_match_value', 'charitable_total_impact',
                      'pledge_fulfillment_rate', 'outstanding_amt_credits', 'expired_charitable_deduction',
                      'expired_option_count', 'expired_option_loss', 'min_cash_balance', 'min_cash_year',
-                     'years_to_burn_amt_credits', 'initial_amt_credits', 'max_tax_burden', 'max_tax_year']
+                     'years_to_burn_amt_credits', 'initial_amt_credits', 'years_with_insufficient_cash']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
@@ -956,6 +956,5 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                 'min_cash_year': metrics.get('min_cash_year', 0),
                 'years_to_burn_amt_credits': metrics.get('years_to_burn_amt_credits', 0),
                 'initial_amt_credits': metrics.get('initial_amt_credits', 0),
-                'max_tax_burden': metrics.get('max_tax_burden', 0),
-                'max_tax_year': metrics.get('max_tax_year', 0)
+                'years_with_insufficient_cash': metrics.get('years_with_insufficient_cash', 0)
             })

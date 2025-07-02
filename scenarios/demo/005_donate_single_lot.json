@@ -1,0 +1,14 @@
+{
+  "scenario_name": "005_donate_single_lot",
+  "description": "Test basic donation - Donate portion of existing RSU shares",
+  "actions": [
+    {
+      "action_date": "2025-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Donate 500 of 1500 RSU shares (LTCG)"
+    }
+  ]
+}

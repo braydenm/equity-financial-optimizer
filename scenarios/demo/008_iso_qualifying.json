@@ -1,0 +1,22 @@
+{
+  "scenario_name": "008_iso_qualifying",
+  "description": "Test ISO qualifying disposition - Exercise and sell after 1+ year",
+  "actions": [
+    {
+      "action_date": "2025-06-15",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise ISOs"
+    },
+    {
+      "action_date": "2026-07-01",
+      "action_type": "sell",
+      "lot_id": "ISO_DEMO_GRANT_001_EX_20250615",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Sell after 1+ year - qualifying disposition"
+    }
+  ]
+}

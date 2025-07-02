@@ -1,14 +1,14 @@
 {
   "scenario_name": "001_exercise_all_vested",
-  "description": "Exercise all vested ISOs at the start of the projection period",
+  "description": "Test basic exercise - Exercise all currently vested ISOs",
   "actions": [
     {
-      "action_date": "2025-07-01",
+      "action_date": "2025-07-15",
       "action_type": "exercise",
-      "lot_id": "ISO",
+      "lot_id": "ISO_DEMO_GRANT_001",
       "quantity": 12000,
       "price": null,
-      "notes": "Exercise all vested ISOs at start of projection"
+      "notes": "Exercise all vested ISOs from demo grant"
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "scenario_name": "010_amt_generation",
+  "description": "Test AMT generation - Large ISO exercise with high bargain element",
+  "actions": [
+    {
+      "action_date": "2025-12-15",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 12000,
+      "price": null,
+      "notes": "Exercise all ISOs - bargain element = (25-5)*12000 = $240k"
+    }
+  ]
+}

@@ -85,7 +85,7 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
             ),
             # Vested ISOs (now use ISO directly)
             ShareLot(
-                lot_id="ISO",
+                lot_id="ISO_TEST_GRANT_001",
                 share_type=ShareType.ISO,
                 quantity=10000,
                 strike_price=5.0,
@@ -128,7 +128,7 @@ def create_test_data() -> tuple[UserProfile, ProjectionPlan]:
         PlannedAction(
             action_date=date(2025, 7, 1),
             action_type=ActionType.EXERCISE,
-            lot_id="ISO",
+            lot_id="ISO_TEST_GRANT_001",
             quantity=5000,
             price=50.0,
             notes="Exercise half of vested ISOs"
@@ -220,10 +220,10 @@ def validate_state_timeline_csv(filepath: str) -> None:
     if not any(int(r.get('2025', 0)) > 0 for r in granted_rows):
         raise CSVValidationError("No granted shares found in state_timeline.csv")
 
-    # Check for ISO lot exists (upstream now uses ISO directly)
+    # Check for ISO lot exists (now uses grant-specific format)
     lot_ids = set(r['Lot_ID'] for r in rows)
-    if 'ISO' not in lot_ids:
-        raise CSVValidationError("ISO lot not found in state_timeline.csv")
+    if not any('ISO_' in lid for lid in lot_ids):
+        raise CSVValidationError("No ISO lots found in state_timeline.csv")
 
     # Check for group TOTAL rows
     total_rows = [r for r in rows if r['State'] == 'TOTAL']

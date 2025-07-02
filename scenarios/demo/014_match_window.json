@@ -1,0 +1,30 @@
+{
+  "scenario_name": "014_match_window",
+  "description": "Test company match window - Donate within 3 years of liquidity event",
+  "actions": [
+    {
+      "action_date": "2025-06-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 800,
+      "price": null,
+      "notes": "Liquidity event - starts 3-year match window"
+    },
+    {
+      "action_date": "2026-05-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 400,
+      "price": null,
+      "notes": "Donate within 1 year - qualifies for match"
+    },
+    {
+      "action_date": "2028-07-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 400,
+      "price": null,
+      "notes": "Donate after 3+ years - no match available"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "scenario_name": "006_stcg_ltcg_boundary",
+  "description": "Test STCG vs LTCG - Sell RSU shares right at 1-year boundary",
+  "actions": [
+    {
+      "action_date": "2025-09-14",
+      "action_type": "sell",
+      "lot_id": "RSU_2024_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Sell 364 days after vest - STCG"
+    },
+    {
+      "action_date": "2025-09-16",
+      "action_type": "sell",
+      "lot_id": "RSU_2024_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Sell 366 days after vest - LTCG"
+    }
+  ]
+}

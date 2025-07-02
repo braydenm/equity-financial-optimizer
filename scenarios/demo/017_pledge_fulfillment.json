@@ -1,0 +1,38 @@
+{
+  "scenario_name": "017_pledge_fulfillment",
+  "description": "Test pledge fulfillment - Sell and donate to meet 25% pledge",
+  "actions": [
+    {
+      "action_date": "2025-08-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2021_001",
+      "quantity": 1200,
+      "price": null,
+      "notes": "Sell RSUs - creates pledge obligation"
+    },
+    {
+      "action_date": "2025-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 300,
+      "price": null,
+      "notes": "Donate 25% to fulfill pledge"
+    },
+    {
+      "action_date": "2026-08-01",
+      "action_type": "sell",
+      "lot_id": "ISO_2023_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Sell ISOs - creates more pledge"
+    },
+    {
+      "action_date": "2026-12-01",
+      "action_type": "donate",
+      "lot_id": "ISO_2023_001",
+      "quantity": 500,
+      "price": null,
+      "notes": "Donate 25% of ISO sale"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "scenario_name": "003_exercise_single_iso",
+  "description": "Test basic ISO exercise - Exercise partial vested ISOs only",
+  "actions": [
+    {
+      "action_date": "2025-08-01",
+      "action_type": "exercise",
+      "lot_id": "ISO_DEMO_GRANT_001",
+      "quantity": 5000,
+      "price": null,
+      "notes": "Exercise 5000 of 12000 vested ISOs"
+    }
+  ]
+}

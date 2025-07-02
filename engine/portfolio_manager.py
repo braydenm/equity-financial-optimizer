@@ -193,9 +193,21 @@ class PortfolioManager:
 
         # Log loading summary
         summary = self.equity_loader.summarize_lots(self._initial_lots)
-        print(f"📊 Loaded {summary['total_lots']} lots with {summary['total_shares']} total shares from profile")
-        print(f"   - By state: {summary['by_lifecycle_state']}")
-        print(f"   - By type: {summary['by_share_type']}")
+        print(f"📊 Loaded {summary['total_lots']} lots with {summary['total_shares']:,} total shares")
+
+        # Display state summary in table format
+        if summary['by_lifecycle_state']:
+            print("\n  Lifecycle State          | Lots | Shares")
+            print("  -------------------------|------|--------")
+            for state, data in sorted(summary['by_lifecycle_state'].items()):
+                print(f"  {state:<23} | {data['count']:>4} | {data['shares']:>6,}")
+
+        # Display type summary in table format
+        if summary['by_share_type']:
+            print("\n  Share Type | Lots | Shares")
+            print("  -----------|------|--------")
+            for share_type, data in sorted(summary['by_share_type'].items()):
+                print(f"  {share_type:<10} | {data['count']:>4} | {data['shares']:>6,}")
 
         return self._user_profile, self._initial_lots
 
@@ -431,28 +443,16 @@ class PortfolioManager:
         - Tender: Check if date matches known tender offer
         """
         if action_type == ActionType.EXERCISE:
-            # Check if this is a special lot ID for unexercised options
-            if lot_id in ['ISO', 'NSO', 'RSU']:
-                # For NSO exercises, still need to check tender price
-                if lot_id == 'NSO':
-                    tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
-                    tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
-                    
-                    if tender_date and tender_price:
-                        tender_date_obj = date.fromisoformat(tender_date)
-                        # If exercising within 30 days of tender, use tender price as FMV
-                        if abs((action_date - tender_date_obj).days) <= 30:
-                            return tender_price
-                
-                # For ISO/RSU or if no tender price applies, let projection calculator handle it
-                return None
-            
-            # For NSO exercises, check if we should use tender price as FMV
+            # For exercises, we need to determine the correct FMV
+            # Find the lot to check if it's an NSO
             lot = next((lot for lot in self._initial_lots if lot.lot_id == lot_id), None)
             if not lot:
-                raise ValueError(f"Lot {lot_id} not found for exercise action")
+                # Lot might not be in initial_lots yet (e.g., future vesting)
+                # Let the projection calculator handle it
+                return None
 
             # For NSOs, check if there's a tender offer near the exercise date
+            # This is critical for cashless exercises to avoid phantom STCG
             if lot.share_type == ShareType.NSO:
                 tender_date = self._profile_data['equity_position']['current_prices'].get('last_tender_offer_date')
                 tender_price = self._profile_data['equity_position']['current_prices'].get('tender_offer_price')
@@ -460,6 +460,7 @@ class PortfolioManager:
                 if tender_date and tender_price:
                     tender_date_obj = date.fromisoformat(tender_date)
                     # If exercising within 30 days of tender, use tender price as FMV
+                    # This ensures no STCG on same-day cashless tender exercises
                     if abs((action_date - tender_date_obj).days) <= 30:
                         return tender_price
 

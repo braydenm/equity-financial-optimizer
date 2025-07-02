@@ -100,7 +100,7 @@ def print_scenario_results(result, detailed=True, verbose=False):
 
     # Total expired charitable carryforward (not remaining)
     expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
-    print(f"  📝 Total Expired Charitable Carryforward: ${expired_charitable_deduction:,.0f}")
+    print(f"  📝 Total Expired Charitable Deduction Carryforward: ${expired_charitable_deduction:,.0f}")
     if expired_charitable_deduction > 1000:
         print(f"    ❗️ WARNING: These deductions expired after 5-year carryforward period. Consider timing donations to maximize deduction utilization")
 

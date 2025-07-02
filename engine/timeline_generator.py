@@ -92,34 +92,41 @@ class TimelineGenerator:
             })
 
         # Add current vested unexercised options
-        vested = equity_pos.get('vested_unexercised', {})
-
-        if vested.get('iso_shares', 0) > 0:
-            # Get strike price from original grants
-            strike_price = self._get_strike_price(equity_pos)
-            rows.append({
-                'date': current_date.isoformat(),
-                'lot_id': 'ISO',
-                'grant_id': self._get_grant_id(equity_pos),
-                'share_type': 'ISO',
-                'quantity': vested['iso_shares'],
-                'strike_price': strike_price,
-                'lifecycle_state': 'vested_not_exercised',
-                'tax_treatment': 'N/A'
-            })
-
-        if vested.get('nso_shares', 0) > 0:
-            strike_price = self._get_strike_price(equity_pos)
-            rows.append({
-                'date': current_date.isoformat(),
-                'lot_id': 'NSO',
-                'grant_id': self._get_grant_id(equity_pos),
-                'share_type': 'NSO',
-                'quantity': vested['nso_shares'],
-                'strike_price': strike_price,
-                'lifecycle_state': 'vested_not_exercised',
-                'tax_treatment': 'N/A'
-            })
+        # First try grant-based structure (v2.0)
+        grants = equity_pos.get('grants', [])
+        if grants:
+            # Process ALL grants, not just the first one
+            for grant_idx, grant in enumerate(grants):
+                vesting_status = grant.get('vesting_status', {})
+                vested = vesting_status.get('vested_unexercised', {})
+                grant_id = grant.get('grant_id', f'GRANT_{grant_idx}')
+                strike_price = grant.get('strike_price', 0.0)
+                
+                # Add ISO shares with unique lot ID per grant
+                if vested.get('iso', 0) > 0:
+                    rows.append({
+                        'date': current_date.isoformat(),
+                        'lot_id': f"ISO_{grant_id}",
+                        'grant_id': grant_id,
+                        'share_type': 'ISO',
+                        'quantity': vested['iso'],
+                        'strike_price': strike_price,
+                        'lifecycle_state': 'vested_not_exercised',
+                        'tax_treatment': 'N/A'
+                    })
+                
+                # Add NSO shares with unique lot ID per grant
+                if vested.get('nso', 0) > 0:
+                    rows.append({
+                        'date': current_date.isoformat(),
+                        'lot_id': f"NSO_{grant_id}",
+                        'grant_id': grant_id,
+                        'share_type': 'NSO',
+                        'quantity': vested['nso'],
+                        'strike_price': strike_price,
+                        'lifecycle_state': 'vested_not_exercised',
+                        'tax_treatment': 'N/A'
+                    })
 
         # Add vesting calendar events
         vesting_events = self._generate_vesting_events(equity_pos, current_date)
@@ -153,35 +160,43 @@ class TimelineGenerator:
     def _generate_vesting_events(self, equity_pos: Dict[str, Any],
                                 current_date: date) -> List[Dict[str, Any]]:
         """Generate vesting calendar events."""
-        unvested = equity_pos.get('unvested', {})
-        vesting_calendar = unvested.get('vesting_calendar', [])
-
-        strike_price = self._get_strike_price(equity_pos)
         vesting_events = []
-
-        for event in vesting_calendar:
-            vest_date = datetime.fromisoformat(event['date']).date()
-
-            # Generate unique lot ID for each vesting event
-            lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}"
-
-            # Determine lifecycle state based on whether vesting has occurred
-            if vest_date <= current_date:
-                lifecycle_state = 'vested_not_exercised'
-            else:
-                lifecycle_state = 'granted_not_vested'
-
-            vesting_events.append({
-                'date': vest_date.isoformat(),
-                'lot_id': lot_id,
-                'grant_id': self._get_grant_id(equity_pos),
-                'share_type': event['share_type'],
-                'quantity': event['shares'],
-                'strike_price': strike_price,
-                'lifecycle_state': lifecycle_state,
-                'tax_treatment': 'N/A'
-            })
-
+        
+        # First try grant-based structure (v2.0)
+        grants = equity_pos.get('grants', [])
+        if grants:
+            # Process ALL grants, not just the first one
+            for grant_idx, grant in enumerate(grants):
+                vesting_status = grant.get('vesting_status', {})
+                unvested = vesting_status.get('unvested', {})
+                vesting_calendar = unvested.get('vesting_calendar', [])
+                
+                strike_price = grant.get('strike_price', 0.0)
+                grant_id = grant.get('grant_id', f'GRANT_{grant_idx}')
+                
+                for event in vesting_calendar:
+                    vest_date = datetime.fromisoformat(event['date']).date()
+                    
+                    # Include grant_id in lot_id for multiple grant support
+                    lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}_{grant_id}"
+                    
+                    # Determine lifecycle state based on whether vesting has occurred
+                    if vest_date <= current_date:
+                        lifecycle_state = 'vested_not_exercised'
+                    else:
+                        lifecycle_state = 'granted_not_vested'
+                    
+                    vesting_events.append({
+                        'date': vest_date.isoformat(),
+                        'lot_id': lot_id,
+                        'grant_id': grant_id,
+                        'share_type': event['share_type'],
+                        'quantity': event['shares'],
+                        'strike_price': strike_price,
+                        'lifecycle_state': lifecycle_state,
+                        'tax_treatment': 'N/A'
+                    })
+        
         return vesting_events
 
     def _save_timeline_csv(self, rows: List[Dict[str, Any]], output_path: Path) -> None:

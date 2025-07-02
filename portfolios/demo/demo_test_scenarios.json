@@ -1,0 +1,44 @@
+{
+  "portfolio_name": "demo_test_scenarios",
+  "description": "Comprehensive demo portfolio with atomic test scenarios for systematic testing",
+  "data_source": "demo",
+  "scenario_source": "demo",
+  "price_scenario": "moderate",
+  "projection_years": 7,
+  "scenarios": [
+    "000_natural_evolution",
+    "001_exercise_all_vested",
+    "002_tender_and_donate",
+    "003_exercise_single_iso",
+    "004_sell_single_lot",
+    "005_donate_single_lot",
+    "006_stcg_ltcg_boundary",
+    "007_iso_disqualifying",
+    "008_iso_qualifying",
+    "009_exercise_future_vests",
+    "010_amt_generation",
+    "011_basis_election",
+    "012_no_basis_election",
+    "013_carryforward_generation",
+    "014_match_window",
+    "015_nso_cashless_exercise",
+    "016_expiring_options",
+    "017_pledge_fulfillment",
+    "018_sell_donate_comparison",
+    "019_annual_pattern",
+    "020_comprehensive_strategy"
+  ],
+  "comparison_metrics": [
+    "total_net_worth",
+    "total_taxes_paid",
+    "total_donations",
+    "amt_credits_remaining",
+    "charitable_carryforward",
+    "expired_options_count"
+  ],
+  "output_settings": {
+    "generate_summary_csv": true,
+    "generate_detailed_comparison": true,
+    "sort_by_metric": "scenario_name"
+  }
+}

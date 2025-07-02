@@ -1,0 +1,54 @@
+{
+  "scenario_name": "019_annual_pattern",
+  "description": "Test consistent annual pattern - Regular sales and donations",
+  "actions": [
+    {
+      "action_date": "2025-03-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2024_001",
+      "quantity": 300,
+      "price": null,
+      "notes": "2025 Q1 sale"
+    },
+    {
+      "action_date": "2025-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 200,
+      "price": null,
+      "notes": "2025 year-end donation"
+    },
+    {
+      "action_date": "2026-03-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2024_001",
+      "quantity": 300,
+      "price": null,
+      "notes": "2026 Q1 sale"
+    },
+    {
+      "action_date": "2026-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 200,
+      "price": null,
+      "notes": "2026 year-end donation"
+    },
+    {
+      "action_date": "2027-03-01",
+      "action_type": "sell",
+      "lot_id": "RSU_2024_001",
+      "quantity": 300,
+      "price": null,
+      "notes": "2027 Q1 sale"
+    },
+    {
+      "action_date": "2027-12-01",
+      "action_type": "donate",
+      "lot_id": "RSU_2024_001",
+      "quantity": 200,
+      "price": null,
+      "notes": "2027 year-end donation"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "scenario_name": "013_carryforward_generation",
+  "description": "Test charitable carryforward - Large donation exceeding AGI limit",
+  "actions": [
+    {
+      "action_date": "2025-12-15",
+      "action_type": "donate",
+      "lot_id": "RSU_2021_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Donate entire lot - creates carryforward"
+    },
+    {
+      "action_date": "2025-12-15",
+      "action_type": "donate",
+      "lot_id": "RSU_2022_001",
+      "quantity": 1500,
+      "price": null,
+      "notes": "Donate entire lot - adds to carryforward"
+    }
+  ]
+}

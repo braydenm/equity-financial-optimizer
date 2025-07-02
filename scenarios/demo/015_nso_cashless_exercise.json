@@ -1,0 +1,22 @@
+{
+  "scenario_name": "015_nso_cashless_exercise",
+  "description": "Test NSO cashless exercise - Exercise and sell NSOs same day",
+  "actions": [
+    {
+      "action_date": "2026-01-15",
+      "action_type": "exercise",
+      "lot_id": "VEST_20260101_NSO_DEMO_GRANT_001",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Exercise NSO"
+    },
+    {
+      "action_date": "2026-01-15",
+      "action_type": "sell",
+      "lot_id": "VEST_20260101_NSO_DEMO_GRANT_001_EX_20260115",
+      "quantity": 2000,
+      "price": null,
+      "notes": "Same-day sale for cashless exercise"
+    }
+  ]
+}
