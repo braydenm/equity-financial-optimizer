@@ -38,7 +38,11 @@ from calculators.tax_constants import (
     CALIFORNIA_CHARITABLE_AGI_LIMITS,
     FEDERAL_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
     CALIFORNIA_CHARITABLE_BASIS_ELECTION_AGI_LIMITS,
-    CHARITABLE_CARRYFORWARD_YEARS
+    CHARITABLE_CARRYFORWARD_YEARS,
+    CHARITABLE_50PCT_ORG_OVERALL_LIMIT,
+    MEDICARE_RATE,
+    ADDITIONAL_MEDICARE_THRESHOLD,
+    SOCIAL_SECURITY_WAGE_BASE
 )
 
 # Import AMT calculation functions
@@ -527,7 +531,7 @@ class AnnualTaxCalculator:
         # For 50% limit organizations, also apply overall charitable limit
         if fifty_pct_limit_org and (cash_donations > 0 or stock_donations > 0):
             # Total donations to 50% orgs cannot exceed 50% of AGI
-            overall_limit = agi * 0.50
+            overall_limit = agi * CHARITABLE_50PCT_ORG_OVERALL_LIMIT
             remaining_overall_after_cash = max(0, overall_limit - cash_used)  # Use total cash, not just current
             effective_stock_limit = min(stock_limit, remaining_overall_after_cash)
         else:
@@ -539,7 +543,7 @@ class AnnualTaxCalculator:
         # Step 4: Stock carryforward with FIFO ordering (up to remaining stock limit)
         # For 50% limit organizations, also check overall limit
         if fifty_pct_limit_org and (cash_donations > 0 or stock_donations > 0 or total_cash_carryforward > 0 or total_stock_carryforward > 0):
-            overall_limit = agi * 0.50
+            overall_limit = agi * CHARITABLE_50PCT_ORG_OVERALL_LIMIT
             total_used_so_far = cash_used + stock_current_used  # Use total cash (current + carryforward)
             remaining_overall = max(0, overall_limit - total_used_so_far)
             effective_stock_limit = min(remaining_stock_limit, remaining_overall)
@@ -824,14 +828,14 @@ class AnnualTaxCalculator:
         total_marginal = federal_marginal + ca_marginal
 
         # Add FICA/Medicare if income is below cap (simplified)
-        # Above ~$160k, only Medicare applies
-        if ordinary_income < 160000:
+        # Above Social Security wage base (~$160k), only Medicare applies
+        if ordinary_income < SOCIAL_SECURITY_WAGE_BASE:
             total_marginal += user_profile.fica_tax_rate
         else:
-            total_marginal += 0.0145  # Medicare portion only
+            total_marginal += MEDICARE_RATE  # Medicare portion only
 
         # Add additional Medicare tax for high earners
-        if ordinary_income > 200000:  # Single filer threshold
+        if ordinary_income > ADDITIONAL_MEDICARE_THRESHOLD['single']:  # Single filer threshold
             total_marginal += user_profile.additional_medicare_rate
 
         return total_marginal

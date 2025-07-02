@@ -29,6 +29,11 @@ for actual tax calculations using progressive brackets (not flat rates).
 **Use pause points** - Before major changes, stop and confirm approach. Break large tasks into atomic steps
 **Define success upfront** - Establish clear criteria before starting work
 
+# Summary instructions
+
+When you are using compact, please write a comprehensive and detailed summary, include in your summary 1) what the original kickoff message was, 2) what task we set about solving originally, 3) any progress made or problems run into on that main task, 4) any diversions pursued and how deep down the tree we might be, 5) any tests run in the history that appeared to be failing 6) any tests that need to be run again now to confirm their state, 7) all files touched or edited this session along with an explaination of why and what the goal was, 8) any files that we are planning on touching but haven't edited yet, and the plans for these files, 9) the entire context of the users last 10 messages to you, along with a summary of what was achieved or problems ran into for each of those messages, 10) a list of tips of working with this codebase such as paths to specific files or instructions the user has recently given to you that you previously weren't doing so you can remember to keep doing them immediately after, 11) project basis such as the commands we frequently run 12) example files we should make sure to read from to understand key formatting or expected structure of the files we are likely to be working on in this upcoming session.
+
+
 ### Code Changes
 **Edit atomically** - Make isolated, in-place edits. Read files before editing. Use `mv` to move files
 **Respect boundaries** - Each file has a specific purpose. Don't mix concerns across files
@@ -39,6 +44,8 @@ for actual tax calculations using progressive brackets (not flat rates).
 ### Documentation & State
 **Document as you go** - Update docs inline with changes, not later. No time estimates in plans or dates in changelogs.
 **Track state here** - Don't maintain separate todo lists. After commits, ask "what are the next steps?"
+- When completing a feature, prior to drafting a commit, add a short 5 bullet summary of what was completed to docs/CHANGELOG.md, while ensuring no personal, user, or sensitive data is mentioned.
+- After completing and documenting a feature (including removing anything unnecessary from CLAUDE.md and adding the short summary to docs/CHANGELOG.md, draft a commit for the user to review and approve, ensuring no sensitive or personal information is included in the commit message especially from the user profile details.
 
 ### Design Approach
 **Keep it simple** - Aim for E2E validation over complex designs. Ask about abstraction preferences
@@ -154,5 +161,7 @@ See CHANGELOG.md for complete feature history and implementation details.
 - Load price projections from external source instead of no-change assumption (natural_evolution_generator.py) - 2 instances
 - Forward reference in ProjectionResult needs documentation for simplest implementation (projection_state.py)
 - Investment return rate hardcoded at 7%, should be user specified (projection_state.py)
-- Search codebase systematically for other hardcoded tax values that should be in tax_constants.py (comprehensive audit needed)
+
+### Recent TODOs & Action Items
 - **AUDIT NEEDED**: Review cost_basis field usage across profile files and ensure correct flow/calculation for both regular and AMT tax on subsequent sale events. Verify ISOs use strike price as cost basis for regular tax but FMV at exercise for AMT calculations
+- TODO: audit all fields in user_profile to find those not used by many downstream calculations and propose a comprehensive reduction plan to simplify this schema

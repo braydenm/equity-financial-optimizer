@@ -644,3 +644,15 @@
 - **Enhanced CSV generators** with detailed pledge obligation tracking and expiration reporting
 - **Added test_vesting_calendar_loading.py** to prevent regression of vesting lot creation
 - **All 37 tests passing** including new pledge tracking scenarios
+
+### Portfolio Analysis Improvements
+- Improved equity position output formatting with clean tables instead of verbose dictionaries
+- Replaced `max_tax_burden` metric with `years_with_insufficient_cash` for better cash flow analysis
+- New metric identifies years where available cash cannot cover tax obligations before considering asset sales
+
+### Tax Constants Centralization
+- **Centralized all hardcoded tax values** into tax_constants.py for maintainability
+- **Added CHARITABLE_50PCT_ORG_OVERALL_LIMIT** constant for 50% organization donation limits
+- **Replaced magic numbers** in annual_tax_calculator.py with proper constants (MEDICARE_RATE, SOCIAL_SECURITY_WAGE_BASE, ADDITIONAL_MEDICARE_THRESHOLD)
+- **Updated LTCG holding period checks** to use LTCG_HOLDING_PERIOD_DAYS constant (366 days) across share_sale_calculator.py and equity_loader.py
+- **Improved code maintainability** by eliminating hardcoded tax thresholds and rates throughout the codebase

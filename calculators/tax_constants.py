@@ -161,6 +161,10 @@ FEDERAL_CHARITABLE_AGI_LIMITS = {
     'stock': 0.30,   # 30% of AGI for appreciated stock donations
 }
 
+# Overall limit for contributions to 50% organizations
+# When donating to 50% organizations, total donations (cash + stock) cannot exceed 50% of AGI
+CHARITABLE_50PCT_ORG_OVERALL_LIMIT = 0.50
+
 # California AGI Limits for Charitable Deductions (2025 values)
 # California maintains the traditional 50% limit for cash donations
 # and does not conform to the temporary federal increase

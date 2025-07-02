@@ -14,6 +14,7 @@ from typing import Dict, List, Tuple, Optional
 from decimal import Decimal
 from datetime import datetime, date
 from calculators.components import ShareSaleComponents, DispositionType
+from calculators.tax_constants import LTCG_HOLDING_PERIOD_DAYS
 
 
 class ShareSaleCalculator:
@@ -64,7 +65,7 @@ class ShareSaleCalculator:
 
         # Calculate holding period
         holding_period_days = (sale_date - exercise_date).days
-        is_long_term = holding_period_days > 365
+        is_long_term = holding_period_days >= LTCG_HOLDING_PERIOD_DAYS
 
         # Initialize component values
         short_term_gain = 0.0
@@ -140,7 +141,7 @@ class ShareSaleCalculator:
             tax_treatment = "Qualifying"
         elif disposition_type == DispositionType.DISQUALIFYING_ISO:
             tax_treatment = "Disqualifying"
-        elif holding_period_days > 365:
+        elif holding_period_days >= LTCG_HOLDING_PERIOD_DAYS:
             tax_treatment = "LTCG"
         else:
             tax_treatment = "STCG"

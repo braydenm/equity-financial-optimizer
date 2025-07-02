@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from projections.projection_state import (
     ShareLot, ShareType, LifecycleState, TaxTreatment
 )
+from calculators.tax_constants import LTCG_HOLDING_PERIOD_DAYS
 
 
 class EquityLoader:
@@ -63,7 +64,7 @@ class EquityLoader:
 
             # Determine tax treatment based on holding period
             holding_period_days = (self.reference_date - exercise_date).days
-            tax_treatment = TaxTreatment.LTCG if holding_period_days > 365 else TaxTreatment.STCG
+            tax_treatment = TaxTreatment.LTCG if holding_period_days >= LTCG_HOLDING_PERIOD_DAYS else TaxTreatment.STCG
 
             lot = ShareLot(
                 lot_id=lot_data['lot_id'],
@@ -104,8 +105,9 @@ class EquityLoader:
             
             # ISO shares
             if vested.get('iso', 0) > 0:
+                lot_id = f"ISO_{grant_id}" if grant_id else 'ISO'
                 lots.append(ShareLot(
-                    lot_id='ISO',
+                    lot_id=lot_id,
                     share_type=ShareType.ISO,
                     quantity=vested['iso'],
                     strike_price=strike_price,
@@ -119,8 +121,9 @@ class EquityLoader:
             
             # NSO shares
             if vested.get('nso', 0) > 0:
+                lot_id = f"NSO_{grant_id}" if grant_id else 'NSO'
                 lots.append(ShareLot(
-                    lot_id='NSO',
+                    lot_id=lot_id,
                     share_type=ShareType.NSO,
                     quantity=vested['nso'],
                     strike_price=strike_price,
@@ -134,8 +137,9 @@ class EquityLoader:
             
             # RSU shares (if any vested but not released)
             if vested.get('rsu', 0) > 0:
+                lot_id = f"VESTED_RSU_{grant_id}" if grant_id else 'VESTED_RSU'
                 lots.append(ShareLot(
-                    lot_id='VESTED_RSU',
+                    lot_id=lot_id,
                     share_type=ShareType.RSU,
                     quantity=vested['rsu'],
                     strike_price=0.0,  # RSUs have no strike price
@@ -176,7 +180,10 @@ class EquityLoader:
                         share_type = self._parse_share_type(event['share_type'])
 
                         # Generate unique lot ID for each vesting event
-                        lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}"
+                        if grant_id:
+                            lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}_{grant_id}"
+                        else:
+                            lot_id = f"VEST_{vest_date.strftime('%Y%m%d')}_{event['share_type']}"
 
                         # Determine lifecycle state based on vesting date
                         if vest_date <= self.reference_date:
