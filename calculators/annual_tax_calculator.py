@@ -835,7 +835,7 @@ class AnnualTaxCalculator:
             total_marginal += MEDICARE_RATE  # Medicare portion only
 
         # Add additional Medicare tax for high earners
-        if ordinary_income > ADDITIONAL_MEDICARE_THRESHOLD['single']:  # Single filer threshold
+        if ordinary_income > ADDITIONAL_MEDICARE_THRESHOLD[filing_status]:
             total_marginal += user_profile.additional_medicare_rate
 
         return total_marginal

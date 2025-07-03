@@ -482,3 +482,104 @@ def generate_pledge_obligations_csv(result: ProjectionResult, output_path: str) 
             writer.writerows(rows)
 
 
+def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) -> None:
+    """Save comprehensive cash flow tracking with all income sources, expenses, and balances."""
+    rows = []
+
+    for i, state in enumerate(result.yearly_states):
+        # Get starting values
+        starting_cash = state.starting_cash
+        starting_investments = state.investment_balance if i == 0 else result.yearly_states[i-1].investment_balance
+
+        # Income breakdown
+        w2_income = state.income
+        spouse_income = state.spouse_income
+        other_income = state.other_income
+        interest_income = result.user_profile.interest_income
+        dividend_income = result.user_profile.dividend_income
+        bonus_income = result.user_profile.bonus_expected
+        investment_growth = starting_investments * result.user_profile.investment_return_rate
+        total_income = (w2_income + spouse_income + other_income + interest_income +
+                       dividend_income + bonus_income + investment_growth)
+
+        # Cash inflows
+        sale_proceeds = sum(
+            comp.gross_proceeds
+            for comp in state.annual_tax_components.sale_components
+        ) if state.annual_tax_components else 0
+        company_match_received = state.company_match_received
+
+        # Cash outflows
+        exercise_costs = state.exercise_costs
+        living_expenses = state.living_expenses
+        gross_tax = state.gross_tax
+        tax_withholdings = state.tax_withholdings
+        net_tax_payment = max(0, gross_tax - tax_withholdings)
+        donation_value = state.donation_value
+
+        # Net cash flow (company match goes directly to DAF, not user cash)
+        net_cash_flow = (total_income + sale_proceeds - exercise_costs -
+                        living_expenses - net_tax_payment)
+
+        # Ending balances
+        ending_cash = state.ending_cash
+        static_investments = result.user_profile.crypto  # Static crypto balance from profile
+        ending_investments = state.investment_balance
+        ending_equity_value = state.total_equity_value
+
+        # Other investments (crypto + real estate + other non-equity assets)
+        crypto_balance = getattr(result.user_profile, 'crypto', 0)
+        real_estate_equity = getattr(result.user_profile, 'real_estate_equity', 0)
+        other_investments = crypto_balance + real_estate_equity
+
+        total_net_worth = ending_cash + static_investments + ending_investments + ending_equity_value
+
+        row = {
+            'year': state.year,
+            # Starting balances
+            'starting_cash': round(starting_cash, 2),
+            'starting_investments': round(starting_investments, 2),
+            # Income sources
+            'w2_income': round(w2_income, 2),
+            'spouse_income': round(spouse_income, 2),
+            'bonus_income': round(bonus_income, 2),
+            'interest_income': round(interest_income, 2),
+            'dividend_income': round(dividend_income, 2),
+            'other_income': round(other_income, 2),
+            'investment_growth': round(investment_growth, 2),
+            'total_income': round(total_income, 2),
+            # Cash inflows
+            'sale_proceeds': round(sale_proceeds, 2),
+            'company_match_received': round(company_match_received, 2),
+            # Cash outflows
+            'exercise_costs': round(exercise_costs, 2),
+            'living_expenses': round(living_expenses, 2),
+            'gross_tax': round(gross_tax, 2),
+            'tax_withholdings': round(tax_withholdings, 2),
+            'net_tax_payment': round(net_tax_payment, 2),
+            'donation_value': round(donation_value, 2),
+            # Net flows
+            'net_cash_flow': round(net_cash_flow, 2),
+            # Ending balances
+            'ending_cash': round(ending_cash, 2),
+            'ending_investments': round(ending_investments, 2),
+            'static_investments': round(static_investments, 2),
+            'other_investments': round(other_investments, 2),
+            'ending_equity_value': round(ending_equity_value, 2),
+            'total_net_worth': round(total_net_worth, 2),
+            # Tax details
+            'amt_credits_used': round(state.tax_state.amt_credits_used, 2),
+            'amt_credits_remaining': round(state.tax_state.amt_credits_remaining, 2),
+        }
+        rows.append(row)
+
+    # Write CSV
+    if rows:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fieldnames = list(rows[0].keys())
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+

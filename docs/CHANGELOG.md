@@ -163,3 +163,13 @@
 - Reorganized portfolios into demo/ and user/ subdirectories
 - Added validation errors for deprecated lot ID formats
 - Enhanced cash flow tracking to identify insufficient cash years
+
+## 2025-07-03 Updates
+- Fixed marginal rate calculation to correctly use filing status for Additional Medicare Tax threshold
+- Fixed company match calculation bug that always returned 0.0 in projection_calculator.py
+- Added charitable_deduction_total column to annual_tax_detail.csv for easier deduction visibility
+- Fixed missing action_date for donation events in components.csv output
+- Refactored save_comprehensive_cashflow_csv from projection_output.py to csv_generators.py for better code organization
+- Enhanced CLAUDE.md documentation for future agents
+- Fixed test failures in test_amt_2035_issue.py and test_amt_charitable_deduction.py
+- Refactored test_charitable_deduction_usage.py to be self-contained

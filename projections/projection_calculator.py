@@ -767,12 +767,14 @@ class ProjectionCalculator:
         # Calculate donation value (FMV for display purposes)
         donation_value = action.quantity * donation_price
 
-        # Company match will be calculated after pledge discharge based on eligible amount
-        company_match_amount = 0.0
-
         # Get grant-specific charitable program for company match ratio
         grant_charitable_program = self._get_charitable_program_for_grant(lot.grant_id)
         grant_company_match_ratio = grant_charitable_program['company_match_ratio']
+        
+        # Calculate the theoretical maximum company match based on donation value and grant-specific ratio
+        # Note: The actual eligible match may be less if pledge limits apply, e.g. due to donating more shares than 
+        # the fraction of eligible vested shares, or if a donation happens after the matching window closes
+        company_match_amount = donation_value * grant_company_match_ratio
 
         # Create donation components
         donation_components = DonationComponents(
@@ -786,7 +788,8 @@ class ProjectionCalculator:
             donation_value=donation_value,
             deduction_type='stock',
             company_match_ratio=grant_company_match_ratio,
-            company_match_amount=company_match_amount
+            company_match_amount=company_match_amount,
+            action_date=action.action_date
         )
 
         # Add components to annual aggregation

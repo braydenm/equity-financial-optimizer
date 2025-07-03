@@ -3,7 +3,47 @@
 ## Project Overview
 Equity compensation optimizer for ISO/NSO/RSU tax planning. Uses component-based architecture
 where individual calculators extract event components, and annual tax calculator aggregates them
-for actual tax calculations using progressive brackets (not flat rates).
+for actual tax calculations using progressive brackets.
+
+## Quick Reference for Common Tasks
+
+### Running Tests: Use `python3` directly, never `pytest`:
+```bash
+python3 run_all_tests.py                    # Run all tests
+python3 tests/test_name.py                  # Run specific test
+```
+
+### Key Commands
+```bash
+# Run specific scenario
+python3 run_scenario_analysis.py [scenario_id] --demo
+
+# Compare portfolios
+python3 run_portfolio_comparison.py [portfolio_name] --demo
+```
+- **Scenario definitions?** → `scenarios/demo/` or `scenarios/user/`
+
+## Why This Code is Complex (and How to Navigate It)
+
+### Key Complexity Sources
+1. **Two-Phase Tax Calculation**: Individual actions (exercise/sell/donate) generate components, but taxes are calculated annually by aggregating all components - this separation is non-obvious
+2. **Multiple Tax Regimes**: Regular tax vs AMT calculations happen in parallel, with different rules
+3. **Deep Object Hierarchies**: UserProfile, ShareLot, ProjectionState all have complex nested structures
+4. **Time-Sensitive Logic**: Holding periods, vesting schedules, expiration dates all interact in subtle ways
+
+### Navigation Tips for Agents
+1. **Start with Tests**: The test files demonstrate actual usage patterns better than docs
+   - `test_annual_tax_composition.py` - Shows complete flow from actions to tax calculation
+   - `test_amt_charitable_deduction.py` - Demonstrates AMT vs regular tax differences
+   
+2. **Follow the Data Flow**:
+   ```
+   JSON Input → Loaders → Components → Annual Tax Calculator → CSV Output
+   ```
+   
+3. **Common Attribute Errors**: When you see `AttributeError`, check:
+   - `UserProfile`: Requires all constructor args, not just a dict
+
 
 ## Architecture Principles
 - Calculators are pure functions returning components, not final tax amounts
@@ -30,10 +70,9 @@ for actual tax calculations using progressive brackets (not flat rates).
 **Define success upfront** - Establish clear criteria before starting work
 
 # Summary instructions
-
+## Compacting  Claude's Context Window
 When you are using compact, please write a comprehensive and detailed summary, include in your summary 1) what the original kickoff message was, including any automated system kickoff as well as the first message sent to you by the user 2) what task we set about solving originally, 3) any progress made or problems run into on that main task, 4) any diversions pursued and how deep down the tree we might be, 5) any tests run in the history that appeared to be failing 6) any tests that need to be run again now to confirm their state, 7) all files touched or edited this session along with an explaination of why and what the goal was, 8) any files that we are planning on touching but haven't edited yet, and the plans for these files, 9) the entire context of the users last 10 messages to you, along with a summary of what was achieved or problems ran into for each of those messages, 10) a list of tips of working with this codebase such as paths to specific files or instructions the user has recently given to you that you previously weren't doing so you can remember to keep doing them immediately after, 11) project basis such as the commands we frequently run 12) example files we should make sure to read from to understand key formatting or expected structure of the files we are likely to be working on in this upcoming session. 13) Include a section for "unwritten content that I might want to add to docs/CHANGELOG.md" 14) include a section for "uncommitted work along with a draft commit message to build on top of for when subsequent tasks in this session are completed"
 After that, continue the default compaction instructions covering chronological conversational history, task status and summary etc. This usually covers the following:
-
 - Analysis: Chronological review of the conversation
   - Summary Structure:
     a. Primary request and intent
@@ -55,22 +94,24 @@ After that, continue the default compaction instructions covering chronological 
 **Check changed files** - When notified "These files changed since last read", immediately read the changed files to understand what's different before proceeding with any analysis or modifications
 
 ### Documentation & State
-**Document as you go** - Update docs inline with changes, not later. No time estimates in plans or dates in changelogs.
-**Track state here** - Don't maintain separate todo lists. After commits, ask "what are the next steps?"
+**Document as you go** - Update docs inline with changes, not later. Don't include time estimates in plans. Verify dates before including them in docs/CHANGELOG.md
+**Track long term state in CLAUDE.md** - Only maintain a separate todo lists when delivering a well contained feature that can be delivered in a single session.
 - When completing a feature, prior to drafting a commit, add a short 5 bullet summary of what was completed to docs/CHANGELOG.md, while ensuring no personal, user, or sensitive data is mentioned.
 - After completing and documenting a feature (including removing anything unnecessary from CLAUDE.md and adding the short summary to docs/CHANGELOG.md, draft a commit for the user to review and approve, ensuring no sensitive or personal information is included in the commit message especially from the user profile details.
+- After commits, ask "what are the next steps?" and suggest some candidate directions.
 
 ### Design Approach
 **Keep it simple** - Aim for E2E validation over complex designs. Ask about abstraction preferences
 **Use discovery questions** - Ask about constraints and risk tolerance rather than assuming
 
 ## Technical Standards
-- python3 (don't try pytest)
+- python3 (we don't use pytest)
 - Decimal for monetary precision
 - ISO 8601 dates
 - Comprehensive docstrings with examples
 - Error messages user-friendly and actionable
 - No external dependencies
+- Prefer to avoid silent fallbacks. Fail loud!
 
 ## Data Flow
 1. User profile (JSON) → loaders → ShareLot objects
@@ -127,12 +168,46 @@ equity-financial-optimizer/
 1. **docs/CLAUDE.md** (this file) - Project context and working instructions
 2. **docs/TECHNICAL_ARCHITECTURE.md** - System design, data flow, and architectural decisions
 3. **docs/DATA_CONTRACT.md** - Profile format v2.0 specification
-4. **docs/CHANGELOG.md** - Complete feature history to understand evolution
+4. **docs/CHANGELOG.md** - Skim this complete feature history to understand evolution
 
-### Recommended Code Files to Study
+### Recommended Code Files to Study (with Why)
 1. **calculators/annual_tax_calculator.py** - Core tax engine showing component aggregation and bracket calculations
+   - Look for `calculate_annual_tax()` method - this is where all components get aggregated
+   - Pay attention to how federal vs state, regular vs AMT are calculated in parallel
+   
 2. **projections/projection_calculator.py** - Multi-year scenario evaluation demonstrating the event processing pipeline
+   - Search for where `DonationComponents` are created to understand field requirements
+   - Shows how actions become components which feed into annual tax calculations
+   
 3. **engine/portfolio_manager.py** - Scenario execution orchestration showing how everything ties together
+   - Demonstrates the full pipeline from scenario loading to CSV output
+   
+4. **tests/test_annual_tax_composition.py** - Best example of complete usage patterns
+   - Shows how to create components from individual actions
+   - Demonstrates proper UserProfile instantiation
+   - Illustrates the two-phase calculation pattern
+
+### Critical Implementation Details
+
+#### Component Creation Pattern
+```python
+# Phase 1: Create components from actions
+iso_component = calculate_exercise_components(...)
+sale_component = ShareSaleCalculator().calculate_sale_components(...)
+donation_component = ShareDonationCalculator().calculate_share_donation_components(...)
+
+# Phase 2: Aggregate in annual tax calculator
+result = AnnualTaxCalculator().calculate_annual_tax(
+    year=2025,
+    user_profile=profile,  # Must be UserProfile object, not dict!
+    exercise_components=[iso_component],
+    sale_components=[sale_component],
+    donation_components=[donation_component]
+)
+```
+
+#### Common Gotchas
+1. **UserProfile Creation**: Always use the full constructor. See other tests for a reference prior to starting your draft.
 
 ## Current Status & Backlog
 
@@ -178,3 +253,57 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Recent TODOs & Action Items
 - **AUDIT NEEDED**: Review cost_basis field usage across profile files and ensure correct flow/calculation for both regular and AMT tax on subsequent sale events. Verify ISOs use strike price as cost basis for regular tax but FMV at exercise for AMT calculations
 - TODO: audit all fields in user_profile to find those not used by many downstream calculations and propose a comprehensive reduction plan to simplify this schema
+
+### Critical Migration TODO: Company Match Calculation
+**CONTEXT**: The current implementation uses a pledge-obligation based system where company match is only given for shares that fulfill outstanding pledge obligations. This is incorrect based on the actual program rules in `docs/reference/equity-donation-matching-faq.md`.
+
+**CURRENT INCORRECT BEHAVIOR** (as of commit f72d7449):
+- Company match is calculated based on `shares_credited` from pledge discharge
+- Only donations that fulfill pledge obligations receive match
+- Example: If pledge is fulfilled, additional donations get $0 match
+
+**CORRECT BEHAVIOR PER FAQ**:
+The company match cap should be based on:
+```
+At any given time, eligible for match = 
+min(
+  (pledge_percentage × total_vested_shares) - shares_already_donated,
+  actual_shares_being_donated
+) × share_price × match_ratio
+```
+
+**KEY RULES FROM FAQ**:
+1. Match eligibility is based on vested shares at time of donation, not pledge obligations
+2. The cap is: "(% pledged × eligible vested shares) - shares/cash already donated"
+3. You cannot "pre-donate" - excess donations don't carry forward for future matching
+4. Match applies to shares donated up to the cap, regardless of pledge fulfillment status
+
+**REQUIRED CHANGES**:
+1. Remove dependency on pledge discharge for match calculation
+2. Track cumulative shares donated across all years (already exists in yearly_state)
+3. Calculate match based on:
+   - Total vested shares from eligible grants at donation time
+   - Pledge percentage for the grant
+   - Cumulative shares already donated
+   - Current donation amount
+4. Update tests to verify new calculation method
+5. Consider removing or repurposing pledge obligation tracking (keep for reporting but not for match eligibility)
+
+**EXAMPLE FIX**:
+In `_process_donation()` around line 272-275:
+```python
+# Current (WRONG):
+actual_company_match = shares_credited * donation_price * match_ratio
+
+# Should be (CORRECT):
+total_vested_eligible = self._calculate_total_vested_eligible_shares(grant_id, action.action_date)
+shares_already_donated = yearly_state.shares_donated.get(lot.lot_id, 0)  # Before this donation
+max_matchable = (pledge_percentage * total_vested_eligible) - shares_already_donated
+shares_eligible_for_match = min(max_matchable, action.quantity)
+actual_company_match = shares_eligible_for_match * donation_price * match_ratio
+```
+
+**TESTING**:
+- Create test scenario where pledge is fulfilled but more shares are donated
+- Verify those additional shares still get company match up to the vested shares cap
+- Test edge cases: pre-donation attempts, donations exceeding cap, multiple grants
