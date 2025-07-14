@@ -306,6 +306,7 @@ class YearlyState:
     pledge_shares_obligated_this_year: int = 0
     pledge_shares_donated_this_year: int = 0
     pledge_shares_expired_this_year: int = 0
+    shares_matched_this_year: int = 0  # Number of donated shares that received company match
 
     # Additional metrics
     total_net_worth: float = 0.0
@@ -406,30 +407,33 @@ class ProjectionResult:
         total_charitable_impact = total_donations + total_company_match
         total_lost_match_value = sum(state.lost_match_opportunities for state in self.yearly_states)
 
-        # Calculate pledge share metrics from individual obligations
+        # Calculate pledge share metrics from yearly states
         pledge_shares_obligated = 0
         pledge_shares_donated = 0
         pledge_shares_outstanding = 0
         pledge_shares_expired_window = 0
 
-        # Sum up expired shares from all yearly states
+        # Sum up expired shares and donations from all yearly states
         for state in self.yearly_states:
             if hasattr(state, 'pledge_shares_expired_this_year'):
                 pledge_shares_expired_window += state.pledge_shares_expired_this_year
+            
+            # Sum up total shares donated across all years
+            if hasattr(state, 'pledge_shares_donated_this_year'):
+                pledge_shares_donated += state.pledge_shares_donated_this_year
+            
+            # Track obligated shares (cumulative)
+            if hasattr(state, 'pledge_shares_obligated_this_year'):
+                pledge_shares_obligated += state.pledge_shares_obligated_this_year
 
-        if final_state and final_state.pledge_state.obligations:
-            from datetime import date as date_class
-            final_year_end = date_class(final_state.year, 12, 31)
-
+        # Outstanding is what remains at the end
+        if final_state and final_state.pledge_state:
+            pledge_shares_outstanding = final_state.pledge_state.total_shares_remaining
+            
+        # For backward compatibility, if obligated wasn't tracked, use initial obligation
+        if pledge_shares_obligated == 0 and final_state and final_state.pledge_state.obligations:
             for obligation in final_state.pledge_state.obligations:
                 pledge_shares_obligated += obligation.shares_obligated
-                pledge_shares_donated += obligation.shares_fulfilled
-
-                # Outstanding shares are those not yet fulfilled
-                if not obligation.is_fulfilled:
-                    pledge_shares_outstanding += obligation.shares_remaining
-
-            pledge_shares_outstanding = pledge_shares_obligated - pledge_shares_donated
 
         # Calculate option expiration opportunity costs
         total_opportunity_cost = 0.0

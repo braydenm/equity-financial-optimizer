@@ -51,14 +51,11 @@ class TestDonationVestingValidation(unittest.TestCase):
                     'grant_id': 'GRANT_001',
                     'grant_date': '2024-01-01',
                     'total_options': 10000,
-                    'share_type': 'ISO',
+                    'option_type': 'ISO',
                     'strike_price': 10.0,
-                    'vesting_schedule': [
-                        {'date': '2025-01-01', 'shares': 2500},
-                        {'date': '2026-01-01', 'shares': 2500},
-                        {'date': '2027-01-01', 'shares': 2500},
-                        {'date': '2028-01-01', 'shares': 2500}
-                    ],
+                    'vesting_schedule': '4_year_monthly_with_cliff',
+                    'cliff_months': 12,
+                    'vesting_start_date': '2024-01-01',
                     'charitable_program': {
                         'pledge_percentage': 0.5,
                         'company_match_ratio': 3.0
@@ -367,13 +364,12 @@ class TestDonationVestingValidation(unittest.TestCase):
         total_shares_donated = sum(year_2025_state.shares_donated.values())
         self.assertEqual(total_shares_donated, 3000)
 
-        # Company match is actually given on all donated shares up to obligation
-        # Since we sold 4000 shares with 50% pledge = 2000 obligation
-        # But donated 3000 shares, only 2000 count for match
-        # Match: 2000 * $50 * 3 = $300,000
-        # But if the system gives match on all 3000: 3000 * $50 * 3 = $450,000
-        # Let's check which behavior is implemented
-        self.assertEqual(year_2025_state.company_match_received, 450000.0)
+        # Company match is based on FAQ formula:
+        # match = min((pledge% × vested) - already_donated, shares_donated) × price × ratio
+        # With 2916 vested shares and 50% pledge = 1458 max matchable
+        # We donated 3000 but only 1458 get match
+        # Match: 1458 * $50 * 3 = $218,700
+        self.assertEqual(year_2025_state.company_match_received, 218700.0)
 
         # The full donation value should be 3000 * $50 = $150,000
         self.assertEqual(year_2025_state.donation_value, 150000.0)

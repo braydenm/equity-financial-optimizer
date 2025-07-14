@@ -17,11 +17,10 @@ The interaction between ISOs, NSOs, AMT, charitable deductions, and donation mat
 
 ## User Goals (with priority to be able to be user specified)
 
-1. **Maximize charitable impact** - Leverage match (3:1 or 1:1) effectively
+1. **Maximize charitable impact** - Leverage match (3:1 or 1:1) effectively to maximize the total charitable impact (user donations plus company match). Minimize expired charitable deduction.
 2. **Ensure sufficient liquidity** - Maintain cash flow for living expenses and exercise and tax expenses
-3. **Preserve upside potential** - Retain equity for future growth depending on employee's risk tolerance and diversification goals
-4. **Minimize tax burden** - Optimize across multiple years including consideration of tax credits, AMT, capital gains, charitable deductions, and tax planning strategies
-5. **Manage downside risk** - Protect against adverse scenarios
+3. **Preserve upside potential** - Retain equity for future growth depending on employee's risk tolerance and diversification goals, to maximize total net wealth at the end of long scenarios
+4. **Minimize tax burden** - Optimize across multiple years including consideration of tax credits, AMT, capital gains, charitable deductions, and tax planning strategies. Minimize the unused AMT credit or the number of years at the end of the scenario that it would take for the AMT credit to be consumed given.
 
 ## System Requirements
 

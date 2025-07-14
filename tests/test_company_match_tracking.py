@@ -29,6 +29,7 @@ from projections.projection_state import (
 )
 from projections.projection_calculator import ProjectionCalculator
 from calculators.share_donation_calculator import ShareDonationCalculator
+from calculators.liquidity_event import LiquidityEvent
 
 
 class TestCompanyMatchTracking:
@@ -36,7 +37,7 @@ class TestCompanyMatchTracking:
 
     def create_test_profile(self, company_match_ratio: float = 3.0) -> UserProfile:
         """Create a test user profile with 50% pledge."""
-        return UserProfile(
+        profile = UserProfile(
             federal_tax_rate=0.37,
             federal_ltcg_rate=0.20,
             state_tax_rate=0.093,
@@ -57,10 +58,28 @@ class TestCompanyMatchTracking:
             filing_status='single',
             state_of_residence='California'
         )
+        
+        # Add grant information
+        profile.grants = [{
+            'grant_id': 'GRANT_001',
+            'grant_date': '2022-01-01',
+            'total_options': 10000,
+            'option_type': 'ISO',
+            'strike_price': 10.0,
+            'vesting_schedule': '4_year_monthly_with_cliff',
+            'cliff_months': 12,
+            'vesting_start_date': '2022-01-01',
+            'charitable_program': {
+                'pledge_percentage': 0.5,
+                'company_match_ratio': company_match_ratio
+            }
+        }]
+        
+        return profile
 
     def create_25_percent_pledge_profile(self) -> UserProfile:
         """Create a test user profile with 25% pledge and 1:1 match."""
-        return UserProfile(
+        profile = UserProfile(
             federal_tax_rate=0.37,
             federal_ltcg_rate=0.20,
             state_tax_rate=0.093,
@@ -81,6 +100,24 @@ class TestCompanyMatchTracking:
             filing_status='single',
             state_of_residence='California'
         )
+        
+        # Add grant information
+        profile.grants = [{
+            'grant_id': 'GRANT_001',
+            'grant_date': '2022-01-01',
+            'total_options': 10000,
+            'option_type': 'ISO',
+            'strike_price': 10.0,
+            'vesting_schedule': '4_year_monthly_with_cliff',
+            'cliff_months': 12,
+            'vesting_start_date': '2022-01-01',
+            'charitable_program': {
+                'pledge_percentage': 0.25,
+                'company_match_ratio': 1.0
+            }
+        }]
+        
+        return profile
 
     def create_test_lots(self, lot_count: int = 1, shares_per_lot: int = 2000) -> list:
         """Create test share lots."""
@@ -96,7 +133,8 @@ class TestCompanyMatchTracking:
                 exercise_date=date(2022, 6, 1),
                 fmv_at_exercise=25.0,
                 lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
-                tax_treatment=TaxTreatment.NA
+                tax_treatment=TaxTreatment.NA,
+                grant_id='GRANT_001'
             ))
         return lots
 
@@ -444,12 +482,13 @@ class TestCompanyMatchTracking:
         result = calculator.evaluate_projection_plan(plan)
         result.calculate_summary_metrics()
 
-        # Verify company match only applies to matchable portion
+        # Verify company match applies to all donated shares (up to vesting cap)
         year_2026_state = result.get_state_for_year(2026)
 
-        # Company match applies to shares credited (1000 shares at current price)
-        # Even though we donate 1500 shares, only 1000 count toward pledge
-        expected_company_match = 1000 * 60.0 * 3.0  # $180,000 for credited shares
+        # With FAQ-based calculation: match applies to all donated shares
+        # 50% pledge on 10k vested = 5k max matchable
+        # Already donated 0, so all 1500 shares get match
+        expected_company_match = 1500 * 60.0 * 3.0  # $270,000 for all donated shares
         assert year_2026_state.company_match_received == expected_company_match
 
         # Verify pledge is fulfilled (only needed amount applied)
@@ -461,7 +500,7 @@ class TestCompanyMatchTracking:
         print(f"✅ Shares obligated: {obligation.shares_obligated}")
         print(f"✅ Shares fulfilled: {obligation.shares_fulfilled}")
         print(f"✅ Donation value: ${1500 * 60.0:,.2f}")
-        print(f"✅ Company match: ${expected_company_match:,.2f} (on credited shares at current price)")
+        print(f"✅ Company match: ${expected_company_match:,.2f} (on all 1500 donated shares)")
         print(f"✅ Pledge fulfilled: {obligation.is_fulfilled} (excess donation beyond obligation)")
 
     def test_scenario_6_two_purchases_one_donation(self):

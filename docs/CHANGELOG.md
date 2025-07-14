@@ -173,3 +173,37 @@
 - Enhanced CLAUDE.md documentation for future agents
 - Fixed test failures in test_amt_2035_issue.py and test_amt_charitable_deduction.py
 - Refactored test_charitable_deduction_usage.py to be self-contained
+
+## IPO Pledge Obligation Fix
+- Fixed bug where IPO pledge obligations were calculated based only on shares vesting during projection
+- Updated calculation to use total_options from grant (assumes IPO after full vesting)
+- Added test_ipo_pledge_total_vested_bug.py demonstrating the issue and fix
+- This prevents massive under-reporting of pledge obligations at IPO time
+
+## Company Match Calculation Fix
+- Fixed company match calculation to follow FAQ rules instead of pledge fulfillment
+- Company match now based on: min((pledge% × vested_shares) - already_donated, shares_being_donated)
+- Added proper 3-year liquidity event window validation
+- Created test demonstrating the bug and verifying the fix
+
+## CSV Output Cleanup
+- Removed duplicate `pledge_shares_donated` field from CSV output (was duplicating `shares_donated_count`)
+- Fixed `pledge_shares_outstanding` to properly decrease when obligations expire
+- Outstanding shares now correctly show 0 after all windows have closed
+- Added test to verify outstanding shares decrease after expiration
+
+## Legacy Code Removal
+- Removed legacy company match calculation fallback
+- Simplified code to always use FAQ-based calculation formula
+- Removed try/except block that fell back to pledge-based calculation
+- All shares now require grant_id for company match tracking
+- Updated tests to reflect correct FAQ-based behavior
+- Deleted test_company_match_calculation_rules.py (documented legacy behavior)
+
+## Vesting Schedule Validation
+- Added test to verify vesting_schedule field validation works correctly
+- User profiles use vesting_calendar (detailed schedule) instead of vesting_schedule (formula)
+- Code properly handles both formats: vesting_calendar preferred, vesting_schedule as fallback
+- Missing vesting_schedule fails loudly with clear error when vesting_status is absent
+- No silent failures - proper error messages guide users to correct format
+

@@ -140,6 +140,7 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
         output_path: Path to save the CSV file
     """
     rows = []
+    cumulative_expired = 0  # Track total expired shares across all years
 
     for yearly_state in result.yearly_states:
         # Calculate counts from components if available
@@ -164,9 +165,14 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
             sale_proceeds = 0.0
             capital_gains = 0.0
 
+        # Track cumulative expired shares across all years
+        cumulative_expired += yearly_state.pledge_shares_expired_this_year
+        
         # Calculate cumulative outstanding from pledge state
         if yearly_state.pledge_state and yearly_state.pledge_state.obligations:
-            cumulative_outstanding = yearly_state.pledge_state.total_shares_remaining
+            # Outstanding = total remaining minus what has expired in previous years
+            total_remaining = yearly_state.pledge_state.total_shares_remaining
+            cumulative_outstanding = max(0, total_remaining - cumulative_expired)
         else:
             cumulative_outstanding = 0
 
@@ -186,27 +192,29 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
                 getattr(yearly_state, 'other_income', 0.0)
             ),
 
-            # Actions
+            # Options counts
             'exercise_costs': yearly_state.exercise_costs,
+            'options_exercised_count': options_exercised,
+            'expired_option_count': expired_options,
+ 
+            # Share Sales
             'sale_proceeds': sale_proceeds,
             'capital_gains': capital_gains,
+            'shares_sold_count': shares_sold,
+
+            # Donation Match
+            'pledge_shares_obligated': yearly_state.pledge_shares_obligated_this_year,
+            'shares_donated_count': shares_donated,
+            'shares_matched': yearly_state.shares_matched_this_year,
+
+            # Pledge tracking (year-specific values from YearlyState)
+            'pledge_shares_outstanding': cumulative_outstanding,
+            'pledge_shares_expired': yearly_state.pledge_shares_expired_this_year,
 
             # Charitable
             'donations': yearly_state.donation_value,
             'company_match': yearly_state.company_match_received,
             'total_charitable_impact': yearly_state.donation_value + yearly_state.company_match_received,
-
-            # Pledge tracking (year-specific values from YearlyState)
-            'pledge_shares_obligated': yearly_state.pledge_shares_obligated_this_year,
-            'pledge_shares_donated': yearly_state.pledge_shares_donated_this_year,
-            'pledge_shares_outstanding': cumulative_outstanding,
-            'pledge_shares_expired': yearly_state.pledge_shares_expired_this_year,
-
-            # Share counts
-            'options_exercised_count': options_exercised,
-            'shares_sold_count': shares_sold,
-            'shares_donated_count': shares_donated,
-            'expired_option_count': expired_options,
 
             # Tax details (from actual progressive calculations)
             'regular_tax': yearly_state.tax_state.regular_tax,
@@ -231,8 +239,8 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
         # Round financial values to 2 decimal places
         non_financial_cols = {'year', 'options_exercised_count', 'shares_sold_count',
                              'shares_donated_count', 'expired_option_count',
-                             'pledge_shares_obligated', 'pledge_shares_donated',
-                             'pledge_shares_outstanding', 'pledge_shares_expired'}
+                             'pledge_shares_obligated', 'pledge_shares_outstanding', 
+                             'pledge_shares_expired'}
 
         for row in rows:
             for key, value in row.items():
