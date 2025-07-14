@@ -140,7 +140,7 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
         output_path: Path to save the CSV file
     """
     rows = []
-    cumulative_expired = 0  # Track total expired shares across all years
+    cumulative_expired = 0  # Track total expired shares to calculate outstanding
 
     for yearly_state in result.yearly_states:
         # Calculate counts from components if available
@@ -165,16 +165,17 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
             sale_proceeds = 0.0
             capital_gains = 0.0
 
-        # Track cumulative expired shares across all years
+        # Track cumulative expired shares
         cumulative_expired += yearly_state.pledge_shares_expired_this_year
         
-        # Calculate cumulative outstanding from pledge state
-        if yearly_state.pledge_state and yearly_state.pledge_state.obligations:
-            # Outstanding = total remaining minus what has expired in previous years
+        # Get outstanding shares from the pledge state for this year
+        if yearly_state.pledge_state:
+            # Outstanding = total remaining minus cumulative expired
+            # This ensures that once shares expire, they're no longer counted as outstanding
             total_remaining = yearly_state.pledge_state.total_shares_remaining
-            cumulative_outstanding = max(0, total_remaining - cumulative_expired)
+            pledge_shares_outstanding = max(0, total_remaining - cumulative_expired)
         else:
-            cumulative_outstanding = 0
+            pledge_shares_outstanding = 0
 
         # Get expiration metrics
         expired_options = sum(e.quantity for e in yearly_state.expiration_events)
@@ -208,7 +209,7 @@ def save_annual_summary_csv(result: ProjectionResult, output_path: str) -> None:
             'shares_matched': yearly_state.shares_matched_this_year,
 
             # Pledge tracking (year-specific values from YearlyState)
-            'pledge_shares_outstanding': cumulative_outstanding,
+            'pledge_shares_outstanding': pledge_shares_outstanding,
             'pledge_shares_expired': yearly_state.pledge_shares_expired_this_year,
 
             # Charitable

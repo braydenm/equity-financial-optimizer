@@ -207,3 +207,10 @@
 - Missing vesting_schedule fails loudly with clear error when vesting_status is absent
 - No silent failures - proper error messages guide users to correct format
 
+## Pledge Tracking Display Fixes
+- Fixed outstanding pledge display to show shares instead of dollar amount
+- Corrected logic to show 0 outstanding shares after expiration instead of total remaining
+- Removed complex average share price calculations for match opportunities
+- Ensured CSV outputs properly track cumulative expired shares per year
+- Updated both summary and detailed outputs for consistent pledge tracking
+

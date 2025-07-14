@@ -74,29 +74,13 @@ def print_scenario_results(result, detailed=True, verbose=False):
     print(f"    └─ Company Match Earned: ${total_company_match:,.0f}")
 
     # Pledge tracking
-    print(f"  📋 Outstanding Pledge Liability: ${metrics['outstanding_obligation']:,.0f}")
-
-    # Calculate outstanding company match opportunity
-    pledge_shares_outstanding = metrics.get('pledge_shares_outstanding', 0)
-    if hasattr(result, 'user_profile') and hasattr(result.user_profile, 'company_match_ratio'):
-        match_ratio = result.user_profile.company_match_ratio
-        # Estimate outstanding match based on current equity value and outstanding pledge shares
-        if pledge_shares_outstanding > 0 and final_state:
-            avg_share_price = metrics['total_equity_value_final'] / max(1, sum(lot.quantity for lot in final_state.equity_holdings))
-            outstanding_match_opportunity = pledge_shares_outstanding * avg_share_price * match_ratio
-            print(f"  🤝 Outstanding Company Match Opportunity: ${outstanding_match_opportunity:,.0f}")
-
+    print(f"  📋 Outstanding Pledge Shares: {metrics['outstanding_obligation']:,.0f} shares")
     print(f"  ✅ Pledge Status: {metrics.get('pledge_shares_donated', 0):,}/{metrics.get('pledge_shares_obligated', 0):,} shares")
 
     # Expired opportunities
     pledge_shares_expired = metrics.get('pledge_shares_expired_window', 0)
     if pledge_shares_expired > 0:
         print(f"  ⚠️  Expired Match Window: {pledge_shares_expired:,} shares (match opportunity lost)")
-        # Calculate expired match value
-        if hasattr(result, 'user_profile') and hasattr(result.user_profile, 'company_match_ratio') and final_state:
-            avg_share_price = metrics['total_equity_value_final'] / max(1, sum(lot.quantity for lot in final_state.equity_holdings))
-            expired_match_value = pledge_shares_expired * avg_share_price * result.user_profile.company_match_ratio
-            print(f"  💸 Expired Match Value: ${expired_match_value:,.0f}")
 
     # Total expired charitable carryforward (not remaining)
     expired_charitable_deduction = metrics.get('expired_charitable_deduction', 0)
@@ -213,7 +197,7 @@ def print_scenario_results(result, detailed=True, verbose=False):
 
         if pledge_shares_outstanding > 0:
             print(f"\n⚠️  PLEDGE OBLIGATION WARNINGS:")
-            print(f"  📋 Outstanding pledge: {pledge_shares_outstanding:,} shares (${outstanding_obligation:,.0f})")
+            print(f"  📋 Outstanding pledge: {pledge_shares_outstanding:,} shares")
             print(f"  ⏰ These obligations have active match windows - donate before expiration!")
 
         if pledge_shares_expired > 0:

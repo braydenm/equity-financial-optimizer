@@ -59,7 +59,7 @@ def print_scenario_results(result, detailed=False):
         if expired > 0:
             print(f"     ⚠️  Expired Window: {expired:,.0f} shares (lost match opportunity)")
         if 'outstanding_obligation' in metrics and metrics['outstanding_obligation'] > 0:
-            print(f"     💵 Outstanding Value: ${metrics['outstanding_obligation']:,.0f}")
+            print(f"     💵 Outstanding Shares: {metrics['outstanding_obligation']:,.0f} shares")
 
     # Option expiration
     if 'expired_option_count' in metrics and metrics['expired_option_count'] > 0:

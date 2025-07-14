@@ -426,9 +426,14 @@ class ProjectionResult:
             if hasattr(state, 'pledge_shares_obligated_this_year'):
                 pledge_shares_obligated += state.pledge_shares_obligated_this_year
 
-        # Outstanding is what remains at the end
+        # Outstanding is what remains at the end (only counting non-expired obligations)
         if final_state and final_state.pledge_state:
-            pledge_shares_outstanding = final_state.pledge_state.total_shares_remaining
+            # Only count shares as outstanding if their match window hasn't expired
+            # Since we already counted expired shares, outstanding should exclude them
+            total_remaining = final_state.pledge_state.total_shares_remaining
+            # If we have expired shares, they should be subtracted from total remaining
+            # because expired shares are no longer eligible for matching
+            pledge_shares_outstanding = max(0, total_remaining - pledge_shares_expired_window)
             
         # For backward compatibility, if obligated wasn't tracked, use initial obligation
         if pledge_shares_obligated == 0 and final_state and final_state.pledge_state.obligations:
@@ -533,7 +538,7 @@ class ProjectionResult:
             'pledge_shares_outstanding': pledge_shares_outstanding,
             'pledge_shares_expired_window': pledge_shares_expired_window,
             'pledge_fulfillment_rate': pledge_fulfillment_rate,
-            'outstanding_obligation': final_state.pledge_state.total_shares_remaining if final_state else 0,
+            'outstanding_obligation': pledge_shares_outstanding,
             'amt_credits_final': amt_credits_final,
             'expired_charitable_deduction': total_expired_charitable,
             'expired_option_count': total_expired_shares,
