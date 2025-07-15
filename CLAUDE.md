@@ -18,8 +18,14 @@ python3 tests/test_name.py                  # Run specific test
 # Run specific scenario
 python3 run_scenario_analysis.py [scenario_id] --demo
 
+# Example non-demo user scenario with a longer projection period
+python3 run_scenario_analysis.py 047 --years 15
+
 # Compare portfolios
 python3 run_portfolio_comparison.py [portfolio_name] --demo
+
+# Example user portfolio
+python3 run_portfolio_analysis.py portfolios/user/my_portfolio.json
 ```
 - **Scenario definitions?** → `scenarios/demo/` or `scenarios/user/`
 
@@ -253,4 +259,4 @@ See CHANGELOG.md for complete feature history and implementation details.
 ### Recent TODOs & Action Items
 - **AUDIT NEEDED**: Review cost_basis field usage across profile files and ensure correct flow/calculation for both regular and AMT tax on subsequent sale events. Verify ISOs use strike price as cost basis for regular tax but FMV at exercise for AMT calculations
 - TODO: audit all fields in user_profile to find those not used by many downstream calculations and propose a comprehensive reduction plan to simplify this schema
-
+- Add pre-scenario pledge obligations to user_profile if these exist (e.g. from a sale before the scenario start)
