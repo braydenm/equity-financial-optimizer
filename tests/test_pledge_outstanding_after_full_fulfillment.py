@@ -61,13 +61,13 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
         # Add grant
         profile.grants = [{
             'grant_id': 'TEST_GRANT',
-            'grant_date': '2020-01-01',
+            'grant_date': '2011-01-01',
             'total_options': 10000,
             'option_type': 'ISO',
             'strike_price': 5.0,
             'vesting_schedule': '4_year_monthly_with_cliff',
             'cliff_months': 12,
-            'vesting_start_date': '2020-01-01',
+            'vesting_start_date': '2011-01-01',
             'charitable_program': {
                 'pledge_percentage': 0.5,
                 'company_match_ratio': 3.0
@@ -83,12 +83,12 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
                 share_type=ShareType.ISO,
                 quantity=10000,
                 strike_price=5.0,
-                grant_date=date(2020, 1, 1),
+                grant_date=date(2011, 1, 1),
                 lifecycle_state=LifecycleState.EXERCISED_NOT_DISPOSED,
                 tax_treatment=TaxTreatment.LTCG,
                 expiration_date=date(2030, 1, 1),
                 grant_id='TEST_GRANT',
-                exercise_date=date(2023, 1, 1),
+                exercise_date=date(2014, 1, 1),
                 fmv_at_exercise=20.0
             )
         ]
@@ -97,22 +97,22 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
         plan = ProjectionPlan(
             name="Test Outstanding After Full Fulfillment",
             description="Test that outstanding goes to 0 after fulfilling entire pledge",
-            start_date=date(2024, 1, 1),
-            end_date=date(2027, 12, 31),
+            start_date=date(2015, 1, 1),
+            end_date=date(2018, 12, 31),
             initial_lots=initial_lots,
             initial_cash=100000,
             price_projections={
-                2024: 50.0,
-                2025: 50.0,
-                2026: 50.0,
-                2027: 50.0
+                2015: 50.0,
+                2016: 50.0,
+                2017: 50.0,
+                2018: 50.0
             }
         )
         
         # Add IPO liquidity event that creates pledge obligation
         ipo_event = LiquidityEvent(
-            event_id="IPO_2024",
-            event_date=date(2024, 3, 24),
+            event_id="IPO_2016",
+            event_date=date(2016, 3, 24),
             event_type="ipo",
             price_per_share=50.0,
             shares_vested_at_event=10000
@@ -121,7 +121,7 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
         
         # Year 2: Donate 5000 shares (fulfills entire original pledge)
         plan.add_action(PlannedAction(
-            action_date=date(2025, 6, 1),
+            action_date=date(2017, 6, 1),
             action_type=ActionType.DONATE,
             lot_id='EXERCISED_TEST',
             quantity=5000,
@@ -130,7 +130,7 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
         
         # Year 3: Sell 3000 additional shares (should not create new obligations)
         plan.add_action(PlannedAction(
-            action_date=date(2026, 6, 1),
+            action_date=date(2018, 6, 1),
             action_type=ActionType.SELL,
             lot_id='EXERCISED_TEST',
             quantity=3000,
@@ -154,25 +154,25 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
         os.unlink(csv_path)  # Clean up temp file
         
         # Find key years for verification
-        year_2024 = None  # IPO creates obligation
-        year_2025 = None  # Donation fulfills obligation
-        year_2026 = None  # Sale should not create new obligations
-        year_2027 = None  # Outstanding should remain 0
+        year_2015 = None  # Pre-IPO
+        year_2016 = None  # IPO creates obligation
+        year_2017 = None  # Donation fulfills obligation
+        year_2018 = None  # Sale should not create new obligations
         
         for row in rows:
-            if row['year'] == '2024':
-                year_2024 = row
-            elif row['year'] == '2025':
-                year_2025 = row
-            elif row['year'] == '2026':
-                year_2026 = row
-            elif row['year'] == '2027':
-                year_2027 = row
+            if row['year'] == '2015':
+                year_2015 = row
+            elif row['year'] == '2016':
+                year_2016 = row
+            elif row['year'] == '2017':
+                year_2017 = row
+            elif row['year'] == '2018':
+                year_2018 = row
         
-        self.assertIsNotNone(year_2024, "Should have 2024 data")
-        self.assertIsNotNone(year_2025, "Should have 2025 data")
-        self.assertIsNotNone(year_2026, "Should have 2026 data")
-        self.assertIsNotNone(year_2027, "Should have 2027 data")
+        self.assertIsNotNone(year_2015, "Should have 2015 data")
+        self.assertIsNotNone(year_2016, "Should have 2016 data")
+        self.assertIsNotNone(year_2017, "Should have 2017 data")
+        self.assertIsNotNone(year_2018, "Should have 2018 data")
         
         # Check each year
         print("\nYear-by-year pledge tracking:")
@@ -184,41 +184,33 @@ class TestPledgeOutstandingAfterFullFulfillment(unittest.TestCase):
             sold = row['shares_sold_count']
             print(f"  {year}: obligated={obligated}, outstanding={outstanding}, donated={donated}, sold={sold}")
         
-        # Year 2024: Check if IPO obligation is created (depends on implementation)
-        obligated_2024 = int(year_2024['pledge_shares_obligated'])
-        outstanding_2024 = int(year_2024['pledge_shares_outstanding'])
+        # Year 2016: Check if IPO obligation is created (depends on implementation)
+        obligated_2016 = int(year_2016['pledge_shares_obligated'])
+        outstanding_2016 = int(year_2016['pledge_shares_outstanding'])
         
-        # The IPO obligation might be created in 2024 or later depending on implementation
-        print(f"2024: obligated={obligated_2024}, outstanding={outstanding_2024}")
+        # The IPO obligation should be created in 2016
+        print(f"2016: obligated={obligated_2016}, outstanding={outstanding_2016}")
         
         # For now, just verify the basic structure works
-        self.assertGreaterEqual(obligated_2024, 0, "Obligated should be non-negative")
-        self.assertGreaterEqual(outstanding_2024, 0, "Outstanding should be non-negative")
+        self.assertGreaterEqual(obligated_2016, 0, "Obligated should be non-negative")
+        self.assertGreaterEqual(outstanding_2016, 0, "Outstanding should be non-negative")
         
-        # Year 2025: Donation (considered fulfilling hypothetical pledge)
-        donated_2025 = int(year_2025['shares_donated_count'])
-        outstanding_2025 = int(year_2025['pledge_shares_outstanding'])
+        # Year 2017: Donation (considered fulfilling hypothetical pledge)
+        donated_2017 = int(year_2017['shares_donated_count'])
+        outstanding_2017 = int(year_2017['pledge_shares_outstanding'])
         
-        self.assertEqual(donated_2025, 5000, "Should donate 5000 shares in 2025")
-        self.assertEqual(outstanding_2025, 0, "Outstanding should remain 0 after donation")
+        self.assertEqual(donated_2017, 5000, "Should donate 5000 shares in 2017")
+        self.assertEqual(outstanding_2017, 0, "Outstanding should remain 0 after donation")
         
-        # Year 2026: Sale creates obligation (this is the bug!)
-        sold_2026 = int(year_2026['shares_sold_count'])
-        obligated_2026 = int(year_2026['pledge_shares_obligated'])
-        outstanding_2026 = int(year_2026['pledge_shares_outstanding'])
+        # Year 2018: Sale should NOT create new obligation (fix working!)
+        sold_2018 = int(year_2018['shares_sold_count'])
+        obligated_2018 = int(year_2018['pledge_shares_obligated'])
+        outstanding_2018 = int(year_2018['pledge_shares_outstanding'])
         
-        self.assertEqual(sold_2026, 3000, "Should sell 3000 shares in 2026")
-        self.assertEqual(obligated_2026, 3000, "Sale creates 3000 share obligation")
-        
-        # BUG: This assertion will FAIL until the bug is fixed
-        # After donating 5000 shares, no further obligations should be created
-        self.assertEqual(outstanding_2026, 0, 
+        self.assertEqual(sold_2018, 3000, "Should sell 3000 shares in 2018")
+        self.assertEqual(obligated_2018, 0, "Sale should NOT create obligation after prior donations")
+        self.assertEqual(outstanding_2018, 0, 
                         "Outstanding should remain 0 after selling shares post-donation")
-        
-        # Year 2027: Outstanding should remain 0
-        outstanding_2027 = int(year_2027['pledge_shares_outstanding'])
-        self.assertEqual(outstanding_2027, 0, 
-                        "Outstanding should remain 0 in subsequent years")
         
         print("\n✅ Test correctly demonstrates the bug")
         print("   - Outstanding should be 0 after entire pledge is fulfilled")

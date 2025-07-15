@@ -116,6 +116,7 @@ class ProjectionCalculator:
         self._validate_exercise_plan(plan)
 
         yearly_states = []
+        total_donations_across_years = 0  # Track total donations for pledge calculation
         current_lots = deepcopy(plan.initial_lots)
         current_cash = plan.initial_cash
         current_investments = self.profile.taxable_investments
@@ -203,28 +204,29 @@ class ProjectionCalculator:
             
             # Check for IPO-triggered pledge obligations BEFORE processing actions
             # This allows same-year donations to be applied to IPO obligations
-            if (self.profile.assumed_ipo and
-                year == self.profile.assumed_ipo.year and
-                not hasattr(yearly_state, '_ipo_obligation_created')):
-
-                # Find or create IPO liquidity event
-                ipo_event = None
-                for event in self.profile.liquidity_events:
-                    if event.event_type == "ipo" and event.event_date.year == year:
-                        ipo_event = event
-                        break
-
-                if not ipo_event:
-                    # Create IPO event if not already in profile
-                    ipo_event = LiquidityEvent(
-                        event_id=f"ipo_{year}",
-                        event_date=self.profile.assumed_ipo,
-                        event_type="ipo",
-                        price_per_share=current_year_fmv,  # Use year's price projection
-                        shares_vested_at_event=0  # Will calculate below
-                    )
-                    self.profile.liquidity_events.append(ipo_event)
-
+            
+            # Look for existing IPO events in current year
+            ipo_event = None
+            for event in self.profile.liquidity_events:
+                if event.event_type == "ipo" and event.event_date.year == year:
+                    ipo_event = event
+                    break
+            
+            # If no IPO event exists but assumed_ipo is set for this year, create one
+            if (not ipo_event and self.profile.assumed_ipo and 
+                year == self.profile.assumed_ipo.year):
+                ipo_event = LiquidityEvent(
+                    event_id=f"ipo_{year}",
+                    event_date=self.profile.assumed_ipo,
+                    event_type="ipo",
+                    price_per_share=current_year_fmv,
+                    shares_vested_at_event=0  # Will calculate below
+                )
+                self.profile.liquidity_events.append(ipo_event)
+            
+            # If we have an IPO event (existing or created), process obligations
+            if ipo_event and not hasattr(yearly_state, '_ipo_obligation_created'):
+                
                 # Process each grant separately for IPO obligations
                 if hasattr(self.profile, 'grants') and self.profile.grants:
                     for grant in self.profile.grants:
@@ -232,7 +234,7 @@ class ProjectionCalculator:
                         grant_shares = grant.get('total_options', 0)
 
                         # Get vested shares for this grant at IPO
-                        vested_shares = self._calculate_vested_shares_for_grant(grant, self.profile.assumed_ipo)
+                        vested_shares = self._calculate_vested_shares_for_grant(grant, ipo_event.event_date)
                         ipo_event.shares_vested_at_event += vested_shares
 
                         # Get charitable program for this grant
@@ -246,7 +248,7 @@ class ProjectionCalculator:
                                 total_vested_shares=vested_shares,
                                 pledge_percentage=pledge_pct,
                                 existing_obligations=pledge_state.obligations,
-                                ipo_date=self.profile.assumed_ipo,
+                                ipo_date=ipo_event.event_date,
                                 ipo_event_id=ipo_event.event_id,
                                 grant_id=grant_id,
                                 match_ratio=match_ratio
@@ -292,18 +294,29 @@ class ProjectionCalculator:
 
                     # Create pledge obligation using grant-specific settings
                     if grant_charitable_program['pledge_percentage'] > 0:
+                        # Include donations from current year that happened before this sale
+                        # total_donations_across_years only includes previous years (updated at end of year)
+                        # yearly_state.pledge_shares_donated_this_year includes current year donations
+                        total_donations_including_current_year = total_donations_across_years + yearly_state.pledge_shares_donated_this_year
+                        
+                        original_grant_size = self._get_original_grant_size(sold_lot.grant_id)
+                        
                         obligation = PledgeCalculator.calculate_sale_obligation(
                             shares_sold=action.quantity,
                             pledge_percentage=grant_charitable_program['pledge_percentage'],
                             sale_date=action.action_date,
                             event_id=sale_event.event_id,
                             grant_id=sold_lot.grant_id,
-                            match_ratio=grant_charitable_program['company_match_ratio']
+                            match_ratio=grant_charitable_program['company_match_ratio'],
+                            existing_obligations=pledge_state.obligations,
+                            original_grant_size=original_grant_size
                         )
-                        pledge_state.add_obligation(obligation)
-
-                        # Track year-specific obligated shares
-                        yearly_state.pledge_shares_obligated_this_year += obligation.shares_obligated
+                        
+                        # Only add obligation if one was created
+                        if obligation is not None:
+                            pledge_state.add_obligation(obligation)
+                            # Track year-specific obligated shares
+                            yearly_state.pledge_shares_obligated_this_year += obligation.shares_obligated
 
                 elif action.action_type == ActionType.DONATE:
                     donation_result = self._process_donation(action, current_lots, annual_components, yearly_state)
@@ -311,6 +324,8 @@ class ProjectionCalculator:
 
                     # Track year-specific donated shares for summary metrics
                     yearly_state.pledge_shares_donated_this_year += action.quantity
+                    
+                    # Note: total_donations_across_years is updated at end of year to avoid double counting
 
                     # Apply donation to pledge obligations using new model
                     discharge_result = pledge_state.apply_share_donation(
@@ -558,6 +573,9 @@ class ProjectionCalculator:
             # Update cumulative tracking for next year
             cumulative_shares_sold = deepcopy(yearly_state.shares_sold)
             cumulative_shares_donated = deepcopy(yearly_state.shares_donated)
+            
+            # Update total donations across years (for pledge calculation in future years)
+            total_donations_across_years += yearly_state.pledge_shares_donated_this_year
 
             yearly_states.append(yearly_state)
 
@@ -604,6 +622,26 @@ class ProjectionCalculator:
             'pledge_percentage': self.profile.pledge_percentage,
             'company_match_ratio': self.profile.company_match_ratio
         }
+
+    def _get_original_grant_size(self, grant_id: Optional[str]) -> Optional[int]:
+        """
+        Get the original grant size for a specific grant.
+
+        Args:
+            grant_id: Grant identifier, may be None for legacy lots
+
+        Returns:
+            Original grant size in shares, or None if not found
+        """
+        if not grant_id:
+            return None
+
+        # Look up grant-specific information
+        for grant in self.profile.grants:
+            if grant.get('grant_id') == grant_id:
+                return grant.get('total_options')
+
+        return None
 
 
 

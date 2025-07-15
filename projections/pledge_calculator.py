@@ -24,8 +24,10 @@ class PledgeCalculator:
         sale_date: date,
         event_id: str,
         grant_id: Optional[str] = None,
-        match_ratio: float = 3.0
-    ) -> PledgeObligation:
+        match_ratio: float = 3.0,
+        existing_obligations: Optional[List[PledgeObligation]] = None,
+        original_grant_size: Optional[int] = None
+    ) -> Optional[PledgeObligation]:
         """
         Calculate pledge obligation from a share sale.
 
@@ -43,9 +45,11 @@ class PledgeCalculator:
             event_id: ID of the liquidity event containing this sale
             grant_id: ID of the grant these shares came from
             match_ratio: Company match ratio for this grant
+            existing_obligations: Existing pledge obligations to consider
+            original_grant_size: Original grant size for calculating max pledge requirement
 
         Returns:
-            PledgeObligation with calculated requirements
+            PledgeObligation with calculated requirements, or None if no obligation needed
 
         Raises:
             ValueError: If pledge_percentage >= 1.0 or other invalid inputs
@@ -63,6 +67,29 @@ class PledgeCalculator:
             shares_required = 0
         else:
             shares_required = int((pledge_percentage * shares_sold) / (1 - pledge_percentage))
+
+        # Check if existing obligations already cover the pledge requirement
+        if existing_obligations is not None:
+            # Calculate total shares already obligated from previous sales for this grant
+            total_obligated = sum(o.shares_obligated for o in existing_obligations if o.grant_id == grant_id)
+            
+            # Use simplified approach: max pledge requirement = original grant * pledge percentage
+            if original_grant_size is not None:
+                max_pledge_requirement = int(original_grant_size * pledge_percentage)
+            else:
+                # Fallback: calculate current sale obligation using maximalist interpretation
+                max_pledge_requirement = shares_required
+            
+            # If existing obligations already cover the max pledge requirement, no new obligation needed
+            if total_obligated >= max_pledge_requirement:
+                return None
+            
+            # Create obligation only for the remaining shortfall
+            shares_required = min(shares_required, max_pledge_requirement - total_obligated)
+
+        # Only create obligation if shares are actually required
+        if shares_required == 0:
+            return None
 
         # Create and return obligation
         return PledgeObligation(
@@ -114,7 +141,6 @@ class PledgeCalculator:
             for o in existing_obligations 
             if o.grant_id == grant_id  # Only count obligations from same grant
         )
-        
         
         # Calculate remaining obligation
         remainder = total_pledge_shares - already_obligated
