@@ -830,24 +830,37 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(output_path, 'w', newline='') as f:
-        fieldnames = ['scenario', 'total_cash_final', 'total_taxes_all_years', 'total_donations_all_years',
-                     'total_equity_value_final', 'pledge_shares_obligated', 'pledge_shares_donated',
+        fieldnames = ['scenario', 'net_worth', 'total_cash_final', 'total_equity_value_final', 
+                     'net_worth_plus_charity', 'total_taxes_all_years', 'total_donations_all_years',
+                     'pledge_shares_obligated', 'pledge_shares_donated',
                      'pledge_shares_outstanding', 'pledge_shares_expired', 'outstanding_obligation',
                      'charitable_personal_value', 'charitable_match_value', 'charitable_total_impact',
                      'pledge_fulfillment_rate', 'outstanding_amt_credits', 'expired_charitable_deduction',
                      'expired_option_count', 'expired_option_loss', 'min_cash_balance', 'min_cash_year',
-                     'years_to_burn_amt_credits', 'initial_amt_credits', 'years_with_insufficient_cash']
+                     'years_to_burn_amt_credits', 'initial_amt_credits', 'years_with_insufficient_cash',
+                     'zero_plg_exp', 'zero_equity', 'meets_all_constraints']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
         for result in results:
             metrics = result.summary_metrics
+            net_worth = metrics.get('total_cash_final', 0) + metrics.get('total_equity_value_final', 0)
+            charity_total = metrics.get('total_charitable_impact_all_years', metrics.get('total_donations_all_years', 0))
+            net_worth_plus_charity = net_worth + charity_total
+            
+            # Check constraints
+            zero_plg_exp = metrics.get('pledge_shares_expired_window', 0) == 0
+            zero_equity = metrics.get('total_equity_value_final', 0) == 0
+            meets_all_constraints = zero_plg_exp and zero_equity
+            
             writer.writerow({
                 'scenario': result.plan.name,
+                'net_worth': net_worth,
                 'total_cash_final': metrics.get('total_cash_final', 0),
+                'total_equity_value_final': metrics.get('total_equity_value_final', 0),
+                'net_worth_plus_charity': net_worth_plus_charity,
                 'total_taxes_all_years': metrics.get('total_taxes_all_years', 0),
                 'total_donations_all_years': metrics.get('total_donations_all_years', 0),
-                'total_equity_value_final': metrics.get('total_equity_value_final', 0),
                 'pledge_shares_obligated': metrics.get('pledge_shares_obligated', 0),
                 'pledge_shares_donated': metrics.get('pledge_shares_donated', 0),
                 'pledge_shares_outstanding': metrics.get('pledge_shares_outstanding', 0),
@@ -865,5 +878,8 @@ def create_comparison_csv(results: List[ProjectionResult], output_path: str) -> 
                 'min_cash_year': metrics.get('min_cash_year', 0),
                 'years_to_burn_amt_credits': metrics.get('years_to_burn_amt_credits', 0),
                 'initial_amt_credits': metrics.get('initial_amt_credits', 0),
-                'years_with_insufficient_cash': metrics.get('years_with_insufficient_cash', 0)
+                'years_with_insufficient_cash': metrics.get('years_with_insufficient_cash', 0),
+                'zero_plg_exp': zero_plg_exp,
+                'zero_equity': zero_equity,
+                'meets_all_constraints': meets_all_constraints
             })

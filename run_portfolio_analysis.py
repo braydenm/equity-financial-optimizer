@@ -115,21 +115,40 @@ def compare_scenarios(results):
     if len(results) < 2:
         return
 
-    print(f"\n{'='*140}")
+    print(f"\n{'='*180}")
     print("SCENARIO COMPARISON")
-    print(f"{'='*140}")
+    print(f"{'='*180}")
 
     # Header
-    print(f"\n{'Scenario':<20} {'Net Worth':>12} {'Equity':>12} {'Cash':>12} {'Taxes':>12} {'Charity':>12} {'Exp Ded':>10} {'Plg Exp':>9}")
-    print(f"{'-'*140}")
+    print(f"\n{'Scenario':<20} {'Net Worth':>12} {'Equity':>12} {'Cash':>12} {'Taxes':>12} {'Charity':>12} {'Exp Ded':>10} {'Plg Exp':>9} {'NW+Charity':>12} {'✓'}")
+    print(f"{'-'*180}")
+
+    # Sort results by constraints (True first) then by NW+Charity descending
+    sorted_results = sorted(results, key=lambda r: (
+        # First sort key: constraints met (True = 1, False = 0, so True comes first when negated)
+        -(r.summary_metrics.get('pledge_shares_expired_window', 0) == 0 and 
+          r.summary_metrics.get('total_equity_value_final', 0) == 0),
+        # Second sort key: NW+Charity descending (negative for descending sort)
+        -(r.summary_metrics.get('total_cash_final', 0) + 
+          r.summary_metrics.get('total_equity_value_final', 0) +
+          r.summary_metrics.get('total_charitable_impact_all_years', 
+                              r.summary_metrics.get('total_donations_all_years', 0)))
+    ))
 
     # Results
-    for result in results:
+    for result in sorted_results:
         metrics = result.summary_metrics
         net_worth = metrics['total_cash_final'] + metrics['total_equity_value_final']
         charity_impact = metrics.get('total_charitable_impact_all_years', metrics.get('total_donations_all_years', 0))
+        nw_plus_charity = net_worth + charity_impact
         expired_ded = metrics.get('expired_charitable_deduction', 0)
         pledge_exp = metrics.get('pledge_shares_expired_window', 0)
+        
+        # Check constraints
+        zero_plg_exp = pledge_exp == 0
+        zero_equity = metrics['total_equity_value_final'] == 0
+        meets_both = zero_plg_exp and zero_equity
+        constraint_str = "✓" if meets_both else ""
 
         # Create short name: if starts with number, use "XXX: " + first few words
         name_parts = result.plan.name.split()
@@ -147,7 +166,7 @@ def compare_scenarios(results):
         print(f"{short_name:<20} ${net_worth:>11,.0f} ${metrics['total_equity_value_final']:>11,.0f} "
               f"${metrics['total_cash_final']:>11,.0f} ${metrics['total_taxes_all_years']:>11,.0f} "
               f"${charity_impact:>11,.0f} ${expired_ded:>9,.0f} "
-              f"{pledge_exp:>8,}")
+              f"{pledge_exp:>8,} ${nw_plus_charity:>11,.0f} {constraint_str:>1}")
 
 
 
