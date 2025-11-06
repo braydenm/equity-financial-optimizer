@@ -419,6 +419,7 @@ class ProjectionCalculator:
                 sale_components=annual_components.sale_components,
                 donation_components=annual_components.donation_components,
                 existing_amt_credit=amt_credits_remaining,
+                retirement_contributions_401k=self.profile.retirement_contributions_401k,
                 carryforward_stock_by_creation_year=federal_carryforward_by_creation_year_current,
                 ca_carryforward_stock_by_creation_year=ca_carryforward_by_creation_year_current,
                 elect_basis_deduction=elect_basis

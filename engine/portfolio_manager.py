@@ -167,6 +167,7 @@ class PortfolioManager:
             interest_income=income.get('interest_income', 0),
             dividend_income=income.get('dividend_income', 0),
             bonus_expected=income.get('bonus_expected', 0),
+            retirement_contributions_401k=income.get('retirement_contributions_401k', 0),
             current_cash=financial['liquid_assets']['cash'],
             exercise_reserves=goals['liquidity_needs']['exercise_reserves'],
             pledge_percentage=default_pledge_percentage,

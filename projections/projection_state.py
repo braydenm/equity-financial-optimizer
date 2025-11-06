@@ -593,6 +593,9 @@ class UserProfile:
     dividend_income: float = 0.0
     bonus_expected: float = 0.0
 
+    # Pre-tax deductions
+    retirement_contributions_401k: float = 0.0
+
     # Expenses and cash flow
     monthly_living_expenses: float = 0.0
 

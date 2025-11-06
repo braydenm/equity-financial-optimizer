@@ -202,6 +202,7 @@ class AnnualTaxCalculator:
         filing_status: Optional[str] = None,
         include_california: Optional[bool] = None,
         existing_amt_credit: float = 0,
+        retirement_contributions_401k: float = 0,
         carryforward_cash_deduction: float = 0,
         carryforward_stock_deduction: float = 0,
         carryforward_cash_by_creation_year: Optional[Dict[int, float]] = None,
@@ -230,6 +231,7 @@ class AnnualTaxCalculator:
             filing_status: Override filing status (uses profile if None)
             include_california: Override CA tax inclusion (uses profile if None)
             existing_amt_credit: AMT credit from prior years
+            retirement_contributions_401k: Pre-tax 401k contributions that reduce AGI
             carryforward_cash_deduction: Charitable cash deduction carryforward (legacy - use carryforward_cash_by_creation_year for FIFO)
             carryforward_stock_deduction: Charitable stock deduction carryforward (legacy - use carryforward_stock_by_creation_year for FIFO)
             carryforward_cash_by_creation_year: Federal cash carryforward by creation year for FIFO compliance
@@ -268,8 +270,8 @@ class AnnualTaxCalculator:
         long_term_gains = cap_gains['long_term']
         total_gains = short_term_gains + long_term_gains
 
-        # Calculate AGI
-        agi = total_ordinary + total_gains
+        # Calculate AGI (adjusted for pre-tax retirement contributions)
+        agi = total_ordinary + total_gains - retirement_contributions_401k
 
         # Handle backward compatibility for legacy carryforward parameters
         if carryforward_stock_by_creation_year is None and carryforward_stock_deduction > 0:

@@ -24,7 +24,8 @@
     "bonus_expected": 50000,
     "interest_income": 5000,
     "dividend_income": 12000,
-    "other_income": 0
+    "other_income": 0,
+    "retirement_contributions_401k": 10000
   },
   "equity_position": {
     "company": "Tech Company",
