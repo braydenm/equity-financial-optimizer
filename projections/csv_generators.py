@@ -523,7 +523,8 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
         living_expenses = state.living_expenses
         gross_tax = state.gross_tax
         tax_withholdings = state.tax_withholdings
-        net_tax_payment = max(0, gross_tax - tax_withholdings)
+        income_tax_withholdings = state.income_tax_withholdings
+        net_tax_payment = max(0, gross_tax - income_tax_withholdings)  # Use income tax only
         donation_value = state.donation_value
 
         # Net cash flow (company match goes directly to DAF, not user cash)
@@ -565,6 +566,7 @@ def save_comprehensive_cashflow_csv(result: ProjectionResult, output_path: str) 
             'living_expenses': round(living_expenses, 2),
             'gross_tax': round(gross_tax, 2),
             'tax_withholdings': round(tax_withholdings, 2),
+            'income_tax_withholdings': round(income_tax_withholdings, 2),
             'net_tax_payment': round(net_tax_payment, 2),
             'donation_value': round(donation_value, 2),
             # Net flows

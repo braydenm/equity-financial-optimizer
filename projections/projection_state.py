@@ -284,6 +284,7 @@ class YearlyState:
     # Tax details
     gross_tax: float = 0.0
     tax_withholdings: float = 0.0
+    income_tax_withholdings: float = 0.0  # Income tax only (excludes FICA/SDI)
 
     # Additional financial tracking
     living_expenses: float = 0.0
@@ -602,6 +603,7 @@ class UserProfile:
     # Tax withholding rates and payments
     regular_income_withholding_rate: float = 0.0
     supplemental_income_withholding_rate: float = 0.0
+    income_tax_withholding_rate: float = 0.31  # Income tax only (excludes FICA/SDI), conservative default
     quarterly_payments: float = 0.0
 
     # Investment tracking

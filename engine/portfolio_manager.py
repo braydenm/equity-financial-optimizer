@@ -177,6 +177,7 @@ class PortfolioManager:
             monthly_living_expenses=monthly_cash_flow.get('expenses', 0),
             regular_income_withholding_rate=estimated_taxes.get('regular_income_withholding_rate', 0.0),
             supplemental_income_withholding_rate=estimated_taxes.get('supplemental_income_withholding_rate', 0.0),
+            income_tax_withholding_rate=estimated_taxes.get('income_tax_withholding_rate', 0.0),
             quarterly_payments=estimated_taxes.get('quarterly_payments', 0),
             taxable_investments=financial['liquid_assets'].get('taxable_investments', 0),
             crypto=financial['liquid_assets'].get('crypto', 0),

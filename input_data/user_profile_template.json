@@ -19,7 +19,7 @@
     "niit_rate": 0.038
   },
   "income": {
-    "annual_w2_income": 350000,
+    "annual_w2_income": 300000,
     "spouse_w2_income": 150000,
     "bonus_expected": 50000,
     "interest_income": 5000,
@@ -106,7 +106,8 @@
     "estimated_taxes": {
       "quarterly_payments": 0,
       "regular_income_withholding_rate": 0.35,
-      "supplemental_income_withholding_rate": 0.33
+      "supplemental_income_withholding_rate": 0.33,
+      "income_tax_withholding_rate": 0.31
     },
     "carryforwards": {
       "amt_credit": 15000,
@@ -116,15 +117,16 @@
   },
   "_comments": {
     "regular_income_withholding_rate": "35% (Example Rate) = Federal Income Tax (varies by bracket) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Tax (varies by state) + State SDI (varies by state)",
-    "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)"
+    "supplemental_income_withholding_rate": "33% (Example Rate) = Federal Supplemental Tax (22% or 37%) + Medicare (1.45%) + Social Security (6.2% up to wage cap) + State Supplemental Tax (varies by state) + State SDI (varies by state)",
+    "income_tax_withholding_rate": "31% (Conservative Estimate) = Federal Income Tax (~23%) + State Income Tax (~8%), EXCLUDES FICA/SDI. Used for calculating net tax due on Form 1040 and comparing to tax advisor projections. Calculate your actual rate from paystubs: (federal_income_tax_ytd + state_income_tax_ytd) / gross_income_ytd"
   },
   "financial_position": {
     "liquid_assets": {
-      "cash": 60000,
+      "cash": 49000,
       "taxable_investments": 500000,
-      "retirement_accounts": 450000,
-      "crypto": 100000,
-      "total": 1110000
+      "retirement_accounts": 400000,
+      "crypto": 1000,
+      "total": 1000000
     },
     "illiquid_assets": {
       "real_estate_equity": 300000,

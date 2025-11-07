@@ -429,8 +429,9 @@ class ProjectionCalculator:
 
             # Calculate net tax payment (gross tax minus withholdings)
             year_gross_tax = tax_result.total_tax
-            year_withholdings = self.calculate_year_withholding(year, annual_components)
-            year_tax_paid = max(0, year_gross_tax - year_withholdings)  # Net payment due
+            year_withholdings = self.calculate_year_withholding(year, annual_components, income_tax_only=False)
+            year_income_tax_withholdings = self.calculate_year_withholding(year, annual_components, income_tax_only=True)
+            year_tax_paid = max(0, year_gross_tax - year_income_tax_withholdings)  # Net income tax payment due
 
             year_tax_state.amt_tax = tax_result.federal_amt + tax_result.ca_amt
             year_tax_state.regular_tax = tax_result.federal_regular_tax + tax_result.ca_tax_owed
@@ -555,6 +556,7 @@ class ProjectionCalculator:
             yearly_state.tax_paid = year_tax_paid
             yearly_state.gross_tax = year_gross_tax
             yearly_state.tax_withholdings = year_withholdings
+            yearly_state.income_tax_withholdings = year_income_tax_withholdings
             yearly_state.living_expenses = year_expenses
             yearly_state.investment_income = year_investment_income
             yearly_state.investment_balance = current_investments
@@ -1063,21 +1065,19 @@ class ProjectionCalculator:
         else:
             raise ValueError(f"Grant {grant_id} has unsupported vesting_schedule: {vesting_schedule}")
 
-    def calculate_year_withholding(self, year: int, annual_components: AnnualTaxComponents) -> float:
+    def calculate_year_withholding(self, year: int, annual_components: AnnualTaxComponents, income_tax_only: bool = False) -> float:
         """
         Calculate tax withholding for a given year based on income types.
-
-        For years after 2024, uses base withholding amounts if available to avoid
-        inflated withholding from stock exercise years.
 
         Args:
             year: Tax year
             annual_components: Annual tax components with income breakdown
+            income_tax_only: If True, returns only income tax (excludes FICA/SDI)
 
         Returns:
             Total withholding amount for the year
         """
-        # Calculate regular income withholding (W2, interest, dividends, bonuses)
+        # Calculate regular income (W2, interest, dividends, bonuses)
         regular_income = (
             self.profile.annual_w2_income +
             self.profile.spouse_w2_income +
@@ -1085,19 +1085,32 @@ class ProjectionCalculator:
             self.profile.dividend_income +
             self.profile.bonus_expected
         )
-        regular_withholding = regular_income * self.profile.regular_income_withholding_rate
 
-        # Calculate supplemental withholding for stock compensation
-        # NSO exercises
+        # Calculate NSO income
         nso_income = sum(comp.bargain_element for comp in annual_components.nso_exercise_components)
 
         # RSU vesting (if any RSU components exist)
         rsu_income = 0.0  # RSUs would be added here if implemented
 
-        total_stock_income = nso_income + rsu_income
-        supplemental_withholding = total_stock_income * self.profile.supplemental_income_withholding_rate
+        if income_tax_only:
+            # Require income_tax_withholding_rate for accurate calculation
+            income_tax_rate = getattr(self.profile, 'income_tax_withholding_rate', 0.0)
 
-        return regular_withholding + supplemental_withholding
+            if not income_tax_rate or income_tax_rate <= 0:
+                raise ValueError(
+                    "income_tax_withholding_rate must be set in profile. "
+                    "This rate excludes FICA/SDI and is used for net tax due calculation. "
+                    "Calculate from paystubs: (fed_income_tax + state_income_tax) / gross_income"
+                )
+
+            total_income = regular_income + nso_income + rsu_income
+            return total_income * income_tax_rate
+        else:
+            # Full withholding including FICA/SDI
+            regular_withholding = regular_income * self.profile.regular_income_withholding_rate
+            total_stock_income = nso_income + rsu_income
+            supplemental_withholding = total_stock_income * self.profile.supplemental_income_withholding_rate
+            return regular_withholding + supplemental_withholding
 
     def _is_within_any_match_window(self, donation_date: date, liquidity_events: List[LiquidityEvent]) -> bool:
         """
