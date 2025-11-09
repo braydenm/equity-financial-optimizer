@@ -260,3 +260,4 @@ See CHANGELOG.md for complete feature history and implementation details.
 - **AUDIT NEEDED**: Review cost_basis field usage across profile files and ensure correct flow/calculation for both regular and AMT tax on subsequent sale events. Verify ISOs use strike price as cost basis for regular tax but FMV at exercise for AMT calculations
 - TODO: audit all fields in user_profile to find those not used by many downstream calculations and propose a comprehensive reduction plan to simplify this schema
 - Add pre-scenario pledge obligations to user_profile if these exist (e.g. from a sale before the scenario start)
+- **CASH DONATION GAP**: Tax infrastructure exists but user pipeline disconnected - see docs/CASH_DONATION_FEATURE_SPEC.md for implementation complexity
