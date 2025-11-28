@@ -161,8 +161,11 @@ def calculate_federal_amt(
         amt_credit_used = 0.0
     else:
         # Paying regular tax: use existing credits, don't generate new ones
+        # Per IRS Form 8801, AMT credit can only reduce regular tax DOWN TO
+        # the tentative minimum tax (AMT), not below it.
         amt_credit_generated = 0.0
-        amt_credit_used = min(existing_amt_credit, regular_tax)
+        max_credit_usable = regular_tax - amt_tax
+        amt_credit_used = min(existing_amt_credit, max_credit_usable)
         tax_owed = regular_tax - amt_credit_used
 
     # Calculate the effective additional tax due to AMT adjustments
@@ -234,8 +237,11 @@ def calculate_amt_for_annual_tax(
         amt_credit_used = 0.0
     else:
         # Paying regular tax: use existing credits, don't generate new ones
+        # Per IRS Form 8801, AMT credit can only reduce regular tax DOWN TO
+        # the tentative minimum tax (AMT), not below it.
         amt_credit_generated = 0.0
-        amt_credit_used = min(existing_amt_credit, regular_tax_before_credits)
+        max_credit_usable = regular_tax_before_credits - amt_tax
+        amt_credit_used = min(existing_amt_credit, max_credit_usable)
         tax_owed = regular_tax_before_credits - amt_credit_used
 
     # Calculate AMT credit carryforward
