@@ -136,5 +136,53 @@ class TestAMTCreditBug(unittest.TestCase):
         # Can use existing credits to reduce regular tax
 
 
+    def test_amt_credit_usage_limited_to_regular_minus_amt(self):
+        """
+        Test that AMT credit usage is limited to (regular_tax - amt).
+
+        Per IRS Form 8801, AMT credits can only reduce regular tax DOWN TO
+        the tentative minimum tax (AMT), not below it.
+
+        Example:
+        - Regular tax: $50,000
+        - AMT (tentative minimum tax): $30,000
+        - Existing AMT credits: $100,000
+        - Max credit usable: $50,000 - $30,000 = $20,000
+        - Tax owed: $50,000 - $20,000 = $30,000 (equals AMT floor)
+
+        BUG (old behavior): Used min($100k, $50k) = $50k, paying $0 federal
+        FIX (correct): Use min($100k, $20k) = $20k, paying $30k (the AMT floor)
+        """
+        result = calculate_amt_for_annual_tax(
+            agi=175000.0,  # Moderate W2 income
+            iso_bargain_element=0.0,  # No ISO this year (regular year)
+            filing_status='single',
+            existing_amt_credit=100000.0,  # Large credit from prior AMT years
+            regular_tax_before_credits=50000.0  # Regular tax on this income
+        )
+
+        print(f"\nAMT Credit Usage Limit Test:")
+        print(f"  Regular tax: $50,000")
+        print(f"  AMT (tentative min): ${result['amt']:,.2f}")
+        print(f"  Existing credits: $100,000")
+        print(f"  Max usable: regular - amt = ${50000 - result['amt']:,.2f}")
+        print(f"  Credits used: ${result['amt_credit_used']:,.2f}")
+        print(f"  Tax owed: ${result['tax_owed']:,.2f}")
+
+        # The key assertion: credits used should be limited to (regular - amt)
+        max_usable = 50000.0 - result['amt']
+        self.assertLessEqual(result['amt_credit_used'], max_usable,
+                            f"AMT credit usage must be <= (regular_tax - amt) = ${max_usable:,.2f}")
+
+        # Tax owed should never go below the AMT floor
+        self.assertGreaterEqual(result['tax_owed'], result['amt'],
+                               f"Tax owed (${result['tax_owed']:,.2f}) must be >= AMT floor (${result['amt']:,.2f})")
+
+        # Verify the exact credit used matches our limit
+        expected_credit_used = min(100000.0, max_usable)
+        self.assertAlmostEqual(result['amt_credit_used'], expected_credit_used, places=2,
+                              msg=f"Credits used should be exactly min(available, max_usable)")
+
+
 if __name__ == '__main__':
     unittest.main()

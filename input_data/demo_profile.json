@@ -113,7 +113,8 @@
     "estimated_taxes": {
       "quarterly_payments": 0,
       "regular_income_withholding_rate": 0.35,
-      "supplemental_income_withholding_rate": 0.33
+      "supplemental_income_withholding_rate": 0.33,
+      "income_tax_withholding_rate": 0.31
     }
   },
   "financial_position": {
